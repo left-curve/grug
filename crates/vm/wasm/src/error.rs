@@ -4,7 +4,10 @@ use {
     grug_types::StdError,
     std::string::FromUtf8Error,
     thiserror::Error,
-    wasmer::{CompileError, ExportError, InstantiationError, MemoryAccessError, RuntimeError},
+    wasmer::{
+        CompileError, DeserializeError, ExportError, InstantiationError, MemoryAccessError,
+        RuntimeError, SerializeError,
+    },
 };
 
 #[derive(Debug, Error)]
@@ -26,6 +29,15 @@ pub enum VmError {
 
     #[error(transparent)]
     Crypto(#[from] CryptoError),
+
+    #[error(transparent)]
+    App(#[from] AppError),
+
+    #[error(transparent)]
+    WasmerSerialize(#[from] SerializeError),
+
+    #[error(transparent)]
+    WasmerDeserialize(#[from] DeserializeError),
 
     // The wasmer `CompileError` and `InstantiateError` are big (56 and 128 bytes,
     // respectively). We get a clippy warning if we wrap them directly here in

@@ -9,6 +9,7 @@ pub struct Tx {
     pub sender: Addr,
     pub msgs: Vec<Message>,
     pub credential: Binary,
+    pub gas_limit: u64,
 }
 
 #[skip_serializing_none]

@@ -10,20 +10,24 @@ license       = { workspace = true }
 categories    = { workspace = true }
 
 [dependencies]
-data-encoding = { workspace = true }
-grug-app      = { path = "../../app" }
-grug-crypto   = { path = "../../crypto" }
-grug-types    = { path = "../../types" }
-serde         = { workspace = true }
-thiserror     = { workspace = true }
-tracing       = { workspace = true }
-wasmer        = { workspace = true, features = ["singlepass"] }
+clru               = { workspace = true }
+data-encoding      = { workspace = true }
+grug-app           = { path = "../../app" }
+grug-crypto        = { path = "../../crypto" }
+grug-types         = { path = "../../types" }
+serde              = { workspace = true }
+thiserror          = { workspace = true }
+tracing            = { workspace = true }
+wasmer             = { workspace = true, features = ["singlepass"] }
+wasmer-middlewares = { workspace = true }
 
 [dev-dependencies]
-anyhow         = { workspace = true }
-grug-account   = { path = "../../../contracts/account", features = ["library"] }
-grug-bank      = { path = "../../../contracts/bank", features = ["library"] }
-grug-db-memory = { path = "../../db/memory" }
-grug-testing   = { path = "../../testing" }
-k256           = { workspace = true }
-rand           = { workspace = true }
+anyhow             = { workspace = true }
+grug-app           = { path = "../../app", features = ["tracing"]}
+grug-account       = { path = "../../../contracts/account", features = ["library"] }
+grug-bank          = { path = "../../../contracts/bank", features = ["library"] }
+grug-db-memory     = { path = "../../db/memory" }
+grug-testing       = { path = "../../testing" }
+k256               = { workspace = true }
+rand               = { workspace = true }
+tracing-subscriber = { workspace = true }

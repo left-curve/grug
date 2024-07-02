@@ -4,23 +4,36 @@ use {
         db_remove_range, db_scan, db_write, debug, ed25519_batch_verify, ed25519_verify, keccak256,
         query_chain, read_then_wipe, secp256k1_pubkey_recover, secp256k1_verify, secp256r1_verify,
         sha2_256, sha2_512, sha2_512_truncated, sha3_256, sha3_512, sha3_512_truncated,
-        write_to_memory, Environment, VmError, VmResult,
+        write_to_memory, Cache, Environment, VmError, VmResult,
     },
-    grug_app::{Instance, QuerierProvider, StorageProvider, Vm},
-    grug_types::{to_borsh_vec, Context},
-    wasmer::{imports, Function, FunctionEnv, Module, Singlepass, Store},
+    grug_app::{Instance, QuerierProvider, SharedGasTracker, StorageProvider, Vm},
+    grug_types::{hash, to_borsh_vec, Context},
+    std::{num::NonZeroUsize, sync::Arc},
+    wasmer::{imports, CompilerConfig, Engine, Function, FunctionEnv, Module, Singlepass, Store},
+    wasmer_middlewares::{
+        metering::{get_remaining_points, set_remaining_points, MeteringPoints},
+        Metering,
+    },
 };
+
+/// Gas cost per operation
+///
+/// TODO: Mocked to 1 now, need to be discussed
+const GAS_PER_OPERATION: u64 = 1;
 
 // ------------------------------------ vm -------------------------------------
 
-#[derive(Default, Clone)]
+#[derive(Clone)]
 pub struct WasmVm {
-    // TODO: add module cache (note: the cache must be clone-able)
+    cache: Cache,
 }
 
 impl WasmVm {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(cache_capacity: usize) -> Self {
+        // TODO: handle the case where cache capacity is zero (which means not to use a cache)
+        Self {
+            cache: Cache::new(NonZeroUsize::new(cache_capacity).unwrap()),
+        }
     }
 }
 
@@ -33,17 +46,29 @@ impl Vm for WasmVm {
         storage: StorageProvider,
         querier: QuerierProvider<Self>,
         code: &[u8],
+        gas_tracker: SharedGasTracker,
     ) -> VmResult<WasmInstance> {
+        let code_hash = hash(code);
+        let (module, engine) = self.cache.get_or_build_with(&code_hash, || {
+            let mut compiler = Singlepass::new();
+            let metering = Metering::new(u64::MAX, |_| GAS_PER_OPERATION);
+            compiler.canonicalize_nans(true);
+            compiler.push_middleware(Arc::new(metering));
+            let engine = Engine::from(compiler);
+            let module = Module::new(&engine, code)?;
+            Ok((module, engine))
+        })?;
+
         // create Wasm store
         // for now we use the singlepass compiler
-        let mut store = Store::new(Singlepass::default());
-
-        // compile Wasm byte code into module
-        let module = Module::new(&store, code)?;
+        let mut store = Store::new(engine);
 
         // create function environment and register imports
         // note: memory/store/instance in the env hasn't been set yet at this point
-        let fe = FunctionEnv::new(&mut store, Environment::new(storage, querier));
+        let fe = FunctionEnv::new(
+            &mut store,
+            Environment::new(storage, querier, gas_tracker.clone()),
+        );
         let import_obj = imports! {
             "env" => {
                 "db_read"                  => Function::new_typed_with_env(&mut store, &fe, db_read),
@@ -84,9 +109,10 @@ impl Vm for WasmVm {
         env.set_wasm_instance(instance.as_ref())?;
 
         Ok(WasmInstance {
-            _instance: instance,
+            instance,
             store,
             fe,
+            gas_tracker,
         })
     }
 }
@@ -94,9 +120,28 @@ impl Vm for WasmVm {
 // --------------------------------- instance ----------------------------------
 
 pub struct WasmInstance {
-    _instance: Box<wasmer::Instance>,
+    instance: Box<wasmer::Instance>,
     store: Store,
     fe: FunctionEnv<Environment>,
+    gas_tracker: SharedGasTracker,
+}
+
+impl WasmInstance {
+    fn consume_gas(&mut self) -> VmResult<()> {
+        match get_remaining_points(&mut self.store, &self.instance) {
+            MeteringPoints::Remaining(remaining) => {
+                // Reset gas consumed
+                set_remaining_points(&mut self.store, &self.instance, u64::MAX);
+                self.gas_tracker
+                    .write_access()
+                    .deduct(u64::MAX - remaining)?;
+                Ok(())
+            },
+            MeteringPoints::Exhausted => {
+                panic!("Out of gas, this should have been caught earlier!")
+            },
+        }
+    }
 }
 
 impl Instance for WasmInstance {
@@ -112,7 +157,11 @@ impl Instance for WasmInstance {
             .try_into()
             .map_err(VmError::ReturnType)?;
 
-        read_then_wipe(env, &mut wasm_store, res_ptr)
+        let data = read_then_wipe(env, &mut wasm_store, res_ptr)?;
+
+        self.consume_gas()?;
+
+        Ok(data)
     }
 
     fn call_in_1_out_1<P>(mut self, name: &str, ctx: &Context, param: &P) -> VmResult<Vec<u8>>
@@ -129,7 +178,11 @@ impl Instance for WasmInstance {
             .try_into()
             .map_err(VmError::ReturnType)?;
 
-        read_then_wipe(env, &mut wasm_store, res_ptr)
+        let data = read_then_wipe(env, &mut wasm_store, res_ptr)?;
+
+        self.consume_gas()?;
+
+        Ok(data)
     }
 
     fn call_in_2_out_1<P1, P2>(
@@ -157,7 +210,10 @@ impl Instance for WasmInstance {
             ])?
             .try_into()
             .map_err(VmError::ReturnType)?;
+        let data = read_then_wipe(env, &mut wasm_store, res_ptr)?;
 
-        read_then_wipe(env, &mut wasm_store, res_ptr)
+        self.consume_gas()?;
+
+        Ok(data)
     }
 }

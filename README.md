@@ -33,7 +33,7 @@ At the heart of the project is the `grug_app::App` type. Fundamentally, a blockc
 ```rust
 struct App<DB, VM> {
     db: DB,
-    vm: PhantomData<VM>,
+    vm: VM,
 }
 ```
 

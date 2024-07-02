@@ -1,6 +1,6 @@
 use {
     crate::{Iterator, VmError, VmResult, WasmVm},
-    grug_app::{QuerierProvider, StorageProvider},
+    grug_app::{QuerierProvider, SharedGasTracker, StorageProvider},
     std::{
         borrow::{Borrow, BorrowMut},
         collections::HashMap,
@@ -17,6 +17,7 @@ pub struct ContextData {
     pub querier: QuerierProvider<WasmVm>,
     pub iterators: HashMap<i32, Iterator>,
     pub next_iterator_id: i32,
+    pub gas_tracker: SharedGasTracker,
     /// A non-owning link to the wasmer instance. Need this for doing function
     /// calls (see Environment::call_function).
     wasmer_instance: Option<NonNull<Instance>>,
@@ -35,10 +36,15 @@ pub struct Environment {
 }
 
 impl Environment {
-    pub fn new(storage: StorageProvider, querier: QuerierProvider<WasmVm>) -> Self {
+    pub fn new(
+        storage: StorageProvider,
+        querier: QuerierProvider<WasmVm>,
+        gas_tracker: SharedGasTracker,
+    ) -> Self {
         Self {
             memory: None,
             data: Arc::new(RwLock::new(ContextData {
+                gas_tracker,
                 storage,
                 querier,
                 iterators: HashMap::new(),

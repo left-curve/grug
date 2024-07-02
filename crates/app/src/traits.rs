@@ -1,5 +1,5 @@
 use {
-    crate::{QuerierProvider, StorageProvider},
+    crate::{QuerierProvider, SharedGasTracker, StorageProvider},
     grug_types::{Batch, Context, Hash, Storage},
     serde::{de::DeserializeOwned, ser::Serialize},
 };
@@ -100,6 +100,7 @@ pub trait Vm: Sized {
         storage: StorageProvider,
         querier: QuerierProvider<Self>,
         code: &[u8],
+        gas_tracker: SharedGasTracker,
     ) -> Result<Self::Instance, Self::Error>;
 }
 
@@ -133,4 +134,6 @@ pub trait Instance {
     where
         P1: AsRef<[u8]>,
         P2: AsRef<[u8]>;
+
+    fn set_gas(&mut self, _remaining: u64) {}
 }

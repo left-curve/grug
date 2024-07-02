@@ -40,6 +40,7 @@ blake2             = "0.10"
 blake3             = "1"
 borsh              = "1"
 clap               = "4"
+clru               = "0.6"
 colored            = "2"
 colored_json       = "4"
 data-encoding      = "2"
@@ -78,6 +79,7 @@ tokio              = "1"
 tracing            = "0.1"
 tracing-subscriber = "0.3"
 wasmer             = "4"
+wasmer-middlewares = "4"
 
 # Our fork of rust-rocksdb is based on the `v0.11.0` release. It adds borsh
 # serialization and implements `From`/`TryFrom` traits for `BUint` types.

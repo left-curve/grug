@@ -31,7 +31,7 @@ impl Default for MockApp {
 impl MockApp {
     pub fn new() -> Self {
         Self {
-            inner: App::new(MemDb::new(), RustVm::new()),
+            inner: App::new(MemDb::new(), RustVm::new(), None),
         }
     }
 

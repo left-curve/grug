@@ -127,6 +127,8 @@ impl SigningKey {
         let signature = self.sign_digest(&sign_bytes);
 
         Ok(Tx {
+            // TODO: Add gas limit
+            gas_limit: 3_000_000,
             sender,
             msgs,
             credential: signature.into(),

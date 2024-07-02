@@ -1,5 +1,5 @@
 use {
-    crate::{do_reply, process_msg, AppError, AppResult, Buffer, Shared, Vm},
+    crate::{do_reply, process_msg, AppError, AppResult, Buffer, Shared, SharedGasTracker, Vm},
     grug_types::{Addr, BlockInfo, Event, GenericResult, ReplyOn, Storage, SubMessage},
 };
 
@@ -35,6 +35,7 @@ pub fn handle_submessages<VM>(
     // https://docs.rs/dyn-clone/1.0.16/dyn_clone/
     storage: Box<dyn Storage>,
     block: BlockInfo,
+    gas_tracker: SharedGasTracker,
     sender: Addr,
     submsgs: Vec<SubMessage>,
 ) -> AppResult<Vec<Event>>
@@ -49,6 +50,7 @@ where
             vm.clone(),
             Box::new(buffer.share()),
             block.clone(),
+            gas_tracker.clone(),
             sender.clone(),
             submsg.msg,
         );
@@ -62,6 +64,7 @@ where
                     vm.clone(),
                     storage.clone(),
                     block.clone(),
+                    gas_tracker.clone(),
                     sender.clone(),
                     &payload,
                     &GenericResult::Ok(submsg_events),
@@ -74,6 +77,7 @@ where
                     vm.clone(),
                     storage.clone(),
                     block.clone(),
+                    gas_tracker.clone(),
                     sender.clone(),
                     &payload,
                     &GenericResult::Err(err.to_string()),

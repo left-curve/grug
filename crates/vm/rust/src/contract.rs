@@ -15,6 +15,7 @@ pub(crate) static CONTRACTS: OnceLock<FrozenVec<Box<dyn Contract + Send + Sync>>
 
 // ---------------------------------- wrapper ----------------------------------
 
+#[derive(Clone)]
 pub struct ContractWrapper {
     pub(crate) index: usize,
 }

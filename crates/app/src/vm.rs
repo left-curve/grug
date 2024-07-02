@@ -1,7 +1,7 @@
 use {
     crate::{
-        handle_submessages, AppError, AppResult, Instance, QuerierProvider, StorageProvider, Vm,
-        CODES, CONTRACT_ADDRESS_KEY, CONTRACT_NAMESPACE,
+        handle_submessages, AppError, AppResult, Instance, QuerierProvider, SharedGasTracker,
+        StorageProvider, Vm, CODES, CONTRACT_ADDRESS_KEY, CONTRACT_NAMESPACE,
     },
     grug_types::{
         from_json_slice, to_json_vec, Addr, BlockInfo, Context, Event, GenericResult, Hash,
@@ -18,6 +18,7 @@ pub fn call_in_0_out_1<VM, R>(
     storage: Box<dyn Storage>,
     code_hash: &Hash,
     ctx: &Context,
+    gas_tracker: SharedGasTracker,
 ) -> AppResult<R>
 where
     R: DeserializeOwned,
@@ -25,7 +26,14 @@ where
     AppError: From<VM::Error>,
 {
     // Create the VM instance
-    let instance = create_vm_instance(vm, storage, ctx.block.clone(), &ctx.contract, code_hash)?;
+    let instance = create_vm_instance(
+        vm,
+        storage,
+        ctx.block.clone(),
+        &ctx.contract,
+        code_hash,
+        gas_tracker,
+    )?;
 
     // Call the function; deserialize the output as JSON
     let out_raw = instance.call_in_0_out_1(name, ctx)?;
@@ -42,6 +50,7 @@ pub fn call_in_1_out_1<VM, P, R>(
     storage: Box<dyn Storage>,
     code_hash: &Hash,
     ctx: &Context,
+    gas_tracker: SharedGasTracker,
     param: &P,
 ) -> AppResult<R>
 where
@@ -51,7 +60,14 @@ where
     AppError: From<VM::Error>,
 {
     // Create the VM instance
-    let instance = create_vm_instance(vm, storage, ctx.block.clone(), &ctx.contract, code_hash)?;
+    let instance = create_vm_instance(
+        vm,
+        storage,
+        ctx.block.clone(),
+        &ctx.contract,
+        code_hash,
+        gas_tracker,
+    )?;
 
     // Serialize the param as JSON
     let param_raw = to_json_vec(param)?;
@@ -71,6 +87,7 @@ pub fn call_in_2_out_1<VM, P1, P2, R>(
     storage: Box<dyn Storage>,
     code_hash: &Hash,
     ctx: &Context,
+    gas_tracker: SharedGasTracker,
     param1: &P1,
     param2: &P2,
 ) -> AppResult<R>
@@ -82,7 +99,14 @@ where
     AppError: From<VM::Error>,
 {
     // Create the VM instance
-    let instance = create_vm_instance(vm, storage, ctx.block.clone(), &ctx.contract, code_hash)?;
+    let instance = create_vm_instance(
+        vm,
+        storage,
+        ctx.block.clone(),
+        &ctx.contract,
+        code_hash,
+        gas_tracker,
+    )?;
 
     // Serialize the params as JSON
     let param1_raw = to_json_vec(param1)?;
@@ -98,13 +122,13 @@ where
 /// Create a VM instance, call a function that takes exactly no input parameter
 /// and returns [`Response`], and handle the submessages. Return a vector of
 /// events emitted.
-#[rustfmt::skip]
 pub fn call_in_0_out_1_handle_response<VM>(
     vm: VM,
     name: &'static str,
     storage: Box<dyn Storage>,
     code_hash: &Hash,
     ctx: &Context,
+    gas_tracker: SharedGasTracker,
 ) -> AppResult<Vec<Event>>
 where
     VM: Vm + Clone,
@@ -116,10 +140,11 @@ where
         storage.clone(),
         code_hash,
         ctx,
+        gas_tracker.clone(),
     )?
     .into_std_result()?;
 
-    handle_response(vm, name, storage, ctx, response)
+    handle_response(vm, name, storage, ctx, gas_tracker, response)
 }
 
 /// Create a VM instance, call a function that takes exactly one parameter and
@@ -131,6 +156,7 @@ pub fn call_in_1_out_1_handle_response<VM, P>(
     storage: Box<dyn Storage>,
     code_hash: &Hash,
     ctx: &Context,
+    gas_tracker: SharedGasTracker,
     param: &P,
 ) -> AppResult<Vec<Event>>
 where
@@ -144,11 +170,12 @@ where
         storage.clone(),
         code_hash,
         ctx,
+        gas_tracker.clone(),
         param,
     )?
     .into_std_result()?;
 
-    handle_response(vm, name, storage, ctx, response)
+    handle_response(vm, name, storage, ctx, gas_tracker, response)
 }
 
 /// Create a VM instance, call a function that takes exactly two parameter and
@@ -160,6 +187,7 @@ pub fn call_in_2_out_1_handle_response<VM, P1, P2>(
     storage: Box<dyn Storage>,
     code_hash: &Hash,
     ctx: &Context,
+    gas_tracker: SharedGasTracker,
     param1: &P1,
     param2: &P2,
 ) -> AppResult<Vec<Event>>
@@ -175,12 +203,13 @@ where
         storage.clone(),
         code_hash,
         ctx,
+        gas_tracker.clone(),
         param1,
         param2,
     )?
     .into_std_result()?;
 
-    handle_response(vm, name, storage, ctx, response)
+    handle_response(vm, name, storage, ctx, gas_tracker, response)
 }
 
 fn create_vm_instance<VM>(
@@ -189,6 +218,7 @@ fn create_vm_instance<VM>(
     block: BlockInfo,
     address: &Addr,
     code_hash: &Hash,
+    gas_tracker: SharedGasTracker,
 ) -> AppResult<VM::Instance>
 where
     VM: Vm + Clone,
@@ -198,10 +228,10 @@ where
     let code = CODES.load(&storage, code_hash)?;
 
     // Create the providers
-    let querier = QuerierProvider::new(vm.clone(), storage.clone(), block);
+    let querier = QuerierProvider::new(vm.clone(), storage.clone(), block, gas_tracker.clone());
     let storage = StorageProvider::new(storage, &[CONTRACT_NAMESPACE, address]);
 
-    Ok(vm.build_instance(storage, querier, &code)?)
+    Ok(vm.build_instance(storage, querier, &code, gas_tracker)?)
 }
 
 pub(crate) fn handle_response<VM>(
@@ -209,6 +239,7 @@ pub(crate) fn handle_response<VM>(
     name: &'static str,
     storage: Box<dyn Storage>,
     ctx: &Context,
+    gas_tracker: SharedGasTracker,
     response: Response,
 ) -> AppResult<Vec<Event>>
 where
@@ -226,6 +257,7 @@ where
         vm,
         storage,
         ctx.block.clone(),
+        gas_tracker,
         ctx.contract.clone(),
         response.submsgs,
     )?);

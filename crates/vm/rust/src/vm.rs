@@ -1,6 +1,6 @@
 use {
     crate::{ContractWrapper, VmError, VmResult, CONTRACTS},
-    grug_app::{Instance, QuerierProvider, StorageProvider, Vm},
+    grug_app::{Instance, QuerierProvider, SharedGasTracker, StorageProvider, Vm},
     grug_types::{from_json_slice, to_json_vec, Context, MockApi},
 };
 
@@ -30,11 +30,13 @@ impl Vm for RustVm {
         storage: StorageProvider,
         querier: QuerierProvider<Self>,
         code: &[u8],
+        _gas_tracker: SharedGasTracker,
     ) -> VmResult<RustInstance> {
         Ok(RustInstance {
             storage,
             querier,
             wrapper: ContractWrapper::from_bytes(code),
+            // TODO: add gas tracker
         })
     }
 }
@@ -43,6 +45,7 @@ pub struct RustInstance {
     storage: StorageProvider,
     querier: QuerierProvider<RustVm>,
     wrapper: ContractWrapper,
+    // TODO: add gas tracker
 }
 
 impl Instance for RustInstance {
