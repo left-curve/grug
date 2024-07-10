@@ -208,7 +208,7 @@ pub struct IndexedSet<'a, K, I> {
     _pk_namespace: &'a [u8],
     _primary: Set<'a, K>,
     /// This is meant to be read directly to get the proper types, like:
-    /// `map.idx.owner.items(...)`.
+    /// `set.idx.owner.items(...)`.
     pub idx: PhantomData<I>,
 }
 
