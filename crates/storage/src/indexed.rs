@@ -1,6 +1,7 @@
 use {
-    crate::{Borsh, Bound, Codec, Key, Map, Prefix},
+    crate::{Borsh, Bound, Codec, Key, Map, Prefix, Set},
     grug_types::{Order, Record, StdError, StdResult, Storage},
+    std::marker::PhantomData,
 };
 
 pub trait IndexList<K, T> {
@@ -12,6 +13,8 @@ pub trait Index<K, T> {
 
     fn remove(&self, store: &mut dyn Storage, pk: K, old_data: &T);
 }
+
+// -------------------------------- indexed map --------------------------------
 
 pub struct IndexedMap<'a, K, T, I, C: Codec<T> = Borsh> {
     pk_namespace: &'a [u8],
@@ -196,6 +199,26 @@ where
         self.replace(storage, key, new_data.as_ref(), old_data.as_ref())?;
 
         Ok(new_data)
+    }
+}
+
+// -------------------------------- indexed set --------------------------------
+
+pub struct IndexedSet<'a, K, I> {
+    _pk_namespace: &'a [u8],
+    _primary: Set<'a, K>,
+    /// This is meant to be read directly to get the proper types, like:
+    /// `map.idx.owner.items(...)`.
+    pub idx: PhantomData<I>,
+}
+
+impl<'a, K, I> IndexedSet<'a, K, I> {
+    pub const fn new(pk_namespace: &'static str) -> Self {
+        IndexedSet {
+            _pk_namespace: pk_namespace.as_bytes(),
+            _primary: Set::new(pk_namespace),
+            idx: PhantomData,
+        }
     }
 }
 

@@ -4,7 +4,7 @@ use {
     std::marker::PhantomData,
 };
 
-// -------------------------------- multi index --------------------------------
+// ------------------------------- multi index map ------------------------------
 
 /// An indexer that allows multiple records in the primary map to have the same
 /// index value.
