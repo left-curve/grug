@@ -50,7 +50,7 @@ const ORDERS: IndexedMap<OrderId, Order, OrderIndexes> = IndexedMap::new("orders
 
 Here we use `MultiIndexMap`, which is an index type where multiple records in the map can have the same index. This is the appropriate choice here, since surely it's possible that two orders have the same limit price or expiration.
 
-However, in cases where indexes are supposed to be unique (no two records shall have the same index), `UniqueIndex` can be used. It will throw an error if you attempt to save two records with the same index.
+However, in cases where indexes are supposed to be unique (no two records shall have the same index), `UniqueIndexMap` can be used. It will throw an error if you attempt to save two records with the same index.
 
 To find all orders whose limit prices are below the oracle price:
 
