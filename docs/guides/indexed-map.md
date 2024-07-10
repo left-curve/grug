@@ -30,17 +30,17 @@ For this, we can convert `Orders` to the following `IndexedMap`:
 ```rust
 #[index_list]
 struct OrderIndexes<'a> {
-    pub limit_price: MultiIndex<'a, OrderId, Udec256, Order>,
-    pub expiration: MultiIndex<'a, OrderId, Timestamp, Order>,
+    pub limit_price: MultiIndexMap<'a, OrderId, Udec256, Order>,
+    pub expiration: MultiIndexMap<'a, OrderId, Timestamp, Order>,
 }
 
 const ORDERS: IndexedMap<OrderId, Order, OrderIndexes> = IndexedMap::new("orders", OrderIndexes {
-    limit_price: MultiIndex::new(
+    limit_price: MultiIndexMap::new(
         |order| *order.limit_price,
         "owners",
         "orders__price",
     ),
-    expiration: MultiIndex::new(
+    expiration: MultiIndexMap::new(
         |order| *order.expiration,
         "owners",
         "orders__exp",
@@ -48,7 +48,7 @@ const ORDERS: IndexedMap<OrderId, Order, OrderIndexes> = IndexedMap::new("orders
 });
 ```
 
-Here we use `MultiIndex`, which is an index type where multiple records in the map can have the same index. This is the appropriate choice here, since surely it's possible that two orders have the same limit price or expiration.
+Here we use `MultiIndexMap`, which is an index type where multiple records in the map can have the same index. This is the appropriate choice here, since surely it's possible that two orders have the same limit price or expiration.
 
 However, in cases where indexes are supposed to be unique (no two records shall have the same index), `UniqueIndex` can be used. It will throw an error if you attempt to save two records with the same index.
 

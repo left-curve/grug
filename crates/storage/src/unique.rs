@@ -9,7 +9,7 @@ use {
 /// An indexer that ensures that indexes are unique, meaning no two records in
 /// the primary map may have the same index.
 ///
-/// Internally, a `UniqueIndex` is a wrapper around a `Map` that maps index keys
+/// Internally, a `UniqueIndexMap` is a wrapper around a `Map` that maps index keys
 /// to values. Essentially, when a key-value pair is stored in the `Map`, the
 /// value is stored twice:
 ///
@@ -77,6 +77,11 @@ where
 
 // ------------------------------- unique index set ------------------------------
 
+/// An indexer that ensures that indexes are unique, meaning no two records in
+/// the primary map may have the same index.
+///
+/// Internally, a `UniqueIndexSet` is a wrapper around a `Map` that maps index keys
+/// to primary key.
 pub struct UniqueIndexSet<'a, IK, PK, C: Codec<PK>> {
     idx_map: Map<'a, IK, PK, C>,
 }
