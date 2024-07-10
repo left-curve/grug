@@ -1,7 +1,6 @@
 use {
     crate::{Borsh, Bound, Codec, Key, Map, Prefix},
     grug_types::{Empty, Order, Record, StdError, StdResult, Storage},
-    std::marker::PhantomData,
 };
 
 pub trait IndexList<K, T> {
@@ -210,7 +209,6 @@ pub struct IndexedSet<'a, K, T, I, C: Codec<T>> {
     /// This is meant to be read directly to get the proper types, like:
     /// `set.idx.owner.items(...)`.
     pub idx: I,
-    phantom: PhantomData<T>,
 }
 
 impl<'a, K, T, I, C> IndexedSet<'a, K, T, I, C>
@@ -223,7 +221,6 @@ where
             pk_namespace: pk_namespace.as_bytes(),
             primary: Map::new(pk_namespace),
             idx: indexes,
-            phantom: PhantomData,
         }
     }
 
