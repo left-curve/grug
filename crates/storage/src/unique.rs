@@ -4,6 +4,8 @@ use {
     std::ops::Deref,
 };
 
+// ------------------------------- unique index map ------------------------------
+
 /// An indexer that ensures that indexes are unique, meaning no two records in
 /// the primary map may have the same index.
 ///
@@ -35,7 +37,7 @@ where
     }
 }
 
-// Since the `UniqueIndex` is essentially a wrapper of a `Map` (`self.idx_map`),
+// Since the `UniqueIndexMap` is essentially a wrapper of a `Map` (`self.idx_map`),
 // we let it dereference to the inner map. This way, users are able to directly
 // call methods on the inner map, such as `range`, `prefix`, etc.
 impl<'a, IK, T, C> Deref for UniqueIndexMap<'a, IK, T, C>
@@ -70,5 +72,43 @@ where
     fn remove(&self, storage: &mut dyn Storage, _pk: PK, old_data: &T) {
         let idx = (self.indexer)(old_data);
         self.idx_map.remove(storage, idx);
+    }
+}
+
+// ------------------------------- unique index set ------------------------------
+
+pub struct UniqueIndexSet<'a, IK, PK, C: Codec<PK>> {
+    idx_map: Map<'a, IK, PK, C>,
+}
+
+// Since the `UniqueIndexSet` is essentially a wrapper of a `Map` (`self.idx_map`),
+// we let it dereference to the inner map. This way, users are able to directly
+// call methods on the inner map, such as `range`, `prefix`, etc.
+impl<'a, IK, T, C> Deref for UniqueIndexSet<'a, IK, T, C>
+where
+    C: Codec<T>,
+{
+    type Target = Map<'a, IK, T, C>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.idx_map
+    }
+}
+
+impl<'a, IK, PK, C> Index<PK, IK> for UniqueIndexSet<'a, IK, PK, C>
+where
+    C: Codec<PK>,
+    IK: Key + Clone,
+{
+    fn save(&self, storage: &mut dyn Storage, pk: PK, idx: &IK) -> StdResult<()> {
+        if self.idx_map.has(storage, idx.clone()) {
+            return Err(StdError::generic_err("Violates unique constraint on index"));
+        }
+
+        self.idx_map.save(storage, idx.clone(), &pk)
+    }
+
+    fn remove(&self, storage: &mut dyn Storage, _pk: PK, idx: &IK) {
+        self.idx_map.remove(storage, idx.clone());
     }
 }
