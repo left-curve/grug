@@ -8,7 +8,7 @@ use {
 
 /// An indexer that allows multiple records in the primary map to have the same
 /// index value.
-pub struct MultiIndex<'a, PK, IK, T, C: Codec<T> = Borsh>
+pub struct MultiIndexMap<'a, PK, IK, T, C: Codec<T> = Borsh>
 where
     PK: Key,
     IK: Key,
@@ -19,7 +19,7 @@ where
     primary_map: Map<'a, PK, T, C>,
 }
 
-impl<'a, PK, IK, T, C: Codec<T>> MultiIndex<'a, PK, IK, T, C>
+impl<'a, PK, IK, T, C: Codec<T>> MultiIndexMap<'a, PK, IK, T, C>
 where
     PK: Key,
     IK: Key,
@@ -29,7 +29,7 @@ where
         pk_namespace: &'a str,
         idx_namespace: &'static str,
     ) -> Self {
-        MultiIndex {
+        MultiIndexMap {
             indexer,
             index_set: Set::new(idx_namespace),
             primary_map: Map::new(pk_namespace),
@@ -174,7 +174,7 @@ where
     }
 }
 
-impl<'a, PK, IK, T, C: Codec<T>> Index<PK, T> for MultiIndex<'a, PK, IK, T, C>
+impl<'a, PK, IK, T, C: Codec<T>> Index<PK, T> for MultiIndexMap<'a, PK, IK, T, C>
 where
     PK: Key,
     IK: Key,

@@ -13,7 +13,7 @@ use {
 ///
 /// - In the primary map: (pk_namespace, pk) => value
 /// - in the index map: (idx_namespace, ik) => value
-pub struct UniqueIndex<'a, IK, T, C: Codec<T> = Borsh> {
+pub struct UniqueIndexMap<'a, IK, T, C: Codec<T> = Borsh> {
     /// A function that takes a piece of data, and return the index key it
     /// should be indexed at.
     indexer: fn(&T) -> IK,
@@ -21,14 +21,14 @@ pub struct UniqueIndex<'a, IK, T, C: Codec<T> = Borsh> {
     idx_map: Map<'a, IK, T, C>,
 }
 
-impl<'a, IK, T, C> UniqueIndex<'a, IK, T, C>
+impl<'a, IK, T, C> UniqueIndexMap<'a, IK, T, C>
 where
     C: Codec<T>,
 {
     /// Note: The developer must make sure that `idx_namespace` is not the same
     /// as the primary map namespace.
     pub const fn new(indexer: fn(&T) -> IK, idx_namespace: &'static str) -> Self {
-        UniqueIndex {
+        UniqueIndexMap {
             indexer,
             idx_map: Map::new(idx_namespace),
         }
@@ -38,7 +38,7 @@ where
 // Since the `UniqueIndex` is essentially a wrapper of a `Map` (`self.idx_map`),
 // we let it dereference to the inner map. This way, users are able to directly
 // call methods on the inner map, such as `range`, `prefix`, etc.
-impl<'a, IK, T, C> Deref for UniqueIndex<'a, IK, T, C>
+impl<'a, IK, T, C> Deref for UniqueIndexMap<'a, IK, T, C>
 where
     C: Codec<T>,
 {
@@ -49,7 +49,7 @@ where
     }
 }
 
-impl<'a, PK, IK, T, C> Index<PK, T> for UniqueIndex<'a, IK, T, C>
+impl<'a, PK, IK, T, C> Index<PK, T> for UniqueIndexMap<'a, IK, T, C>
 where
     IK: Key + Clone,
     C: Codec<T>,

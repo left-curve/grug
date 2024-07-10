@@ -227,19 +227,19 @@ impl<'a, K, I> IndexedSet<'a, K, I> {
 #[cfg(test)]
 mod tests {
     use {
-        crate::{Bound, Index, IndexList, IndexedMap, MultiIndex, UniqueIndex},
+        crate::{Bound, Index, IndexList, IndexedMap, MultiIndexMap, UniqueIndexMap},
         borsh::{BorshDeserialize, BorshSerialize},
         grug_types::{MockStorage, Order, StdResult},
     };
 
     const FOOS: IndexedMap<(u64, u64), Foo, FooIndexes> = IndexedMap::new("foo", FooIndexes {
-        name: MultiIndex::new(|_, data| data.name.clone(), "foo", "foo__name"),
-        name_surname: MultiIndex::new(
+        name: MultiIndexMap::new(|_, data| data.name.clone(), "foo", "foo__name"),
+        name_surname: MultiIndexMap::new(
             |_, data| (data.name.clone(), data.surname.clone()),
             "foo",
             "foo__name_surname",
         ),
-        id: UniqueIndex::new(|data| data.id, "foo__id"),
+        id: UniqueIndexMap::new(|data| data.id, "foo__id"),
     });
 
     #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq, Eq)]
@@ -260,9 +260,9 @@ mod tests {
     }
 
     struct FooIndexes<'a> {
-        pub name: MultiIndex<'a, (u64, u64), String, Foo>,
-        pub name_surname: MultiIndex<'a, (u64, u64), (String, String), Foo>,
-        pub id: UniqueIndex<'a, u32, Foo>,
+        pub name: MultiIndexMap<'a, (u64, u64), String, Foo>,
+        pub name_surname: MultiIndexMap<'a, (u64, u64), (String, String), Foo>,
+        pub id: UniqueIndexMap<'a, u32, Foo>,
     }
 
     impl<'a> IndexList<(u64, u64), Foo> for FooIndexes<'a> {
