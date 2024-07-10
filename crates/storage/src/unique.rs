@@ -82,30 +82,32 @@ where
 ///
 /// Internally, a `UniqueIndexSet` is a wrapper around a `Map` that maps index keys
 /// to primary key.
-pub struct UniqueIndexSet<'a, IK, PK, C: Codec<PK>> {
+pub struct UniqueIndexSet<'a, IK, PK, T, C: Codec<PK>> {
+    indexer: fn(&T) -> IK,
     idx_map: Map<'a, IK, PK, C>,
 }
 
 // Since the `UniqueIndexSet` is essentially a wrapper of a `Map` (`self.idx_map`),
 // we let it dereference to the inner map. This way, users are able to directly
 // call methods on the inner map, such as `range`, `prefix`, etc.
-impl<'a, IK, T, C> Deref for UniqueIndexSet<'a, IK, T, C>
+impl<'a, IK, PK, T, C> Deref for UniqueIndexSet<'a, IK, PK, T, C>
 where
-    C: Codec<T>,
+    C: Codec<PK>,
 {
-    type Target = Map<'a, IK, T, C>;
+    type Target = Map<'a, IK, PK, C>;
 
     fn deref(&self) -> &Self::Target {
         &self.idx_map
     }
 }
 
-impl<'a, IK, PK, C> Index<PK, IK> for UniqueIndexSet<'a, IK, PK, C>
+impl<'a, IK, PK, T, C> Index<PK, T> for UniqueIndexSet<'a, IK, PK, T, C>
 where
     C: Codec<PK>,
     IK: Key + Clone,
 {
-    fn save(&self, storage: &mut dyn Storage, pk: PK, idx: &IK) -> StdResult<()> {
+    fn save(&self, storage: &mut dyn Storage, pk: PK, idx: &T) -> StdResult<()> {
+        let idx = (self.indexer)(idx);
         if self.idx_map.has(storage, idx.clone()) {
             return Err(StdError::generic_err("Violates unique constraint on index"));
         }
@@ -113,7 +115,8 @@ where
         self.idx_map.save(storage, idx.clone(), &pk)
     }
 
-    fn remove(&self, storage: &mut dyn Storage, _pk: PK, idx: &IK) {
+    fn remove(&self, storage: &mut dyn Storage, _pk: PK, idx: &T) {
+        let idx = (self.indexer)(idx);
         self.idx_map.remove(storage, idx.clone());
     }
 }

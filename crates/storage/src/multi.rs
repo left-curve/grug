@@ -192,21 +192,23 @@ where
 
 // ------------------------------- multi index set ------------------------------
 
-pub struct MultiIndexSet<'a, PK, IK>
+pub struct MultiIndexSet<'a, PK, IK, T>
 where
     PK: Key,
     IK: Key,
 {
+    indexer: fn(&T) -> IK,
     index_set: Set<'a, (IK, PK)>,
 }
 
-impl<'a, PK, IK> MultiIndexSet<'a, PK, IK>
+impl<'a, PK, IK, T> MultiIndexSet<'a, PK, IK, T>
 where
     PK: Key,
     IK: Key + Clone,
 {
-    pub const fn new(idx_namespace: &'static str) -> Self {
+    pub const fn new(idx_namespace: &'static str, indexer: fn(&T) -> IK) -> Self {
         MultiIndexSet {
+            indexer,
             index_set: Set::new(idx_namespace),
         }
     }
@@ -274,16 +276,18 @@ where
     }
 }
 
-impl<'a, PK, IK> Index<PK, IK> for MultiIndexSet<'a, PK, IK>
+impl<'a, PK, IK, T> Index<PK, T> for MultiIndexSet<'a, PK, IK, T>
 where
     PK: Key,
     IK: Key + Clone,
 {
-    fn save(&self, storage: &mut dyn Storage, pk: PK, idx: &IK) -> StdResult<()> {
+    fn save(&self, storage: &mut dyn Storage, pk: PK, idx: &T) -> StdResult<()> {
+        let idx = (self.indexer)(idx);
         self.index_set.insert(storage, (idx.clone(), pk))
     }
 
-    fn remove(&self, storage: &mut dyn Storage, pk: PK, old_idx: &IK) {
+    fn remove(&self, storage: &mut dyn Storage, pk: PK, old_idx: &T) {
+        let old_idx = (self.indexer)(old_idx);
         self.index_set.remove(storage, (old_idx.clone(), pk))
     }
 }

@@ -1,6 +1,6 @@
 use {
-    crate::{Borsh, Bound, Codec, Key, Map, Prefix, Set},
-    grug_types::{Order, Record, StdError, StdResult, Storage},
+    crate::{Borsh, Bound, Codec, Key, Map, Prefix},
+    grug_types::{Empty, Order, Record, StdError, StdResult, Storage},
     std::marker::PhantomData,
 };
 
@@ -204,28 +204,128 @@ where
 
 // -------------------------------- indexed set --------------------------------
 
-pub struct IndexedSet<'a, K, I> {
-    _pk_namespace: &'a [u8],
-    _primary: Set<'a, K>,
+pub struct IndexedSet<'a, K, T, I, C: Codec<T>> {
+    pk_namespace: &'a [u8],
+    primary: Map<'a, K, T, C>,
     /// This is meant to be read directly to get the proper types, like:
     /// `set.idx.owner.items(...)`.
-    pub idx: PhantomData<I>,
+    pub idx: I,
+    phantom: PhantomData<T>,
 }
 
-impl<'a, K, I> IndexedSet<'a, K, I> {
-    pub const fn new(pk_namespace: &'static str) -> Self {
+impl<'a, K, T, I, C> IndexedSet<'a, K, T, I, C>
+where
+    C: Codec<T>,
+    K: Key,
+{
+    pub const fn new(pk_namespace: &'static str, indexes: I) -> Self {
         IndexedSet {
-            _pk_namespace: pk_namespace.as_bytes(),
-            _primary: Set::new(pk_namespace),
-            idx: PhantomData,
+            pk_namespace: pk_namespace.as_bytes(),
+            primary: Map::new(pk_namespace),
+            idx: indexes,
+            phantom: PhantomData,
         }
+    }
+
+    fn no_prefix(&self) -> Prefix<K, Empty> {
+        Prefix::new(self.pk_namespace, &[])
+    }
+
+    pub fn prefix(&self, prefix: K::Prefix) -> Prefix<K::Suffix, Empty> {
+        Prefix::new(self.pk_namespace, &prefix.raw_keys())
+    }
+
+    pub fn is_empty(&self, storage: &dyn Storage) -> bool {
+        self.no_prefix()
+            .keys_raw(storage, None, None, Order::Ascending)
+            .next()
+            .is_none()
+    }
+
+    pub fn has(&self, storage: &dyn Storage, k: K) -> bool {
+        self.primary.has(storage, k)
+    }
+
+    pub fn may_load(&self, storage: &dyn Storage, key: K) -> StdResult<Option<T>> {
+        self.primary.may_load(storage, key)
+    }
+
+    pub fn load(&self, storage: &dyn Storage, key: K) -> StdResult<T> {
+        self.primary.load(storage, key)
+    }
+
+    pub fn range_raw<'b>(
+        &self,
+        store: &'b dyn Storage,
+        min: Option<Bound<K>>,
+        max: Option<Bound<K>>,
+        order: Order,
+    ) -> Box<dyn Iterator<Item = Vec<u8>> + 'b> {
+        self.no_prefix().keys_raw(store, min, max, order)
+    }
+
+    pub fn range<'b>(
+        &self,
+        storage: &'b dyn Storage,
+        min: Option<Bound<K>>,
+        max: Option<Bound<K>>,
+        order: Order,
+    ) -> Box<dyn Iterator<Item = StdResult<K::Output>> + 'b> {
+        self.no_prefix().keys(storage, min, max, order)
+    }
+
+    pub fn clear(&self, storage: &mut dyn Storage, min: Option<Bound<K>>, max: Option<Bound<K>>) {
+        self.no_prefix().clear(storage, min, max)
     }
 }
 
+impl<'a, K, T, I, C> IndexedSet<'a, K, T, I, C>
+where
+    C: Codec<T>,
+    K: Key + Clone,
+    I: IndexList<K, T>,
+{
+    pub fn save(&'a self, storage: &mut dyn Storage, key: K, data: &T) -> StdResult<()> {
+        let old_data = self.may_load(storage, key.clone())?;
+        self.replace(storage, key, Some(data), old_data.as_ref())
+    }
+
+    pub fn remove(&'a self, storage: &mut dyn Storage, key: K) -> StdResult<()> {
+        let old_data = self.may_load(storage, key.clone())?;
+        self.replace(storage, key, None, old_data.as_ref())
+    }
+
+    fn replace(
+        &'a self,
+        storage: &mut dyn Storage,
+        key: K,
+        data: Option<&T>,
+        old_data: Option<&T>,
+    ) -> StdResult<()> {
+        // If old data exists, its index is to be deleted.
+        if let Some(old) = old_data {
+            for index in self.idx.get_indexes() {
+                index.remove(storage, key.clone(), old);
+            }
+        }
+
+        // Write new data to the primary store, and write its indexes.
+        if let Some(updated) = data {
+            for index in self.idx.get_indexes() {
+                index.save(storage, key.clone(), updated)?;
+            }
+            self.primary.save(storage, key, updated)?;
+        } else {
+            self.primary.remove(storage, key);
+        }
+
+        Ok(())
+    }
+}
 // ----------------------------------- tests -----------------------------------
 
 #[cfg(test)]
-mod tests {
+mod map_tests {
     use {
         crate::{Bound, Index, IndexList, IndexedMap, MultiIndexMap, UniqueIndexMap},
         borsh::{BorshDeserialize, BorshSerialize},
