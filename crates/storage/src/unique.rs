@@ -82,9 +82,23 @@ where
 ///
 /// Internally, a `UniqueIndexSet` is a wrapper around a `Map` that maps index keys
 /// to primary key.
-pub struct UniqueIndexSet<'a, IK, PK, T, C: Codec<PK>> {
+pub struct UniqueIndexSet<'a, IK, PK, T, C: Codec<PK> = Borsh> {
     indexer: fn(&T) -> IK,
     idx_map: Map<'a, IK, PK, C>,
+}
+
+impl<'a, IK, PK, T, C> UniqueIndexSet<'a, IK, PK, T, C>
+where
+    C: Codec<PK>,
+{
+    /// Note: The developer must make sure that `idx_namespace` is not the same
+    /// as the primary map namespace.
+    pub const fn new(indexer: fn(&T) -> IK, idx_namespace: &'static str) -> Self {
+        UniqueIndexSet {
+            indexer,
+            idx_map: Map::new(idx_namespace),
+        }
+    }
 }
 
 // Since the `UniqueIndexSet` is essentially a wrapper of a `Map` (`self.idx_map`),

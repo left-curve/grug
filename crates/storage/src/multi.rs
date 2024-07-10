@@ -206,7 +206,7 @@ where
     PK: Key,
     IK: Key + Clone,
 {
-    pub const fn new(idx_namespace: &'static str, indexer: fn(&T) -> IK) -> Self {
+    pub const fn new(indexer: fn(&T) -> IK, idx_namespace: &'static str) -> Self {
         MultiIndexSet {
             indexer,
             index_set: Set::new(idx_namespace),

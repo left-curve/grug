@@ -203,7 +203,10 @@ where
 
 // -------------------------------- indexed set --------------------------------
 
-pub struct IndexedSet<'a, K, T, I, C: Codec<T>> {
+/// Similar to [IndexedMap] but the value is not saved.
+///
+///
+pub struct IndexedSet<'a, K, T, I, C: Codec<T> = Borsh> {
     pk_namespace: &'a [u8],
     primary: Map<'a, K, T, C>,
     /// This is meant to be read directly to get the proper types, like:
@@ -324,7 +327,10 @@ where
 #[cfg(test)]
 mod map_tests {
     use {
-        crate::{Bound, Index, IndexList, IndexedMap, MultiIndexMap, UniqueIndexMap},
+        crate::{
+            Bound, Index, IndexList, IndexedMap, IndexedSet, MultiIndexMap, MultiIndexSet,
+            UniqueIndexMap, UniqueIndexSet,
+        },
         borsh::{BorshDeserialize, BorshSerialize},
         grug_types::{MockStorage, Order, StdResult},
     };
@@ -370,26 +376,33 @@ mod map_tests {
         }
     }
 
-    fn setup_test() -> MockStorage {
-        let mut storage = MockStorage::new();
+    macro_rules! setup_test {
+        ($index:expr) => {{
+            let mut storage = MockStorage::new();
 
-        for (key, name, surname, id) in [
-            ((0, 1), "bar", "s_bar", 101),
-            ((0, 2), "bar", "s_bar", 102),
-            ((1, 1), "bar", "s_bar", 103),
-            ((1, 2), "bar", "s_fooes", 104),
-            ((1, 3), "foo", "s_foo", 105),
-        ] {
-            FOOS.save(&mut storage, key, &Foo::new(name, surname, id))
-                .unwrap();
-        }
+            for (key, name, surname, id) in [
+                ((0, 1), "bar", "s_bar", 101),
+                ((0, 2), "bar", "s_bar", 102),
+                ((1, 1), "bar", "s_bar", 103),
+                ((1, 2), "bar", "s_fooes", 104),
+                ((1, 3), "foo", "s_foo", 105),
+            ] {
+                $index
+                    .save(&mut storage, key, &Foo::new(name, surname, id))
+                    .unwrap();
+            }
 
-        storage
+            storage
+        }};
+    }
+
+    fn setup_test_map() -> MockStorage {
+        setup_test!(FOOS)
     }
 
     #[test]
-    fn unique_index_works() {
-        let mut storage = setup_test();
+    fn unique_index_works_map() {
+        let mut storage = setup_test_map();
 
         // Load a single data by the index.
         {
@@ -422,10 +435,10 @@ mod map_tests {
         }
     }
 
-    /// Multi index, where the index key is a singleton.
+    /// Multi index map, where the index key is a singleton.
     #[test]
-    fn multi_index_singleton_works() {
-        let storage = setup_test();
+    fn multi_index_singleton_works_map() {
+        let storage = setup_test_map();
 
         // Iterate all index values and records.
         {
@@ -466,7 +479,7 @@ mod map_tests {
         }
     }
 
-    /// Multi index, where the index key is a tuple.
+    /// Multi index map, where the index key is a tuple.
     ///
     /// In this case,
     ///
@@ -478,8 +491,8 @@ mod map_tests {
     ///
     /// Let's denote the index key as `(A, B)` and the primary key as `(C, D)`.
     #[test]
-    fn multi_index_tuple_works() {
-        let storage = setup_test();
+    fn multi_index_tuple_works_map() {
+        let storage = setup_test_map();
 
         // Given (A, B), iterate (C, D), without bounds.
         //
@@ -603,6 +616,231 @@ mod map_tests {
                 .unwrap();
 
             assert_eq!(val, vec![((0, 2), Foo::new("bar", "s_bar", 102)),]);
+        }
+    }
+
+    // ---------- Set --------
+
+    struct FooIndexeSet<'a> {
+        pub name: MultiIndexSet<'a, (u64, u64), String, Foo>,
+        pub name_surname: MultiIndexSet<'a, (u64, u64), (String, String), Foo>,
+        pub id: UniqueIndexSet<'a, u32, (u64, u64), Foo>,
+    }
+
+    impl<'a> IndexList<(u64, u64), Foo> for FooIndexeSet<'a> {
+        fn get_indexes(&self) -> Box<dyn Iterator<Item = &'_ dyn Index<(u64, u64), Foo>> + '_> {
+            let v: Vec<&dyn Index<(u64, u64), Foo>> =
+                vec![&self.name, &self.id, &self.name_surname];
+            Box::new(v.into_iter())
+        }
+    }
+
+    const FOOS_SET: IndexedSet<(u64, u64), Foo, FooIndexeSet> =
+        IndexedSet::new("foo", FooIndexeSet {
+            name: MultiIndexSet::new(|data| data.name.clone(), "foo_name"),
+            name_surname: MultiIndexSet::new(
+                |data| (data.name.clone(), data.surname.clone()),
+                "foo__name_surname",
+            ),
+            id: UniqueIndexSet::new(|data| data.id, "foo__id"),
+        });
+
+    fn setup_test_set() -> MockStorage {
+        setup_test!(FOOS_SET)
+    }
+
+    #[test]
+    fn unique_index_works_set() {
+        let mut storage: MockStorage = setup_test_set();
+
+        // Load a single PK by the index.
+        {
+            let val = FOOS_SET.idx.id.load(&storage, 104).unwrap();
+            assert_eq!(val, (1, 2));
+        }
+
+        // Try to save a key with duplicate index; should fail.
+        {
+            FOOS_SET
+                .save(&mut storage, (5, 5), &Foo::new("bar", "s_fooes", 104))
+                .unwrap_err();
+        }
+
+        // Iterate index values and keys.
+        {
+            let val = FOOS_SET
+                .idx
+                .id
+                .range(&storage, None, None, Order::Ascending)
+                .map(|val| val.unwrap())
+                .collect::<Vec<_>>();
+
+            assert_eq!(val, vec![
+                (101, (0, 1)),
+                (102, (0, 2)),
+                (103, (1, 1)),
+                (104, (1, 2)),
+                (105, (1, 3))
+            ]);
+        }
+    }
+
+    /// Multi index set, where the index key is a singleton.
+    #[test]
+    fn multi_index_singleton_works_set() {
+        let storage = setup_test_set();
+
+        // Iterate all index values and PKs.
+        {
+            let val = FOOS_SET
+                .idx
+                .name
+                .range(&storage, None, None, Order::Ascending)
+                .collect::<StdResult<Vec<_>>>()
+                .unwrap();
+
+            assert_eq!(val, vec![
+                ("bar".to_string(), (0, 1)),
+                ("bar".to_string(), (0, 2)),
+                ("bar".to_string(), (1, 1)),
+                ("bar".to_string(), (1, 2)),
+                ("foo".to_string(), (1, 3)),
+            ]);
+        }
+
+        // Given a specific index value, iterate PKs corresponding to it.
+        //
+        // In this test case, we find all foos whose name is "bar".
+        {
+            let val = FOOS_SET
+                .idx
+                .name
+                .prefix("bar".to_string())
+                .range(&storage, None, None, Order::Ascending)
+                .collect::<StdResult<Vec<_>>>()
+                .unwrap();
+
+            assert_eq!(val, vec![((0, 1)), ((0, 2)), ((1, 1)), ((1, 2)),]);
+        }
+    }
+
+    /// Multi index set, where the index key is a tuple.
+    ///
+    /// In this case,
+    ///
+    /// - index key is `name_surname` of `(String, String)` type;
+    /// - primary key is of `(u64, u64)` type;
+    ///
+    /// The index set is therefore a `Set<((String, String), (u64, u64))>`.
+    ///
+    /// Let's denote the index key as `(A, B)` and the primary key as `(C, D)`.
+    #[test]
+    fn multi_index_tuple_works_set() {
+        let storage = setup_test_set();
+
+        // Given (A, B), iterate (C, D), without bounds.
+        //
+        // In this test case, we find all PKs whose index name is "bar" and last name
+        // is "s_bar".
+        {
+            let val = FOOS_SET
+                .idx
+                .name_surname
+                .prefix(("bar".to_string(), "s_bar".to_string()))
+                .range(&storage, None, None, Order::Ascending)
+                .collect::<StdResult<Vec<_>>>()
+                .unwrap();
+
+            assert_eq!(val, vec![((0, 1)), ((0, 2)), ((1, 1)),]);
+        }
+
+        // Given (A, B), iterate (C, D), with bounds.
+        //
+        // Same as the previous test case, but the with bounds for (C, D).
+        {
+            let val = FOOS_SET
+                .idx
+                .name_surname
+                .prefix(("bar".to_string(), "s_bar".to_string()))
+                .range(
+                    &storage,
+                    Some(Bound::Inclusive((0, 2))),
+                    None,
+                    Order::Ascending,
+                )
+                .collect::<StdResult<Vec<_>>>()
+                .unwrap();
+
+            assert_eq!(val, vec![((0, 2)), ((1, 1)),]);
+        }
+
+        // Given A, iterate (B, C, D), without bounds.
+        //
+        // In this test case, we find all PKs whose index name is "bar".
+        {
+            let val = FOOS_SET
+                .idx
+                .name_surname
+                .sub_prefix("bar".to_string())
+                .range(&storage, None, None, Order::Ascending)
+                .collect::<StdResult<Vec<_>>>()
+                .unwrap();
+
+            assert_eq!(val, vec![((0, 1)), ((0, 2)), ((1, 1)), ((1, 2)),]);
+        }
+
+        // Given A, iterate (B, C, D), with bounds.
+        //
+        // Same as the previous test case, but (B, C, D) must be greater than
+        // ("bar", 0, 1).
+        {
+            let val = FOOS_SET
+                .idx
+                .name_surname
+                .sub_prefix("bar".to_string())
+                .range(
+                    &storage,
+                    Some(Bound::Exclusive(("s_bar".to_string(), (0, 1)))),
+                    None,
+                    Order::Ascending,
+                )
+                .collect::<StdResult<Vec<_>>>()
+                .unwrap();
+
+            assert_eq!(val, vec![((0, 2)), ((1, 1)), ((1, 2)),]);
+        }
+
+        // Given (A, B, C), iterate D, without bounds.
+        //
+        // In this test case, we find all PKs whose index name is "bar" and surname
+        // is "s_bar" and the first number in the primary key is 0.
+        {
+            let val = FOOS_SET
+                .idx
+                .name_surname
+                .prefix(("bar".to_string(), "s_bar".to_string()))
+                .append(0)
+                .range(&storage, None, None, Order::Ascending)
+                .collect::<StdResult<Vec<_>>>()
+                .unwrap();
+
+            assert_eq!(val, vec![((0, 1)), ((0, 2)),]);
+        }
+
+        // Given (A, B, C), iterate D, with bounds.
+        //
+        // Same with the previous test case, but D must be greater than 1.
+        {
+            let val = FOOS_SET
+                .idx
+                .name_surname
+                .prefix(("bar".to_string(), "s_bar".to_string()))
+                .append(0)
+                .range(&storage, Some(Bound::Exclusive(1)), None, Order::Ascending)
+                .collect::<StdResult<Vec<_>>>()
+                .unwrap();
+
+            assert_eq!(val, vec![((0, 2))]);
         }
     }
 }
