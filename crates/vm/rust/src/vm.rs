@@ -38,6 +38,7 @@ impl Vm for RustVm {
         // Rust VM doesn't support gas tracking, so we make no use of the
         // provided `GasTracker`.
         _gas_tracker: GasTracker,
+        _memory: grug_app::Memory,
     ) -> VmResult<RustInstance> {
         Ok(RustInstance {
             storage,

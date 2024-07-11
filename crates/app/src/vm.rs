@@ -1,6 +1,6 @@
 use {
     crate::{
-        handle_submessages, AppError, AppResult, GasTracker, Instance, QuerierProvider,
+        handle_submessages, AppError, AppResult, GasTracker, Instance, Memory, QuerierProvider,
         StorageProvider, Vm, CODES, CONTRACT_ADDRESS_KEY, CONTRACT_NAMESPACE,
     },
     grug_types::{
@@ -20,6 +20,7 @@ pub fn call_in_0_out_1<VM, R>(
     code_hash: &Hash,
     ctx: &Context,
     storage_readonly: bool,
+    memory: Memory,
 ) -> AppResult<R>
 where
     R: DeserializeOwned,
@@ -35,6 +36,7 @@ where
         &ctx.contract,
         code_hash,
         storage_readonly,
+        memory,
     )?;
 
     // Call the function; deserialize the output as JSON
@@ -55,6 +57,7 @@ pub fn call_in_1_out_1<VM, P, R>(
     ctx: &Context,
     storage_readonly: bool,
     param: &P,
+    memory: Memory,
 ) -> AppResult<R>
 where
     P: Serialize,
@@ -71,6 +74,7 @@ where
         &ctx.contract,
         code_hash,
         storage_readonly,
+        memory,
     )?;
 
     // Serialize the param as JSON
@@ -95,6 +99,7 @@ pub fn call_in_2_out_1<VM, P1, P2, R>(
     storage_readonly: bool,
     param1: &P1,
     param2: &P2,
+    memory: Memory,
 ) -> AppResult<R>
 where
     P1: Serialize,
@@ -112,6 +117,7 @@ where
         &ctx.contract,
         code_hash,
         storage_readonly,
+        memory,
     )?;
 
     // Serialize the params as JSON
@@ -136,6 +142,7 @@ pub fn call_in_0_out_1_handle_response<VM>(
     code_hash: &Hash,
     ctx: &Context,
     storage_readonly: bool,
+    memory: Memory,
 ) -> AppResult<Vec<Event>>
 where
     VM: Vm + Clone,
@@ -149,6 +156,7 @@ where
         code_hash,
         ctx,
         storage_readonly,
+        memory,
     )?
     .into_std_result()?;
 
@@ -167,6 +175,7 @@ pub fn call_in_1_out_1_handle_response<VM, P>(
     ctx: &Context,
     storage_readonly: bool,
     param: &P,
+    memory: Memory,
 ) -> AppResult<Vec<Event>>
 where
     P: Serialize,
@@ -182,6 +191,7 @@ where
         ctx,
         storage_readonly,
         param,
+        memory,
     )?
     .into_std_result()?;
 
@@ -201,6 +211,7 @@ pub fn call_in_2_out_1_handle_response<VM, P1, P2>(
     storage_readonly: bool,
     param1: &P1,
     param2: &P2,
+    memory: Memory,
 ) -> AppResult<Vec<Event>>
 where
     P1: Serialize,
@@ -218,6 +229,7 @@ where
         storage_readonly,
         param1,
         param2,
+        memory,
     )?
     .into_std_result()?;
 
@@ -232,6 +244,7 @@ fn create_vm_instance<VM>(
     address: &Addr,
     code_hash: &Hash,
     storage_readonly: bool,
+    memory: Memory,
 ) -> AppResult<VM::Instance>
 where
     VM: Vm + Clone,
@@ -251,6 +264,7 @@ where
         storage_readonly,
         querier,
         gas_tracker,
+        memory,
     )?)
 }
 

@@ -1,5 +1,7 @@
+use crate::Memory;
 #[cfg(feature = "tracing")]
 use tracing::{debug, info, warn};
+
 use {
     crate::{
         call_in_0_out_1_handle_response, call_in_1_out_1_handle_response,
@@ -175,6 +177,7 @@ where
     };
     let msg = BankMsg { from, to, coins };
 
+    let memory = Memory::StaticLimited(32 * 1024 * 1024);
     let mut events = call_in_1_out_1_handle_response(
         vm.clone(),
         storage.clone(),
@@ -184,6 +187,7 @@ where
         &ctx,
         false,
         &msg,
+        memory,
     )?;
 
     if do_receive {
@@ -215,6 +219,7 @@ where
         simulate: None,
     };
 
+    let memory = Memory::StaticLimited(128 * 1024 * 1024);
     call_in_0_out_1_handle_response(
         vm,
         storage,
@@ -223,6 +228,7 @@ where
         &account.code_hash,
         &ctx,
         false,
+        memory,
     )
 }
 
@@ -328,6 +334,8 @@ where
         funds: Some(funds),
         simulate: None,
     };
+    let memory = Memory::StaticLimited(128 * 1024 * 1024);
+
     events.extend(call_in_1_out_1_handle_response(
         vm,
         storage,
@@ -337,6 +345,7 @@ where
         &ctx,
         false,
         msg,
+        memory,
     )?);
 
     Ok((events, ctx.contract))
@@ -422,6 +431,8 @@ where
         funds: Some(funds),
         simulate: None,
     };
+    let memory = Memory::StaticLimited(128 * 1024 * 1024);
+
     events.extend(call_in_1_out_1_handle_response(
         vm,
         storage,
@@ -431,6 +442,7 @@ where
         &ctx,
         false,
         msg,
+        memory,
     )?);
 
     Ok(events)
@@ -515,6 +527,7 @@ where
         funds: None,
         simulate: None,
     };
+    let memory = Memory::StaticLimited(128 * 1024 * 1024);
 
     call_in_1_out_1_handle_response(
         vm,
@@ -525,6 +538,7 @@ where
         &ctx,
         false,
         msg,
+        memory,
     )
 }
 
@@ -589,6 +603,7 @@ where
         simulate: None,
     };
 
+    let memory = Memory::StaticLimited(128 * 1024 * 1024);
     call_in_2_out_1_handle_response(
         vm,
         storage,
@@ -599,6 +614,7 @@ where
         false,
         msg,
         result,
+        memory,
     )
 }
 
@@ -691,6 +707,8 @@ where
         simulate: Some(false),
     };
 
+    let memory = Memory::StaticLimited(128 * 1024 * 1024);
+
     call_in_1_out_1_handle_response(
         vm,
         storage,
@@ -700,6 +718,7 @@ where
         &ctx,
         false,
         tx,
+        memory,
     )
 }
 
@@ -792,6 +811,7 @@ where
         simulate: None,
     };
 
+    let memory = Memory::StaticLimited(128 * 1024 * 1024);
     call_in_0_out_1_handle_response(
         vm,
         storage,
@@ -800,5 +820,6 @@ where
         &account.code_hash,
         &ctx,
         false,
+        memory,
     )
 }

@@ -1,7 +1,9 @@
 use {
     crate::{Environment, Region, VmError, VmResult},
     data_encoding::BASE64,
-    wasmer::{AsStoreMut, AsStoreRef, MemoryView, WasmPtr},
+    wasmer::{
+        AsStoreMut, AsStoreRef, MemoryError, MemoryType, MemoryView, Pages, Tunables, WasmPtr,
+    },
 };
 
 pub fn read_from_memory(
@@ -73,4 +75,94 @@ fn read_region(memory: &MemoryView, offset: u32) -> VmResult<Region> {
 fn write_region(memory: &MemoryView, offset: u32, region: Region) -> VmResult<()> {
     let wptr = <WasmPtr<Region>>::new(offset);
     wptr.deref(memory).write(region).map_err(Into::into)
+}
+
+pub struct MemoryLimit<T> {
+    /// Host and client memory is limited to this number of pages separately.
+    /// So total limit is 2 * shared_limit.
+    shared_limit: Pages,
+    base: T,
+}
+
+impl<T: Tunables> MemoryLimit<T> {
+    pub fn new(bytes: usize, base: T) -> Self {
+        Self {
+            shared_limit: u32::try_from(bytes / wasmer::WASM_MAX_PAGES as usize)
+                .unwrap()
+                .into(),
+            base,
+        }
+    }
+
+    fn ensure_memory(&self, ty: &MemoryType) -> Result<MemoryType, MemoryError> {
+        if ty.minimum > self.shared_limit {
+            Err(MemoryError::MinimumMemoryTooLarge {
+                min_requested: ty.minimum,
+                max_allowed: self.shared_limit,
+            })
+        } else {
+            match ty.maximum {
+                Some(max) if max > self.shared_limit => Err(MemoryError::MaximumMemoryTooLarge {
+                    max_requested: max,
+                    max_allowed: self.shared_limit,
+                }),
+                None => Ok(self.limit_max(ty)),
+                _ => Ok(*ty),
+            }
+        }
+    }
+
+    fn limit_max(&self, ty: &MemoryType) -> MemoryType {
+        let mut ty = *ty;
+        ty.maximum = Some(ty.maximum.unwrap_or(self.shared_limit));
+        ty
+    }
+}
+
+impl<T: Tunables> Tunables for MemoryLimit<T> {
+    fn memory_style(&self, ty: &MemoryType) -> wasmer::vm::MemoryStyle {
+        let ty = &self.limit_max(ty);
+        self.base.memory_style(ty)
+    }
+
+    fn create_host_memory(
+        &self,
+        ty: &MemoryType,
+        style: &wasmer::vm::MemoryStyle,
+    ) -> Result<wasmer::vm::VMMemory, wasmer::MemoryError> {
+        let ty = &self.ensure_memory(ty)?;
+        self.base.create_host_memory(ty, style)
+    }
+
+    unsafe fn create_vm_memory(
+        &self,
+        ty: &MemoryType,
+        style: &wasmer::vm::MemoryStyle,
+        vm_definition_location: std::ptr::NonNull<wasmer::vm::VMMemoryDefinition>,
+    ) -> Result<wasmer::vm::VMMemory, wasmer::MemoryError> {
+        let ty = &self.ensure_memory(ty)?;
+        self.base
+            .create_vm_memory(ty, style, vm_definition_location)
+    }
+
+    fn table_style(&self, table: &wasmer::TableType) -> wasmer::vm::TableStyle {
+        self.base.table_style(table)
+    }
+
+    fn create_host_table(
+        &self,
+        ty: &wasmer::TableType,
+        style: &wasmer::vm::TableStyle,
+    ) -> Result<wasmer::vm::VMTable, String> {
+        self.base.create_host_table(ty, style)
+    }
+
+    unsafe fn create_vm_table(
+        &self,
+        ty: &wasmer::TableType,
+        style: &wasmer::vm::TableStyle,
+        vm_definition_location: std::ptr::NonNull<wasmer::vm::VMTableDefinition>,
+    ) -> Result<wasmer::vm::VMTable, String> {
+        self.base.create_vm_table(ty, style, vm_definition_location)
+    }
 }

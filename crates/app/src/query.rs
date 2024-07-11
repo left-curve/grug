@@ -1,7 +1,7 @@
 use {
     crate::{
-        call_in_1_out_1, AppError, AppResult, GasTracker, StorageProvider, Vm, ACCOUNTS, CHAIN_ID,
-        CODES, CONFIG, CONTRACT_NAMESPACE, LAST_FINALIZED_BLOCK,
+        call_in_1_out_1, AppError, AppResult, GasTracker, Memory, StorageProvider, Vm, ACCOUNTS,
+        CHAIN_ID, CODES, CONFIG, CONTRACT_NAMESPACE, LAST_FINALIZED_BLOCK,
     },
     grug_storage::Bound,
     grug_types::{
@@ -120,6 +120,7 @@ where
         simulate: None,
     };
 
+    let memory = Memory::StaticLimited(32 * 1024 * 1024);
     call_in_1_out_1::<_, _, GenericResult<BankQueryResponse>>(
         vm,
         storage,
@@ -129,6 +130,7 @@ where
         &ctx,
         true,
         msg,
+        memory,
     )?
     .into_std_result()
     .map_err(AppError::Std)
@@ -220,6 +222,8 @@ where
         funds: None,
         simulate: None,
     };
+    let memory = Memory::StaticLimited(128 * 1024 * 1024);
+
     let data = call_in_1_out_1::<_, _, GenericResult<Json>>(
         vm,
         storage,
@@ -229,6 +233,7 @@ where
         &ctx,
         true,
         &msg,
+        memory,
     )?
     .into_std_result()?;
 

@@ -103,7 +103,13 @@ pub trait Vm: Sized {
         storage_readonly: bool,
         querier: QuerierProvider<Self>,
         gas_tracker: GasTracker,
+        memory: Memory,
     ) -> Result<Self::Instance, Self::Error>;
+}
+
+pub enum Memory {
+    /// Bytes limits of host and guest memory.
+    StaticLimited(usize),
 }
 
 pub trait Instance {
