@@ -34,7 +34,7 @@ fn setup(
     Shared<MockStorage>,
 )> {
     let storage = storage.unwrap_or_default();
-    let gas_tracker = gas_tracker.unwrap_or_else(|| GasTracker::new_limitless());
+    let gas_tracker = gas_tracker.unwrap_or_else(GasTracker::new_limitless);
 
     let querier = QuerierProvider::new(
         vm.clone(),
@@ -136,7 +136,7 @@ fn scan(c: &mut Criterion) {
         ctx.funds = Some(Coins::default());
         ctx.simulate = Some(false);
 
-        let data = (1..iterations + 1).into_iter().fold(vec![], |mut buf, i| {
+        let data = (1..iterations + 1).fold(vec![], |mut buf, i| {
             buf.push((i.to_string(), Uint128::from(i as u128)));
             buf
         });

@@ -16,11 +16,10 @@ pub enum QueryMsg {
         order: Order,
         limit: u32,
         sized: bool,
-    }
+    },
 }
 
 #[grug_derive(serde)]
 pub enum ExecuteMsg {
     Populate { data: Vec<(String, Uint128)> },
-
 }

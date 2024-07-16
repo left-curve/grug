@@ -34,7 +34,7 @@ fn setup(
     Shared<MockStorage>,
 )> {
     let storage = storage.unwrap_or_default();
-    let gas_tracker = gas_tracker.unwrap_or_else(|| GasTracker::new_limitless());
+    let gas_tracker = gas_tracker.unwrap_or_else(GasTracker::new_limitless);
 
     let querier = QuerierProvider::new(
         vm.clone(),
@@ -73,7 +73,7 @@ fn try_execute() {
 
     let (instance, ctx, _, storage) = setup(&mut vm, None, None).unwrap();
 
-    let data = (1..limit + 1).into_iter().fold(vec![], |mut buf, i| {
+    let data = (1..limit + 1).fold(vec![], |mut buf, i| {
         buf.push((i.to_string(), Uint128::from(i as u128)));
         buf
     });
@@ -82,7 +82,7 @@ fn try_execute() {
 
     let res = instance.call_in_1_out_1("execute", &ctx, &msg).unwrap();
 
-    let res: GenericResult<Json> = from_json_slice(&res).unwrap();
+    let res: GenericResult<Json> = from_json_slice(res).unwrap();
 
     debug!("{:?}", res);
 
@@ -102,6 +102,6 @@ fn try_execute() {
 
     let ellapsed = now.elapsed();
 
-    let _res: GenericResult<Json> = from_json_slice(&res).unwrap();
+    let _res: GenericResult<Json> = from_json_slice(res).unwrap();
     println!("{:?}", ellapsed);
 }
