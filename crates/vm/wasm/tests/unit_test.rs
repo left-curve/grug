@@ -21,7 +21,6 @@ const MOCK_BLOCK: BlockInfo = BlockInfo {
 };
 
 static BENCHMARKER_CODE: &[u8] = include_bytes!("../testdata/grug_tester_benchmarker.wasm");
-// static BENCHMARKER_CODE: &[u8] = include_bytes!("../testdata/grug_tester_benchmarker.wasm");
 
 fn setup(
     vm: &mut WasmVm,
@@ -65,6 +64,10 @@ fn setup(
     Ok((instance, ctx, gas_tracker, storage))
 }
 
+// The purpose of this test is to check the performance of scan_sized vs scan.
+// The benchmark results are quite strange, with a big advantage for the scan method.
+// However, this simple test shows how the scan_sized method is about 3 times faster.
+// Need to understand why the benchmark gives opposite results, especially on long iterations.
 #[test]
 fn try_execute() {
     let mut vm = WasmVm::new(10000);
