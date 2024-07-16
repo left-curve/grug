@@ -45,7 +45,8 @@ impl<V> Op<V> {
 }
 
 /// Describing iteration order.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum Order {
     Ascending = 1,
     Descending = 2,

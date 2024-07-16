@@ -17,6 +17,7 @@ extern "C" {
     // must have succeeded.
     fn db_read(key_ptr: usize) -> usize;
     fn db_scan(min_ptr: usize, max_ptr: usize, order: i32) -> i32;
+    fn db_scan_sized(min_ptr: usize, max_ptr: usize, order: i32, size: u32) -> i32;
     fn db_next(iterator_id: i32) -> usize;
     fn db_next_key(iterator_id: i32) -> usize;
     fn db_next_value(iterator_id: i32) -> usize;
@@ -147,6 +148,38 @@ impl Storage for ExternalStorage {
 
         unsafe { db_remove_range(min_ptr, max_ptr) }
     }
+
+    fn scan_sized<'a>(
+        &'a self,
+        min: Option<&[u8]>,
+        max: Option<&[u8]>,
+        order: Order,
+        size: u32,
+    ) -> Box<dyn Iterator<Item = Record> + 'a> {
+        let min_region = min.map(Region::build);
+        let min_ptr = get_optional_region_ptr(min_region.as_ref());
+
+        let max_region = max.map(Region::build);
+        let max_ptr = get_optional_region_ptr(max_region.as_ref());
+
+        let value_ptr = unsafe { db_scan_sized(min_ptr, max_ptr, order.into(), size) };
+        if value_ptr == 0 {
+            return Box::new(vec![].into_iter());
+        }
+
+        let mut res = unsafe { Region::consume(value_ptr as *mut Region) };
+
+        let mut records = vec![];
+
+        while !res.is_empty() {
+            let key = split_front(&mut res);
+            let value = split_front(&mut res);
+
+            records.push((key, value));
+        }
+
+        Box::new(records.into_iter())
+    }
 }
 
 /// Iterator wrapper over the `db_next` import, which iterates over both the
@@ -251,6 +284,25 @@ fn split_tail(mut data: Vec<u8>) -> Record {
     (data, value)
 }
 
+fn split_front(data: &mut Vec<u8>) -> Vec<u8> {
+    // pop two bytes from the end, must both be Some
+    let (Some(byte1), Some(byte2)) = (pop_front(data), pop_front(data)) else {
+        panic!("[ExternalIterator]: can't read length suffix");
+    };
+
+    // note the order here between the two bytes
+    let key_len = u16::from_be_bytes([byte1, byte2]);
+    data.drain(0..key_len.into()).collect()
+    // data.split_off(key_len.into())
+}
+
+fn pop_front(data: &mut Vec<u8>) -> Option<u8> {
+    if data.is_empty() {
+        None
+    } else {
+        Some(data.remove(0))
+    }
+}
 // ------------------------------------ api ------------------------------------
 
 /// A zero-sized wrapper over cryptography-related (signature verification and
@@ -463,5 +515,15 @@ mod test {
         data.extend_from_slice(&(key.len() as u16).to_be_bytes());
 
         assert_eq!((key.to_vec(), value.to_vec()), split_tail(data))
+    }
+
+    #[test]
+    fn spliting_front() {
+        let mut data: Vec<u8> = vec![0, 5, 1, 2, 3, 4, 5, 6];
+
+        let front = split_front(&mut data);
+
+        assert_eq!(front, vec![1, 2, 3, 4, 5]);
+        assert_eq!(data, vec![6]);
     }
 }

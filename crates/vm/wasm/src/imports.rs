@@ -3,7 +3,8 @@ use {
         read_from_memory, write_to_memory, Environment, Iterator, VmError, VmResult, GAS_COSTS,
     },
     grug_types::{
-        decode_sections, from_json_slice, to_json_vec, Addr, Querier, QueryRequest, Record, Storage,
+        decode_sections, encode_length, from_json_slice, to_json_vec, Addr, Querier, QueryRequest,
+        Record, Storage,
     },
     tracing::info,
     wasmer::FunctionEnvMut,
@@ -56,6 +57,49 @@ pub fn db_scan(
     env.consume_external_gas(&mut store, GAS_COSTS.db_scan, "db_scan")?;
 
     Ok(env.add_iterator(iterator))
+}
+
+pub fn db_scan_sized(
+    mut fe: FunctionEnvMut<Environment>,
+    min_ptr: u32,
+    max_ptr: u32,
+    order: i32,
+    size: u32,
+) -> VmResult<u32> {
+    let (env, mut store) = fe.data_and_store_mut();
+
+    // Parse iteration parameters provided by the module and create iterator.
+    let min = if min_ptr != 0 {
+        Some(read_from_memory(env, &store, min_ptr)?)
+    } else {
+        None
+    };
+    let max = if max_ptr != 0 {
+        Some(read_from_memory(env, &store, max_ptr)?)
+    } else {
+        None
+    };
+    let order = order.try_into()?;
+
+    let value = env
+        .storage
+        .scan_sized(min.as_deref(), max.as_deref(), order, size)
+        .fold(vec![], |mut buffer, (k, v)| {
+            buffer.extend_from_slice(&encode_length(&k));
+            buffer.extend_from_slice(&k);
+            buffer.extend_from_slice(&encode_length(&v));
+            buffer.extend_from_slice(&v);
+
+            buffer
+        });
+
+    env.consume_external_gas(
+        &mut store,
+        // TODO
+        GAS_COSTS.db_read.cost(value.len()),
+        "db_scan_sized",
+    )?;
+    write_to_memory(env, &mut store, &value)
 }
 
 pub fn db_next(mut fe: FunctionEnvMut<Environment>, iterator_id: i32) -> VmResult<u32> {

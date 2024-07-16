@@ -63,7 +63,7 @@ fn bank_transfers() -> anyhow::Result<()> {
     let info = suite.query_info().should_succeed()?;
 
     let holders: BTreeMap<Addr, Uint128> = suite
-        .query_wasm_smart(info.config.bank, &grug_bank::QueryMsg::Holders {
+        .query_wasm_smart(info.config.bank.clone(), &grug_bank::QueryMsg::Holders {
             denom: DENOM.to_string(),
             start_after: None,
             limit: None,
@@ -79,6 +79,24 @@ fn bank_transfers() -> anyhow::Result<()> {
         .into_iter()
         .collect::<BTreeMap<Addr, Uint128>>()
     );
+
+    // try execute
+    suite
+        .execute_message_with_gas(
+            &accounts["sender"],
+            300000000000,
+            Message::execute(
+                info.config.bank,
+                &grug_bank::ExecuteMsg::Mint {
+                    to: accounts["receiver"].address.clone(),
+                    denom: "uosmo".to_string(),
+                    amount: Uint128::from(100_u128),
+                },
+                vec![],
+            )
+            .unwrap(),
+        )
+        .unwrap();
 
     Ok(())
 }

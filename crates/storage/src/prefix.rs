@@ -76,6 +76,27 @@ where
         Box::new(iter)
     }
 
+    pub fn range_raw_sized<'a>(
+        &self,
+        storage: &'a dyn Storage,
+        min: Option<Bound<K>>,
+        max: Option<Bound<K>>,
+        order: Order,
+        size: u32,
+    ) -> Box<dyn Iterator<Item = Record> + 'a> {
+        let (min, max) = range_bounds(&self.prefix, min, max);
+        let prefix = self.prefix.clone();
+
+        let iter = storage
+            .scan_sized(Some(&min), Some(&max), order, size)
+            .map(move |(k, v)| {
+                debug_assert_eq!(&k[0..prefix.len()], prefix, "prefix mispatch");
+                (trim(&prefix, &k), v)
+            });
+
+        Box::new(iter)
+    }
+
     pub fn range<'a>(
         &self,
         storage: &'a dyn Storage,
@@ -90,6 +111,25 @@ where
                 let value = C::decode(&value_raw)?;
                 Ok((key, value))
             });
+
+        Box::new(iter)
+    }
+
+    pub fn range_sized<'a>(
+        &self,
+        storage: &'a dyn Storage,
+        min: Option<Bound<K>>,
+        max: Option<Bound<K>>,
+        order: Order,
+        size: u32,
+    ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'a> {
+        let iter =
+            self.range_raw_sized(storage, min, max, order, size)
+                .map(|(key_raw, value_raw)| {
+                    let key = K::deserialize(&key_raw)?;
+                    let value = C::decode(&value_raw)?;
+                    Ok((key, value))
+                });
 
         Box::new(iter)
     }

@@ -119,6 +119,18 @@ where
         self.no_prefix().range_raw(storage, min, max, order)
     }
 
+    pub fn range_raw_sized<'b>(
+        &self,
+        storage: &'b dyn Storage,
+        min: Option<Bound<K>>,
+        max: Option<Bound<K>>,
+        order: Order,
+        size: u32,
+    ) -> Box<dyn Iterator<Item = Record> + 'b> {
+        self.no_prefix()
+            .range_raw_sized(storage, min, max, order, size)
+    }
+
     pub fn range<'b>(
         &self,
         storage: &'b dyn Storage,
@@ -127,6 +139,17 @@ where
         order: Order,
     ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'b> {
         self.no_prefix().range(storage, min, max, order)
+    }
+
+    pub fn range_sized<'b>(
+        &self,
+        storage: &'b dyn Storage,
+        min: Option<Bound<K>>,
+        max: Option<Bound<K>>,
+        order: Order,
+        size: u32,
+    ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'b> {
+        self.no_prefix().range_sized(storage, min, max, order, size)
     }
 
     pub fn keys_raw<'b>(
