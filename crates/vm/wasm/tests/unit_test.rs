@@ -72,7 +72,7 @@ fn setup(
 fn try_execute() {
     let mut vm = WasmVm::new(10000);
 
-    let limit = 100;
+    let limit = 3000;
 
     let (instance, ctx, _, storage) = setup(&mut vm, None, None).unwrap();
 
@@ -96,7 +96,7 @@ fn try_execute() {
         max: None,
         order: grug_types::Order::Ascending,
         limit: limit as u32,
-        sized: true,
+        sized: false,
     })
     .unwrap();
 

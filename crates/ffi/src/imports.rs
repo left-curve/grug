@@ -1,8 +1,8 @@
 use {
     crate::Region,
     grug_types::{
-        encode_sections, from_json_slice, to_json_vec, Addr, Api, GenericResult, Order, Querier,
-        QueryRequest, QueryResponse, Record, StdError, StdResult, Storage,
+        encode_sections, from_borsh_slice, from_json_slice, to_json_vec, Addr, Api, GenericResult,
+        Order, Querier, QueryRequest, QueryResponse, Record, StdError, StdResult, Storage,
     },
 };
 
@@ -167,16 +167,9 @@ impl Storage for ExternalStorage {
             return Box::new(vec![].into_iter());
         }
 
-        let mut res = unsafe { Region::consume(value_ptr as *mut Region) };
+        let res = unsafe { Region::consume(value_ptr as *mut Region) };
 
-        let mut records = vec![];
-
-        while !res.is_empty() {
-            let key = split_front(&mut res);
-            let value = split_front(&mut res);
-
-            records.push((key, value));
-        }
+        let records: Vec<(Vec<u8>, Vec<u8>)> = from_borsh_slice(res.as_slice()).unwrap();
 
         Box::new(records.into_iter())
     }
@@ -284,25 +277,6 @@ fn split_tail(mut data: Vec<u8>) -> Record {
     (data, value)
 }
 
-fn split_front(data: &mut Vec<u8>) -> Vec<u8> {
-    // pop two bytes from the end, must both be Some
-    let (Some(byte1), Some(byte2)) = (pop_front(data), pop_front(data)) else {
-        panic!("[ExternalIterator]: can't read length suffix");
-    };
-
-    // note the order here between the two bytes
-    let key_len = u16::from_be_bytes([byte1, byte2]);
-    data.drain(0..key_len.into()).collect()
-    // data.split_off(key_len.into())
-}
-
-fn pop_front(data: &mut Vec<u8>) -> Option<u8> {
-    if data.is_empty() {
-        None
-    } else {
-        Some(data.remove(0))
-    }
-}
 // ------------------------------------ api ------------------------------------
 
 /// A zero-sized wrapper over cryptography-related (signature verification and
@@ -515,15 +489,5 @@ mod test {
         data.extend_from_slice(&(key.len() as u16).to_be_bytes());
 
         assert_eq!((key.to_vec(), value.to_vec()), split_tail(data))
-    }
-
-    #[test]
-    fn spliting_front() {
-        let mut data: Vec<u8> = vec![0, 5, 1, 2, 3, 4, 5, 6];
-
-        let front = split_front(&mut data);
-
-        assert_eq!(front, vec![1, 2, 3, 4, 5]);
-        assert_eq!(data, vec![6]);
     }
 }

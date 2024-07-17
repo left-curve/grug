@@ -3,7 +3,7 @@ use {
         read_from_memory, write_to_memory, Environment, Iterator, VmError, VmResult, GAS_COSTS,
     },
     grug_types::{
-        decode_sections, encode_length, from_json_slice, to_json_vec, Addr, Querier, QueryRequest,
+        decode_sections, from_json_slice, to_borsh_vec, to_json_vec, Addr, Querier, QueryRequest,
         Record, Storage,
     },
     tracing::info,
@@ -84,14 +84,9 @@ pub fn db_scan_sized(
     let value = env
         .storage
         .scan_sized(min.as_deref(), max.as_deref(), order, size)
-        .fold(vec![], |mut buffer, (k, v)| {
-            buffer.extend_from_slice(&encode_length(&k));
-            buffer.extend_from_slice(&k);
-            buffer.extend_from_slice(&encode_length(&v));
-            buffer.extend_from_slice(&v);
+        .collect::<Vec<_>>();
 
-            buffer
-        });
+    let value = to_borsh_vec(&value)?;
 
     env.consume_external_gas(
         &mut store,
