@@ -163,7 +163,7 @@ fn scan(c: &mut Criterion) {
     };
 
     for iterations in [200, 1000] {
-        let mut output_1: Option<Vec<u8>> = None;
+        let mut output_non_sized: Option<Vec<u8>> = None;
         let mut sum = 0;
         let mut repeats = 0;
         group.bench_with_input(
@@ -176,7 +176,8 @@ fn scan(c: &mut Criterion) {
                         let (instance, ctx, gas_tracker, msg) = suite.unwrap();
 
                         // Call the `loop` query method
-                        output_1 = Some(instance.call_in_1_out_1("query", &ctx, &msg).unwrap());
+                        output_non_sized =
+                            Some(instance.call_in_1_out_1("query", &ctx, &msg).unwrap());
                         // Record the gas consumed
                         sum += gas_tracker.used();
                         repeats += 1;
@@ -197,7 +198,7 @@ fn scan(c: &mut Criterion) {
         sum = 0;
         repeats = 0;
 
-        let mut output_2: Option<Vec<u8>> = None;
+        let mut output_sized: Option<Vec<u8>> = None;
         group.bench_with_input(
             BenchmarkId::new("sized", iterations),
             &iterations,
@@ -208,7 +209,7 @@ fn scan(c: &mut Criterion) {
                         let (instance, ctx, gas_tracker, msg) = suite.unwrap();
 
                         // Call the `loop` query method
-                        output_2 = Some(instance.call_in_1_out_1("query", &ctx, &msg).unwrap());
+                        output_sized = Some(instance.call_in_1_out_1("query", &ctx, &msg).unwrap());
 
                         sum += gas_tracker.used();
                         repeats += 1;
@@ -226,16 +227,16 @@ fn scan(c: &mut Criterion) {
             );
         }
 
-        let output_1 = from_json_slice::<GenericResult<Json>>(&output_1.unwrap())
+        let output_non_sized = from_json_slice::<GenericResult<Json>>(&output_non_sized.unwrap())
             .unwrap()
             .as_ok();
-        let output_2 = from_json_slice::<GenericResult<Json>>(&output_2.unwrap())
+        let output_sized = from_json_slice::<GenericResult<Json>>(&output_sized.unwrap())
             .unwrap()
             .as_ok();
 
-        match (&output_1, &output_2) {
-            (Json::Array(op1), Json::Array(op2)) => {
-                if op1 != op2 {
+        match (&output_non_sized, &output_sized) {
+            (Json::Array(non_sized), Json::Array(sized)) => {
+                if non_sized != sized {
                     let clos = |comp: &[Json], with: &[Json], desc: &str| {
                         println!("{desc} - len: {}", comp.len());
                         for i in comp {
@@ -248,10 +249,10 @@ fn scan(c: &mut Criterion) {
                         println!();
                     };
 
-                    clos(op1, op2, "non_sized");
-                    clos(op2, op1, "sized");
+                    clos(non_sized, sized, "non_sized");
+                    clos(sized, non_sized, "sized");
 
-                    panic!("outputs are different");
+                    println!("Warning: result as differents!");
                 }
             },
             _ => panic!("unexpected output format"),

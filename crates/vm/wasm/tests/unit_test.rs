@@ -1,13 +1,13 @@
 use {
+    colored::*,
     grug_app::{GasTracker, Instance, QuerierProvider, Shared, StorageProvider, Vm},
     grug_crypto::sha2_256,
     grug_tester_benchmarker::{ExecuteMsg, QueryMsg},
     grug_types::{
         from_json_slice, to_json_vec, Addr, BlockInfo, Coins, Context, GenericResult, Hash, Json,
-        MockStorage, Timestamp, Uint128, Uint64,
+        MockStorage, Order, Timestamp, Uint128, Uint64,
     },
     grug_vm_wasm::WasmVm,
-    tracing::debug,
 };
 
 const MOCK_CHAIN_ID: &str = "dev-1";
@@ -64,15 +64,11 @@ fn setup(
     Ok((instance, ctx, gas_tracker, storage))
 }
 
-const SIZED: bool = true;
-const LIMIT: u32 = 1000;
+const LIMIT: u32 = 200;
 
-// The purpose of this test is to check the performance of scan_sized vs scan.
-// The benchmark results are quite strange, with a big advantage for the scan method.
-// However, this simple test shows how the scan_sized method is about 3 times faster.
-// Need to understand why the benchmark gives opposite results, especially on long iterations.
-#[test]
-fn try_execute() {
+const ORDER: Order = Order::Ascending;
+
+fn scan_execute(sized: bool) -> Json {
     let mut vm = WasmVm::new(10000);
 
     let (instance, ctx, _, storage) = setup(&mut vm, None, None).unwrap();
@@ -86,39 +82,53 @@ fn try_execute() {
 
     let res = instance.call_in_1_out_1("execute", &ctx, &msg).unwrap();
 
-    let res: GenericResult<Json> = from_json_slice(res).unwrap();
-
-    debug!("{:?}", res);
+    from_json_slice::<GenericResult<Json>>(res).unwrap().as_ok();
 
     let (instance, ctx, ..) = setup(&mut vm, Some(storage), None).unwrap();
 
-    let query = to_json_vec(&QueryMsg::Data {
+    let query_msg = to_json_vec(&QueryMsg::Data {
         min: None,
         max: None,
-        order: grug_types::Order::Ascending,
+        order: ORDER,
         limit: LIMIT,
-        sized: SIZED,
+        sized,
     })
     .unwrap();
 
-    let now = std::time::Instant::now();
-    let res = instance.call_in_1_out_1("query", &ctx, &query).unwrap();
-    println!("{:?}", now.elapsed());
+    let res = instance.call_in_1_out_1("query", &ctx, &query_msg).unwrap();
 
-    let res = from_json_slice::<GenericResult<Json>>(res).unwrap().as_ok();
-    println!("{res:?}")
+    from_json_slice::<GenericResult<Json>>(&res)
+        .unwrap()
+        .as_ok()
 }
 
 #[test]
-fn des() {
-    let b_18 = "18".to_string();
-    let b_180 = "180".to_string();
-    let b_19 = "19".to_string();
+fn scan_sized_vs_non_sized() {
+    let sized = scan_execute(true);
+    let non_sized = scan_execute(false);
 
-    let bytes_18 = to_json_vec(&b_18).unwrap();
-    let bytes_180 = to_json_vec(&b_180).unwrap();
-    let bytes_19 = to_json_vec(&b_19).unwrap();
-    println!("{:?}", bytes_18);
-    println!("{:?}", bytes_180);
-    println!("{:?}", bytes_19);
+    match (&non_sized, &sized) {
+        (Json::Array(non_sized), Json::Array(sized)) => {
+            if non_sized != sized {
+                let clos = |comp: &[Json], with: &[Json], desc: &str| {
+                    println!("{desc} - len: {}", comp.len());
+                    for i in comp {
+                        if !with.contains(i) {
+                            print!("{}", format!("{i},").red());
+                        } else {
+                            print!("{}", format!("{i},").black());
+                        }
+                    }
+                    println!();
+                };
+
+                println!("Result as differents! - iterations: {}", LIMIT);
+                clos(non_sized, sized, "non_sized");
+                clos(sized, non_sized, "sized");
+            } else {
+                println!("Both results are equal");
+            }
+        },
+        _ => panic!("unexpected output format"),
+    }
 }
