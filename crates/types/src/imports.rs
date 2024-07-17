@@ -104,9 +104,7 @@ pub trait Storage: DynClone + Send + Sync {
         max: Option<&[u8]>,
         order: Order,
         size: u32,
-    ) -> Box<dyn Iterator<Item = Record> + 'a> {
-        Box::new(self.scan(min, max, order).take(size as usize))
-    }
+    ) -> Box<dyn Iterator<Item = Record> + 'a>;
 }
 
 // A boxed `Storage` is also a `Storage`.
@@ -163,6 +161,16 @@ impl Storage for Box<dyn Storage> {
 
     fn flush(&mut self, batch: Batch) {
         self.as_mut().flush(batch)
+    }
+
+    fn scan_sized<'a>(
+        &'a self,
+        min: Option<&[u8]>,
+        max: Option<&[u8]>,
+        order: Order,
+        size: u32,
+    ) -> Box<dyn Iterator<Item = Record> + 'a> {
+        self.as_ref().scan_sized(min, max, order, size)
     }
 }
 

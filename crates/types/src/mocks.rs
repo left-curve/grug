@@ -111,6 +111,17 @@ impl Storage for MockStorage {
             false
         });
     }
+
+    fn scan_sized<'a>(
+        &'a self,
+        min: Option<&[u8]>,
+        max: Option<&[u8]>,
+        order: Order,
+        size: u32,
+    ) -> Box<dyn Iterator<Item = Record> + 'a> {
+        // TODO: optimize this??
+        Box::new(self.scan(min, max, order).take(size as usize))
+    }
 }
 
 // ------------------------------------ api ------------------------------------

@@ -1,4 +1,6 @@
 use {
+    colored::*,
+    core::panic,
     criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion},
     grug_app::{GasTracker, Instance, QuerierProvider, Shared, StorageProvider, Vm},
     grug_crypto::sha2_256,
@@ -160,7 +162,7 @@ fn scan(c: &mut Criterion) {
         Ok((instance, ctx, gas_tracker, query))
     };
 
-    for iterations in [30, 100, 1000] {
+    for iterations in [200, 1000] {
         let mut output_1: Option<Vec<u8>> = None;
         let mut sum = 0;
         let mut repeats = 0;
@@ -231,15 +233,28 @@ fn scan(c: &mut Criterion) {
             .unwrap()
             .as_ok();
 
-        match (output_1, output_2) {
-            (Json::Array(output_1), Json::Array(output_2)) => {
-                for (i, (non_sized, sized)) in
-                    output_1.into_iter().zip(output_2.into_iter()).enumerate()
-                {
-                    assert_eq!(non_sized, sized, "failiure at index {}", i);
+        match (&output_1, &output_2) {
+            (Json::Array(op1), Json::Array(op2)) => {
+                if op1 != op2 {
+                    let clos = |comp: &[Json], with: &[Json], desc: &str| {
+                        println!("{desc} - len: {}", comp.len());
+                        for i in comp {
+                            if !with.contains(i) {
+                                print!("{}", format!("{i},").red());
+                            } else {
+                                print!("{}", format!("{i},").black());
+                            }
+                        }
+                        println!();
+                    };
+
+                    clos(op1, op2, "non_sized");
+                    clos(op2, op1, "sized");
+
+                    panic!("outputs are different");
                 }
             },
-            _ => todo!(),
+            _ => panic!("unexpected output format"),
         }
     }
 }

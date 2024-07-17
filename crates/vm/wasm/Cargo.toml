@@ -30,6 +30,7 @@ wasmer-middlewares = { workspace = true }
 [dev-dependencies]
 anyhow                  = { workspace = true }
 criterion               = { workspace = true }
+colored                 = { workspace = true }
 grug-app                = { path = "../../app", features = ["tracing"] }
 grug-bank               = { path = "../../../contracts/bank" }
 grug-crypto             = { path = "../../crypto" }

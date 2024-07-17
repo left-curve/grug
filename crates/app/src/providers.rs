@@ -92,6 +92,21 @@ impl Storage for StorageProvider {
         let (min, max) = prefixed_range_bounds(&self.namespace, min, max);
         self.storage.remove_range(Some(&min), Some(&max))
     }
+
+    fn scan_sized<'a>(
+        &'a self,
+        min: Option<&[u8]>,
+        max: Option<&[u8]>,
+        order: Order,
+        size: u32,
+    ) -> Box<dyn Iterator<Item = Record> + 'a> {
+        let (min, max) = prefixed_range_bounds(&self.namespace, min, max);
+        let iter = self
+            .storage
+            .scan_sized(Some(&min), Some(&max), order, size)
+            .map(|(key, value)| (trim_wasm_prefix(&self.namespace, key), value));
+        Box::new(iter)
+    }
 }
 
 #[inline]

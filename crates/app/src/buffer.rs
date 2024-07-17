@@ -132,6 +132,17 @@ impl<S: Storage + Clone> Storage for Buffer<S> {
         // are chosen. this is exactly what we want.
         self.pending.extend(batch);
     }
+
+    fn scan_sized<'a>(
+        &'a self,
+        min: Option<&[u8]>,
+        max: Option<&[u8]>,
+        order: Order,
+        size: u32,
+    ) -> Box<dyn Iterator<Item = Record> + 'a> {
+        // TODO: optimize this??
+        Box::new(self.scan(min, max, order).take(size as usize))
+    }
 }
 
 struct Merged<'a, B, P>

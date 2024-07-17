@@ -64,6 +64,9 @@ fn setup(
     Ok((instance, ctx, gas_tracker, storage))
 }
 
+const SIZED: bool = true;
+const LIMIT: u32 = 1000;
+
 // The purpose of this test is to check the performance of scan_sized vs scan.
 // The benchmark results are quite strange, with a big advantage for the scan method.
 // However, this simple test shows how the scan_sized method is about 3 times faster.
@@ -72,11 +75,9 @@ fn setup(
 fn try_execute() {
     let mut vm = WasmVm::new(10000);
 
-    let limit = 10;
-
     let (instance, ctx, _, storage) = setup(&mut vm, None, None).unwrap();
 
-    let data = (1..limit + 1).fold(vec![], |mut buf, i| {
+    let data = (1..LIMIT + 1).fold(vec![], |mut buf, i| {
         buf.push((i.to_string(), Uint128::from(i as u128)));
         buf
     });
@@ -95,8 +96,8 @@ fn try_execute() {
         min: None,
         max: None,
         order: grug_types::Order::Ascending,
-        limit: limit as u32,
-        sized: false,
+        limit: LIMIT,
+        sized: SIZED,
     })
     .unwrap();
 
@@ -104,6 +105,20 @@ fn try_execute() {
     let res = instance.call_in_1_out_1("query", &ctx, &query).unwrap();
     println!("{:?}", now.elapsed());
 
-    let res  = from_json_slice::<GenericResult<Json>>(res).unwrap().as_ok();
+    let res = from_json_slice::<GenericResult<Json>>(res).unwrap().as_ok();
     println!("{res:?}")
+}
+
+#[test]
+fn des() {
+    let b_18 = "18".to_string();
+    let b_180 = "180".to_string();
+    let b_19 = "19".to_string();
+
+    let bytes_18 = to_json_vec(&b_18).unwrap();
+    let bytes_180 = to_json_vec(&b_180).unwrap();
+    let bytes_19 = to_json_vec(&b_19).unwrap();
+    println!("{:?}", bytes_18);
+    println!("{:?}", bytes_180);
+    println!("{:?}", bytes_19);
 }

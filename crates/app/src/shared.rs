@@ -144,6 +144,21 @@ impl<S: Storage> Storage for Shared<S> {
     fn flush(&mut self, batch: Batch) {
         self.write_access().flush(batch)
     }
+
+    fn scan_sized<'a>(
+        &'a self,
+        min: Option<&[u8]>,
+        max: Option<&[u8]>,
+        order: Order,
+        size: u32,
+    ) -> Box<dyn Iterator<Item = Record> + 'a> {
+        Box::new(
+            self.read_access()
+                .scan_sized(min, max, order, size)
+                .collect::<Vec<_>>()
+                .into_iter(),
+        )
+    }
 }
 
 struct SharedIter<'a, S> {
