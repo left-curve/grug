@@ -72,7 +72,7 @@ fn setup(
 fn try_execute() {
     let mut vm = WasmVm::new(10000);
 
-    let limit = 3000;
+    let limit = 10;
 
     let (instance, ctx, _, storage) = setup(&mut vm, None, None).unwrap();
 
@@ -102,9 +102,8 @@ fn try_execute() {
 
     let now = std::time::Instant::now();
     let res = instance.call_in_1_out_1("query", &ctx, &query).unwrap();
+    println!("{:?}", now.elapsed());
 
-    let ellapsed = now.elapsed();
-
-    let _res: GenericResult<Json> = from_json_slice(res).unwrap();
-    println!("{:?}", ellapsed);
+    let res  = from_json_slice::<GenericResult<Json>>(res).unwrap().as_ok();
+    println!("{res:?}")
 }

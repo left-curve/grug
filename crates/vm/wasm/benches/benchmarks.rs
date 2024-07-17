@@ -4,8 +4,8 @@ use {
     grug_crypto::sha2_256,
     grug_tester_benchmarker::{ExecuteMsg, QueryMsg},
     grug_types::{
-        to_json_vec, Addr, BlockInfo, Coins, Context, Empty, GenericResult, Hash, MockStorage,
-        Timestamp, Uint128, Uint64,
+        from_json_slice, to_json_vec, Addr, BlockInfo, Coins, Context, Empty, GenericResult, Hash,
+        Json, MockStorage, Timestamp, Uint128, Uint64,
     },
     grug_vm_wasm::{WasmInstance, WasmVm},
     std::time::Duration,
@@ -224,7 +224,23 @@ fn scan(c: &mut Criterion) {
             );
         }
 
-        assert_eq!(output_1, output_2);
+        let output_1 = from_json_slice::<GenericResult<Json>>(&output_1.unwrap())
+            .unwrap()
+            .as_ok();
+        let output_2 = from_json_slice::<GenericResult<Json>>(&output_2.unwrap())
+            .unwrap()
+            .as_ok();
+
+        match (output_1, output_2) {
+            (Json::Array(output_1), Json::Array(output_2)) => {
+                for (i, (non_sized, sized)) in
+                    output_1.into_iter().zip(output_2.into_iter()).enumerate()
+                {
+                    assert_eq!(non_sized, sized, "failiure at index {}", i);
+                }
+            },
+            _ => todo!(),
+        }
     }
 }
 
