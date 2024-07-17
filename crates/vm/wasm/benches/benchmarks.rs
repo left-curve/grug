@@ -162,6 +162,8 @@ fn scan(c: &mut Criterion) {
 
     for iterations in [30, 100, 1000] {
         let mut output_1: Option<Vec<u8>> = None;
+        let mut sum = 0;
+        let mut repeats = 0;
         group.bench_with_input(
             BenchmarkId::new("non_sized", iterations),
             &iterations,
@@ -169,15 +171,29 @@ fn scan(c: &mut Criterion) {
                 b.iter_batched(
                     || -> anyhow::Result<_> { setup_sized(*iterations, false) },
                     |suite| {
-                        let (instance, ctx, _, msg) = suite.unwrap();
+                        let (instance, ctx, gas_tracker, msg) = suite.unwrap();
 
                         // Call the `loop` query method
                         output_1 = Some(instance.call_in_1_out_1("query", &ctx, &msg).unwrap());
+                        // Record the gas consumed
+                        sum += gas_tracker.used();
+                        repeats += 1;
                     },
                     BatchSize::SmallInput,
                 )
             },
         );
+
+        if repeats != 0 {
+            println!(
+                "Iterations per run = {}; points per run = {}\n",
+                iterations,
+                sum / repeats
+            );
+        }
+
+        sum = 0;
+        repeats = 0;
 
         let mut output_2: Option<Vec<u8>> = None;
         group.bench_with_input(
@@ -187,15 +203,26 @@ fn scan(c: &mut Criterion) {
                 b.iter_batched(
                     || -> anyhow::Result<_> { setup_sized(*iterations, true) },
                     |suite| {
-                        let (instance, ctx, _, msg) = suite.unwrap();
+                        let (instance, ctx, gas_tracker, msg) = suite.unwrap();
 
                         // Call the `loop` query method
                         output_2 = Some(instance.call_in_1_out_1("query", &ctx, &msg).unwrap());
+
+                        sum += gas_tracker.used();
+                        repeats += 1;
                     },
                     BatchSize::SmallInput,
                 )
             },
         );
+
+        if repeats != 0 {
+            println!(
+                "Iterations per run = {}; points per run = {}\n",
+                iterations,
+                sum / repeats
+            );
+        }
 
         assert_eq!(output_1, output_2);
     }
