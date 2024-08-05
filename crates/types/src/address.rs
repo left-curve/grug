@@ -183,7 +183,13 @@ impl FromStr for Addr {
         let bytes = hex::decode(hex_str)?;
 
         // Make sure the byte slice of the correct length.
-        let hash = Hash160::from_array(bytes.as_slice().try_into()?);
+        let hash = Hash160::from_array(bytes.as_slice().try_into().map_err(|_| {
+            StdError::deserialize::<Self, _>(format!(
+                "invalid bytes len: expected: {} got: {}",
+                Hash160::LENGTH,
+                bytes.len()
+            ))
+        })?);
 
         Ok(Self(hash))
     }
@@ -253,6 +259,7 @@ impl<'de> de::Visitor<'de> for AddrVisitor {
 mod tests {
     #[cfg(feature = "erc55")]
     use test_case::test_case;
+
     use {
         crate::{from_json_value, to_json_value, Addr},
         hex_literal::hex,
@@ -263,6 +270,7 @@ mod tests {
     // the same as the mock hash from the Hash unit tests, except cropped to 20
     // bytes and with the `0x` prefix.
     const MOCK_STR: &str = "0x299663875422cc5a4574816e6165824d0c5bfdba";
+    const INVALID_MOCK_STR: &str = "0x299663875422cc5a4574816e6165824d0c5bfdba01";
     const MOCK_ADDR: Addr = Addr::from_array(hex!("299663875422cc5a4574816e6165824d0c5bfdba"));
 
     #[test]
@@ -275,6 +283,7 @@ mod tests {
     fn deserializing() {
         assert_eq!(MOCK_ADDR, Addr::from_str(MOCK_STR).unwrap());
         assert_eq!(MOCK_ADDR, from_json_value::<Addr>(json!(MOCK_STR)).unwrap());
+        Addr::from_str(&INVALID_MOCK_STR).unwrap_err();
     }
 
     // Test cases from ERC-55 spec:
