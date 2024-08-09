@@ -314,4 +314,18 @@ mod tests {
         let encoded = encode_sections(data).unwrap();
         assert_eq!(data, decode_sections(&encoded));
     }
+
+    #[test]
+    fn encode_section() {
+        let data: &[&[u8]] = &[b"Jake", b"Larry", b"Rhaki"];
+
+        let encode_section = crate::encode_sections(data).unwrap();
+        let decode_section = crate::decode_sections(&encode_section);
+
+        assert_eq!(data, decode_section);
+
+        println!("data: {:?}", data);
+        println!("encode_section: {:?}", encode_section);
+        println!("decode_section: {:?}", decode_section);
+    }
 }

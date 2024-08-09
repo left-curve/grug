@@ -1,11 +1,15 @@
 use {
+    grug_crypto::{sha2_256, sha2_512, Identity256, Identity512},
+    grug_tester::{CryptoVerifyType, QueryMsg as TesterQueryMsg},
     grug_testing::TestBuilder,
     grug_types::{
         to_json_value, Addr, Binary, Coins, Empty, Message, MultiplyFraction, NonZero, NumberConst,
         Udec128, Uint256,
     },
     grug_vm_wasm::{VmError, WasmVm},
+    rand::rngs::OsRng,
     std::{collections::BTreeMap, fs, io, str::FromStr, vec},
+    test_case::test_case,
 };
 
 const WASM_CACHE_CAPACITY: usize = 10;
@@ -218,6 +222,263 @@ fn immutable_state() -> anyhow::Result<()> {
         })?
         .result
         .should_fail_with_error(VmError::ReadOnly);
+
+    Ok(())
+}
+
+const MSG: &[u8] = b"finger but hole";
+
+const WRONG_MSG: &[u8] = b"precious item ahead";
+
+fn secp256k1() -> (TesterQueryMsg, fn(&[u8]) -> [u8; 32]) {
+    use k256::ecdsa::{signature::DigestSigner, Signature, SigningKey, VerifyingKey};
+
+    let sk = SigningKey::random(&mut OsRng);
+    let vk = VerifyingKey::from(&sk);
+    let msg_hash = Identity256::from(sha2_256(MSG));
+    let sig: Signature = sk.sign_digest(msg_hash.clone());
+
+    (
+        TesterQueryMsg::CryptoVerify {
+            ty: CryptoVerifyType::Secp256k1,
+            pk: vk.to_sec1_bytes().to_vec(),
+            sig: sig.to_bytes().to_vec(),
+            msg_hash: msg_hash.to_vec(),
+        },
+        sha2_256,
+    )
+}
+
+fn secp256r1() -> (TesterQueryMsg, fn(&[u8]) -> [u8; 32]) {
+    use p256::ecdsa::{signature::DigestSigner, Signature, SigningKey, VerifyingKey};
+
+    let sk = SigningKey::random(&mut OsRng);
+    let vk = VerifyingKey::from(&sk);
+    let msg_hash = Identity256::from(sha2_256(MSG));
+    let sig: Signature = sk.sign_digest(msg_hash.clone());
+
+    (
+        TesterQueryMsg::CryptoVerify {
+            ty: CryptoVerifyType::Secp256r1,
+            pk: vk.to_sec1_bytes().to_vec(),
+            sig: sig.to_bytes().to_vec(),
+            msg_hash: msg_hash.to_vec(),
+        },
+        sha2_256,
+    )
+}
+
+fn ed25519() -> (TesterQueryMsg, fn(&[u8]) -> [u8; 64]) {
+    use ed25519_dalek::{DigestSigner, SigningKey, VerifyingKey};
+
+    let sk = SigningKey::generate(&mut OsRng);
+    let vk = VerifyingKey::from(&sk);
+    let msg_hash = Identity512::from(sha2_512(MSG));
+    let sig = sk.sign_digest(msg_hash.clone());
+
+    (
+        TesterQueryMsg::CryptoVerify {
+            ty: CryptoVerifyType::Ed25519,
+            pk: vk.as_bytes().to_vec(),
+            sig: sig.to_bytes().to_vec(),
+            msg_hash: msg_hash.to_vec(),
+        },
+        sha2_512,
+    )
+}
+
+#[test_case(secp256k1; "wasm_secp256k1")]
+#[test_case(secp256r1; "wasm_secp256r1")]
+#[test_case(ed25519; "wasm_ed25519")]
+fn export_crypto_verify<const N: usize>(
+    clos: fn() -> (TesterQueryMsg, fn(&[u8]) -> [u8; N]),
+) -> anyhow::Result<()> {
+    let (mut suite, accounts) = TestBuilder::new_with_vm(WasmVm::new(WASM_CACHE_CAPACITY))
+        .add_account("owner", Coins::new())?
+        .add_account("sender", Coins::one(DENOM, NonZero::new(32_100_000_u128)))?
+        .set_owner("owner")?
+        .set_fee_rate(Udec128::from_str(FEE_RATE)?)
+        .set_tracing_level(None)
+        .build()?;
+
+    // Deploy the tester contract
+    let (_, tester) = suite.upload_and_instantiate_with_gas(
+        &accounts["sender"],
+        // Currently, deploying a contract consumes an exceedingly high amount
+        // of gas because of the need to allocate hundreds ok kB of contract
+        // bytecode into Wasm memory and have the contract deserialize it...
+        320_000_000,
+        read_wasm_file("grug_tester.wasm")?,
+        "tester",
+        &grug_tester::InstantiateMsg {},
+        Coins::new(),
+    )?;
+
+    let (mut query_msg, hash_fn) = clos();
+
+    // Ok
+    {
+        suite
+            .query_wasm_smart::<_, ()>(tester.clone(), &query_msg)
+            .should_succeed();
+    }
+
+    // Err, verify sign failed
+    {
+        // Replace the message with a wrong one
+        if let TesterQueryMsg::CryptoVerify { msg_hash, .. } = &mut query_msg {
+            *msg_hash = hash_fn(WRONG_MSG).to_vec();
+        };
+        suite
+            .query_wasm_smart::<_, ()>(tester.clone(), &query_msg)
+            .should_fail_with_error("verify sign failed");
+    }
+
+    // Err, wrong msg format
+    {
+        // Replace the message with a wrong one
+        if let TesterQueryMsg::CryptoVerify { msg_hash, .. } = &mut query_msg {
+            *msg_hash = WRONG_MSG.to_vec();
+        };
+        suite
+            .query_wasm_smart::<_, ()>(tester, &query_msg)
+            .should_fail_with_error("invalid msg format");
+    }
+
+    Ok(())
+}
+
+#[test]
+fn wasm_secp256k1_pubkey_recover() -> anyhow::Result<()> {
+    use k256::ecdsa::{SigningKey, VerifyingKey};
+
+    let (mut suite, accounts) = TestBuilder::new_with_vm(WasmVm::new(WASM_CACHE_CAPACITY))
+        .add_account("owner", Coins::new())?
+        .add_account("sender", Coins::one(DENOM, NonZero::new(32_100_000_u128)))?
+        .set_owner("owner")?
+        .set_fee_rate(Udec128::from_str(FEE_RATE)?)
+        .set_tracing_level(None)
+        .build()?;
+
+    // Deploy the tester contract
+    let (_, tester) = suite.upload_and_instantiate_with_gas(
+        &accounts["sender"],
+        // Currently, deploying a contract consumes an exceedingly high amount
+        // of gas because of the need to allocate hundreds ok kB of contract
+        // bytecode into Wasm memory and have the contract deserialize it...
+        320_000_000,
+        read_wasm_file("grug_tester.wasm")?,
+        "tester",
+        &grug_tester::InstantiateMsg {},
+        Coins::new(),
+    )?;
+
+    // Generate a valid signature
+    let sk = SigningKey::random(&mut OsRng);
+    let vk = VerifyingKey::from(&sk);
+    let msg_hash = Identity256::from(sha2_256(MSG));
+    let (sig, recovery_id) = sk.sign_digest_recoverable(msg_hash.clone()).unwrap();
+
+    let mut query_msg = TesterQueryMsg::RecoverSepc256k1 {
+        sig: sig.to_vec(),
+        msg_hash: msg_hash.to_vec(),
+        recovery_id: recovery_id.to_byte(),
+        compressed: true,
+    };
+
+    // Ok
+    {
+        let pk = suite
+            .query_wasm_smart::<_, Vec<u8>>(tester.clone(), &query_msg)
+            .should_succeed();
+
+        assert_eq!(pk.to_vec(), vk.to_sec1_bytes().to_vec());
+    }
+
+    // Different msg, succeed but pk is different
+    {
+        if let TesterQueryMsg::RecoverSepc256k1 { msg_hash, .. } = &mut query_msg {
+            *msg_hash = sha2_256(WRONG_MSG).to_vec();
+        };
+        let pk = suite
+            .query_wasm_smart::<_, Vec<u8>>(tester.clone(), &query_msg)
+            .should_succeed();
+
+        assert_ne!(pk.to_vec(), vk.to_sec1_bytes().to_vec());
+    }
+
+    // Wrong msg format
+    {
+        if let TesterQueryMsg::RecoverSepc256k1 { msg_hash, .. } = &mut query_msg {
+            *msg_hash = WRONG_MSG.to_vec();
+        };
+
+        suite
+            .query_wasm_smart::<_, Vec<u8>>(tester.clone(), &query_msg)
+            .should_fail_with_error("invalid msg format");
+    }
+
+    Ok(())
+}
+
+#[test]
+fn wasm_ed25519_batch_verify() -> anyhow::Result<()> {
+    use ed25519_dalek::{Signer, SigningKey, VerifyingKey};
+
+    fn ed25519_sign(msg: &str) -> (Vec<u8>, [u8; 64], [u8; 32]) {
+        let sk = SigningKey::generate(&mut OsRng);
+        let vk = VerifyingKey::from(&sk);
+        let sig = sk.sign(msg.as_bytes());
+        (msg.as_bytes().to_vec(), sig.to_bytes(), vk.to_bytes())
+    }
+
+    let (mut suite, accounts) = TestBuilder::new_with_vm(WasmVm::new(WASM_CACHE_CAPACITY))
+        .add_account("owner", Coins::new())?
+        .add_account("sender", Coins::one(DENOM, NonZero::new(32_100_000_u128)))?
+        .set_owner("owner")?
+        .set_fee_rate(Udec128::from_str(FEE_RATE)?)
+        .set_tracing_level(None)
+        .build()?;
+
+    // Deploy the tester contract
+    let (_, tester) = suite.upload_and_instantiate_with_gas(
+        &accounts["sender"],
+        // Currently, deploying a contract consumes an exceedingly high amount
+        // of gas because of the need to allocate hundreds ok kB of contract
+        // bytecode into Wasm memory and have the contract deserialize it...
+        320_000_000,
+        read_wasm_file("grug_tester.wasm")?,
+        "tester",
+        &grug_tester::InstantiateMsg {},
+        Coins::new(),
+    )?;
+
+    let (prehash_msg1, sig1, vk1) = ed25519_sign("Jake");
+    let (prehash_msg2, sig2, vk2) = ed25519_sign("Larry");
+    let (prehash_msg3, sig3, vk3) = ed25519_sign("Rhaki");
+
+    let mut query_msg = TesterQueryMsg::Ed25519BatchVerify {
+        prehash_msgs: vec![prehash_msg1, prehash_msg2, prehash_msg3],
+        sigs: vec![sig1.to_vec(), sig2.to_vec(), sig3.to_vec()],
+        pks: vec![vk1.to_vec(), vk2.to_vec(), vk3.to_vec()],
+    };
+
+    // Ok
+    {
+        suite
+            .query_wasm_smart::<_, ()>(tester.clone(), &query_msg)
+            .should_succeed();
+    }
+
+    // Revert sign
+    {
+        if let TesterQueryMsg::Ed25519BatchVerify { sigs, .. } = &mut query_msg {
+            sigs.reverse();
+        };
+        suite
+            .query_wasm_smart::<_, ()>(tester.clone(), &query_msg)
+            .should_fail_with_error("verify sign failed");
+    }
 
     Ok(())
 }

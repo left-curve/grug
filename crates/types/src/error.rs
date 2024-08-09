@@ -19,6 +19,9 @@ pub enum StdError {
     #[error(transparent)]
     TryFromSlice(#[from] TryFromSliceError),
 
+    #[error(transparent)]
+    Crypto(#[from] CryptoError),
+
     // TODO: rename this. this means an error is thrown by the host over the FFI.
     // something like `StdError::Host` may be more appropriate.
     #[error("generic error: {0}")]
@@ -317,3 +320,56 @@ impl StdError {
 }
 
 pub type StdResult<T> = core::result::Result<T, StdError>;
+
+#[derive(Debug, Clone, Error)]
+pub enum CryptoError {
+    #[error("verify sign failed")]
+    VerifyFailed,
+
+    #[error("public key recovery failed")]
+    RecoveryFailed,
+
+    #[error("invalid public key format")]
+    InvalidPk,
+
+    #[error("invalid signature format")]
+    InvalidSig,
+
+    #[error("invalid msg format")]
+    InvalidMsg,
+
+    #[error("invalid recovery id: supported values are 0 and 1")]
+    InvalidRecoveryId,
+
+    #[error("unknown error code: {error_code}")]
+    UnknownErr { error_code: u32 },
+}
+
+impl From<u32> for CryptoError {
+    fn from(value: u32) -> Self {
+        match value {
+            0 => unreachable!("0 is not a valid error code"),
+            1 => Self::VerifyFailed,
+            2 => Self::RecoveryFailed,
+            3 => Self::InvalidPk,
+            4 => Self::InvalidSig,
+            5 => Self::InvalidMsg,
+            6 => Self::InvalidRecoveryId,
+            i => Self::UnknownErr { error_code: i },
+        }
+    }
+}
+
+impl From<CryptoError> for u32 {
+    fn from(value: CryptoError) -> Self {
+        match value {
+            CryptoError::VerifyFailed => 1,
+            CryptoError::RecoveryFailed => 2,
+            CryptoError::InvalidPk => 3,
+            CryptoError::InvalidSig => 4,
+            CryptoError::InvalidMsg => 5,
+            CryptoError::InvalidRecoveryId => 6,
+            CryptoError::UnknownErr { error_code } => error_code,
+        }
+    }
+}

@@ -42,3 +42,43 @@ where
         from_proto_slice(data)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use {
+        super::Codec,
+        crate::{Borsh, Proto},
+        borsh::{BorshDeserialize, BorshSerialize},
+        std::fmt::Debug,
+        test_case::test_case,
+    };
+
+    #[derive(BorshSerialize, BorshDeserialize, prost::Message, PartialEq)]
+    struct Test {
+        #[prost(uint32, tag = "1")]
+        foo: u32,
+        #[prost(string, tag = "2")]
+        bar: String,
+    }
+
+    impl Test {
+        fn mock() -> Self {
+            Self {
+                foo: 3,
+                bar: "bar".to_string(),
+            }
+        }
+    }
+
+    #[test_case(Test::mock(), Borsh; "borsh")]
+    #[test_case(Test::mock(), Proto; "proto")]
+    fn codec<T, C>(data: T, _codec: C)
+    where
+        T: PartialEq + Debug,
+        C: Codec<T>,
+    {
+        let encoded = C::encode(&data).unwrap();
+        let decoded = C::decode(&encoded).unwrap();
+        assert_eq!(data, decoded);
+    }
+}

@@ -19,10 +19,11 @@ bnum          = { workspace = true, features = ["borsh"] }
 borsh         = { workspace = true, features = ["derive", "de_strict_order"] }
 data-encoding = { workspace = true }
 digest        = { workspace = true }
-hex           = { workspace = true }
-hex-literal   = { workspace = true }
 dyn-clone     = { workspace = true }
 forward_ref   = { workspace = true }
+hex           = { workspace = true }
+hex-literal   = { workspace = true }
+paste         = { workspace = true }
 prost         = { workspace = true }
 ripemd        = { workspace = true }
 serde         = { workspace = true, features = ["derive"] }

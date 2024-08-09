@@ -49,6 +49,10 @@ impl<T> Signed<T> {
             negative: true,
         }
     }
+
+    pub fn inner(&self) -> &T {
+        &self.abs
+    }
 }
 
 impl<T> Inner for Signed<T> {

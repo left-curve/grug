@@ -1,6 +1,7 @@
 use {
     crate::{read_from_memory, write_to_memory, Environment, Iterator, VmError, VmResult},
     grug_app::GAS_COSTS,
+    grug_crypto::CryptoResult,
     grug_types::{
         decode_sections, from_json_slice, to_json_vec, Addr, QueryRequest, Record, Storage,
     },
@@ -245,7 +246,7 @@ pub fn secp256k1_verify(
     msg_hash_ptr: u32,
     sig_ptr: u32,
     pk_ptr: u32,
-) -> VmResult<i32> {
+) -> VmResult<u32> {
     let (env, mut store) = fe.data_and_store_mut();
 
     let msg_hash = read_from_memory(env, &store, msg_hash_ptr)?;
@@ -254,10 +255,9 @@ pub fn secp256k1_verify(
 
     env.consume_external_gas(&mut store, GAS_COSTS.secp256k1_verify, "secp256k1_verify")?;
 
-    match grug_crypto::secp256k1_verify(&msg_hash, &sig, &pk) {
-        Ok(()) => Ok(0),
-        Err(_) => Ok(1),
-    }
+    let res = grug_crypto::secp256k1_verify(&msg_hash, &sig, &pk);
+
+    write_verify_result(res)
 }
 
 pub fn secp256r1_verify(
@@ -265,7 +265,7 @@ pub fn secp256r1_verify(
     msg_hash_ptr: u32,
     sig_ptr: u32,
     pk_ptr: u32,
-) -> VmResult<i32> {
+) -> VmResult<u32> {
     let (env, mut store) = fe.data_and_store_mut();
 
     let msg_hash = read_from_memory(env, &store, msg_hash_ptr)?;
@@ -274,10 +274,9 @@ pub fn secp256r1_verify(
 
     env.consume_external_gas(&mut store, GAS_COSTS.secp256k1_verify, "secp256r1_verify")?;
 
-    match grug_crypto::secp256r1_verify(&msg_hash, &sig, &pk) {
-        Ok(()) => Ok(0),
-        Err(_) => Ok(1),
-    }
+    let res = grug_crypto::secp256r1_verify(&msg_hash, &sig, &pk);
+
+    write_verify_result(res)
 }
 
 pub fn secp256k1_pubkey_recover(
@@ -286,7 +285,7 @@ pub fn secp256k1_pubkey_recover(
     sig_ptr: u32,
     recovery_id: u8,
     compressed: u8,
-) -> VmResult<u32> {
+) -> VmResult<u64> {
     let (env, mut store) = fe.data_and_store_mut();
 
     let msg_hash = read_from_memory(env, &store, msg_hash_ptr)?;
@@ -305,9 +304,15 @@ pub fn secp256k1_pubkey_recover(
     )?;
 
     match grug_crypto::secp256k1_pubkey_recover(&msg_hash, &sig, recovery_id, compressed) {
-        Ok(pk) => write_to_memory(env, &mut store, &pk),
-        Err(_) => Ok(0),
+        Ok(pk) => {
+            let ptr = write_to_memory(env, &mut store, &pk)?;
+            Ok(to_high_half(ptr))
+        },
+        Err(err) => Ok(to_low_half(err.into())),
     }
+
+    // let res_bytes = to_borsh_vec(&res)?;
+    // write_to_memory(env, &mut store, &res_bytes)
 }
 
 pub fn ed25519_verify(
@@ -315,7 +320,7 @@ pub fn ed25519_verify(
     msg_hash_ptr: u32,
     sig_ptr: u32,
     pk_ptr: u32,
-) -> VmResult<i32> {
+) -> VmResult<u32> {
     let (env, mut store) = fe.data_and_store_mut();
 
     let msg_hash = read_from_memory(env, &store, msg_hash_ptr)?;
@@ -324,10 +329,9 @@ pub fn ed25519_verify(
 
     env.consume_external_gas(&mut store, GAS_COSTS.ed25519_verify, "ed25519_verify")?;
 
-    match grug_crypto::ed25519_verify(&msg_hash, &sig, &pk) {
-        Ok(()) => Ok(0),
-        Err(_) => Ok(1),
-    }
+    let res = grug_crypto::ed25519_verify(&msg_hash, &sig, &pk);
+
+    write_verify_result(res)
 }
 
 pub fn ed25519_batch_verify(
@@ -335,7 +339,7 @@ pub fn ed25519_batch_verify(
     msgs_hash_ptr: u32,
     sigs_ptr: u32,
     pks_ptr: u32,
-) -> VmResult<i32> {
+) -> VmResult<u32> {
     let (env, mut store) = fe.data_and_store_mut();
 
     let msgs_hash = read_from_memory(env, &store, msgs_hash_ptr)?;
@@ -352,10 +356,9 @@ pub fn ed25519_batch_verify(
         "ed25519_batch_verify",
     )?;
 
-    match grug_crypto::ed25519_batch_verify(&msgs_hash, &sigs, &pks) {
-        Ok(()) => Ok(0),
-        Err(_) => Ok(1),
-    }
+    let res = grug_crypto::ed25519_batch_verify(&msgs_hash, &sigs, &pks);
+
+    write_verify_result(res)
 }
 
 macro_rules! impl_hash_method {
@@ -397,4 +400,28 @@ fn encode_record((mut k, v): Record) -> Vec<u8> {
     k.extend(v);
     k.extend_from_slice(&(key_len as u16).to_be_bytes());
     k
+}
+
+#[inline]
+fn write_verify_result(result: CryptoResult<()>) -> VmResult<u32> {
+    match result {
+        Ok(()) => Ok(0),
+        Err(err) => Ok(err.into()),
+    }
+}
+
+#[inline]
+fn to_high_half(data: u32) -> u64 {
+    // See https://stackoverflow.com/a/58956419/2013738 to understand
+    // why this is endianness agnostic.
+    (data as u64) << 32
+}
+
+/// Returns the data copied to the 4 least significant bytes.
+///
+/// This is independent of endianness. But to get the idea, it would be
+/// `0x00000000 || data` in big endian representation.
+#[inline]
+fn to_low_half(data: u32) -> u64 {
+    data.into()
 }

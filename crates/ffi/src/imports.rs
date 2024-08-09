@@ -1,8 +1,8 @@
 use {
     crate::Region,
     grug_types::{
-        encode_sections, from_json_slice, to_json_vec, Addr, Api, GenericResult, Order, Querier,
-        QueryRequest, QueryResponse, Record, StdError, StdResult, Storage,
+        encode_sections, from_json_slice, to_json_vec, Addr, Api, CryptoError, GenericResult,
+        Order, Querier, QueryRequest, QueryResponse, Record, StdError, StdResult, Storage,
     },
 };
 
@@ -26,16 +26,16 @@ extern "C" {
 
     // Signature verification
     // Return value of 0 means ok; any value other than 0 means error.
-    fn secp256r1_verify(msg_hash_ptr: usize, sig_ptr: usize, pk_ptr: usize) -> i32;
-    fn secp256k1_verify(msg_hash_ptr: usize, sig_ptr: usize, pk_ptr: usize) -> i32;
+    fn secp256r1_verify(msg_hash_ptr: usize, sig_ptr: usize, pk_ptr: usize) -> usize;
+    fn secp256k1_verify(msg_hash_ptr: usize, sig_ptr: usize, pk_ptr: usize) -> usize;
     fn secp256k1_pubkey_recover(
         msg_hash_ptr: usize,
         sig_ptr: usize,
         recovery_id: u8,
         compressed: u8,
-    ) -> usize;
-    fn ed25519_verify(msg_hash_ptr: usize, sig_ptr: usize, pk_ptr: usize) -> i32;
-    fn ed25519_batch_verify(msgs_hash_ptr: usize, sigs_ptr: usize, pks_ptr: usize) -> i32;
+    ) -> u64;
+    fn ed25519_verify(msg_hash_ptr: usize, sig_ptr: usize, pk_ptr: usize) -> usize;
+    fn ed25519_batch_verify(msgs_hash_ptr: usize, sigs_ptr: usize, pks_ptr: usize) -> usize;
 
     // Hashes
     fn sha2_256(data_ptr: usize) -> usize;
@@ -313,15 +313,10 @@ impl Api for ExternalApi {
         let pk_region = Region::build(pk);
         let pk_ptr = &*pk_region as *const Region;
 
-        let return_value =
+        let res =
             unsafe { secp256r1_verify(msg_hash_ptr as usize, sig_ptr as usize, pk_ptr as usize) };
 
-        if return_value == 0 {
-            Ok(())
-        } else {
-            // TODO: more useful error codes
-            Err(StdError::VerificationFailed)
-        }
+        parse_crypto_verify_result(res)
     }
 
     fn secp256k1_verify(&self, msg_hash: &[u8], sig: &[u8], pk: &[u8]) -> StdResult<()> {
@@ -334,15 +329,10 @@ impl Api for ExternalApi {
         let pk_region = Region::build(pk);
         let pk_ptr = &*pk_region as *const Region;
 
-        let return_value =
+        let res =
             unsafe { secp256k1_verify(msg_hash_ptr as usize, sig_ptr as usize, pk_ptr as usize) };
 
-        if return_value == 0 {
-            Ok(())
-        } else {
-            // TODO: more useful error codes
-            Err(StdError::VerificationFailed)
-        }
+        parse_crypto_verify_result(res)
     }
 
     fn secp256k1_pubkey_recover(
@@ -358,7 +348,7 @@ impl Api for ExternalApi {
         let sig_region = Region::build(sig);
         let sig_ptr = &*sig_region as *const Region;
 
-        let pk_ptr = unsafe {
+        let res = unsafe {
             secp256k1_pubkey_recover(
                 msg_hash_ptr as usize,
                 sig_ptr as usize,
@@ -367,13 +357,16 @@ impl Api for ExternalApi {
             )
         };
 
-        if pk_ptr == 0 {
-            // we interpret a zero pointer as meaning the key doesn't exist
-            // TODO: more useful error codes
-            return Err(StdError::VerificationFailed);
-        }
+        let ptr_result = from_high_half(res);
+        let err = from_low_half(res);
 
-        unsafe { Ok(Region::consume(pk_ptr as *mut Region)) }
+        match err {
+            0 => {
+                let val = unsafe { Region::consume(ptr_result as *mut Region) };
+                Ok(val)
+            },
+            i => Err(StdError::Crypto(CryptoError::from(i))),
+        }
     }
 
     fn ed25519_verify(&self, msg_hash: &[u8], sig: &[u8], pk: &[u8]) -> StdResult<()> {
@@ -386,15 +379,10 @@ impl Api for ExternalApi {
         let pk_region = Region::build(pk);
         let pk_ptr = &*pk_region as *const Region;
 
-        let return_value =
+        let res =
             unsafe { ed25519_verify(msg_hash_ptr as usize, sig_ptr as usize, pk_ptr as usize) };
 
-        if return_value == 0 {
-            Ok(())
-        } else {
-            // TODO: more useful error codes
-            Err(StdError::VerificationFailed)
-        }
+        parse_crypto_verify_result(res)
     }
 
     fn ed25519_batch_verify(
@@ -403,26 +391,46 @@ impl Api for ExternalApi {
         sigs: &[&[u8]],
         pks: &[&[u8]],
     ) -> StdResult<()> {
-        let msgs_hash_region = Region::build(&encode_sections(msgs_hash)?);
+        let msg_encoded = encode_sections(msgs_hash)?;
+        let msgs_hash_region = Region::build(&msg_encoded);
         let msgs_hash_ptr = &*msgs_hash_region as *const Region;
 
-        let sigs_region = Region::build(&encode_sections(sigs)?);
+        let sigs_encoded = encode_sections(sigs)?;
+        let sigs_region = Region::build(&sigs_encoded);
         let sigs_ptr = &*sigs_region as *const Region;
 
-        let pks_region = Region::build(&encode_sections(pks)?);
+        let pks_encoded = encode_sections(pks)?;
+        let pks_region = Region::build(&pks_encoded);
         let pks_ptr = &*pks_region as *const Region;
 
-        let return_value = unsafe {
+        let res = unsafe {
             ed25519_batch_verify(msgs_hash_ptr as usize, sigs_ptr as usize, pks_ptr as usize)
         };
 
-        if return_value == 0 {
-            Ok(())
-        } else {
-            // TODO: more useful error codes
-            Err(StdError::VerificationFailed)
-        }
+        parse_crypto_verify_result(res)
     }
+}
+
+fn parse_crypto_verify_result(res: usize) -> StdResult<()> {
+    if res == 0 {
+        Ok(())
+    } else {
+        Err(StdError::Crypto(CryptoError::from(res as u32)))
+    }
+}
+
+/// Returns the four most significant bytes
+#[allow(dead_code)] // only used in Wasm builds
+#[inline]
+pub fn from_high_half(data: u64) -> u32 {
+    (data >> 32).try_into().unwrap()
+}
+
+/// Returns the four least significant bytes
+#[allow(dead_code)] // only used in Wasm builds
+#[inline]
+pub fn from_low_half(data: u64) -> u32 {
+    (data & 0xFFFFFFFF).try_into().unwrap()
 }
 
 // ---------------------------------- querier ----------------------------------

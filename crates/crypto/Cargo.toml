@@ -14,12 +14,12 @@ blake2        = { workspace = true }
 blake3        = { workspace = true }
 digest        = { workspace = true }
 ed25519-dalek = { workspace = true, features = ["batch", "digest"] }
+grug-types    = { path = "../types" }
 k256          = { workspace = true }
 p256          = { workspace = true }
 sha2          = { workspace = true }
 sha3          = { workspace = true }
 signature     = { workspace = true }
-thiserror     = { workspace = true }
 
 [dev-dependencies]
 criterion   = { workspace = true }

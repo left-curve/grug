@@ -1,27 +1,31 @@
-use thiserror::Error;
-
-#[derive(Debug, Error)]
-pub enum CryptoError {
-    #[error(transparent)]
-    Signature(#[from] signature::Error),
-
-    #[error("data is of incorrect length: expecting {expect}, found {actual}")]
-    IncorrectLength { expect: usize, actual: usize },
-
-    #[error("data is of incorrect length: expecting one of {expect:?}, found {actual}")]
-    IncorrectLengths {
-        expect: &'static [usize],
-        actual: usize,
-    },
-
-    #[error("invalid recovery id {recovery_id}")]
-    InvalidRecoveryId { recovery_id: u8 },
-
-    #[error("array exceeds maximum length, max {max_length}, found {actual_length}")]
-    ExceedsMaximumLength {
-        max_length: usize,
-        actual_length: usize,
-    },
-}
+use grug_types::CryptoError;
 
 pub type CryptoResult<T> = core::result::Result<T, CryptoError>;
+
+pub(crate) trait SignatureResultExt {
+    type Inner;
+    fn crypto_verify_failed(self) -> CryptoResult<Self::Inner>;
+    fn crypto_recovery_failed(self) -> CryptoResult<Self::Inner>;
+    fn crypto_invalid_pk_format(self) -> CryptoResult<Self::Inner>;
+    fn crypto_invalid_sig_format(self) -> CryptoResult<Self::Inner>;
+}
+
+impl<T> SignatureResultExt for Result<T, signature::Error> {
+    type Inner = T;
+
+    fn crypto_verify_failed(self) -> CryptoResult<T> {
+        self.map_err(|_| CryptoError::VerifyFailed)
+    }
+
+    fn crypto_recovery_failed(self) -> CryptoResult<Self::Inner> {
+        self.map_err(|_| CryptoError::RecoveryFailed)
+    }
+
+    fn crypto_invalid_pk_format(self) -> CryptoResult<T> {
+        self.map_err(|_| CryptoError::InvalidPk)
+    }
+
+    fn crypto_invalid_sig_format(self) -> CryptoResult<T> {
+        self.map_err(|_| CryptoError::InvalidSig)
+    }
+}

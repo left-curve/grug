@@ -81,82 +81,39 @@ pub enum QueryResponse {
     WasmSmart(Json),
 }
 
-// TODO: can we use a macro to implement these?
+macro_rules! generate_as {
+    ($id:ident => $ret:ty) => {
+        paste::paste! {
+            pub fn [<as_$id:snake>](self) -> $ret {
+                let Self::$id(resp) = self else {
+                     panic!("QueryResponse is not {}", stringify!($id));
+                };
+                resp
+            }
+        }
+    };
+}
+
 impl QueryResponse {
-    pub fn as_info(self) -> InfoResponse {
-        let Self::Info(resp) = self else {
-            panic!("QueryResponse is not Info");
-        };
-        resp
-    }
+    generate_as!(Info => InfoResponse);
 
-    pub fn as_balance(self) -> Coin {
-        let Self::Balance(coin) = self else {
-            panic!("BankQueryResponse is not Balance");
-        };
-        coin
-    }
+    generate_as!(Balance => Coin);
 
-    pub fn as_balances(self) -> Coins {
-        let Self::Balances(coins) = self else {
-            panic!("BankQueryResponse is not Balances");
-        };
-        coins
-    }
+    generate_as!(Balances => Coins);
 
-    pub fn as_supply(self) -> Coin {
-        let Self::Supply(coin) = self else {
-            panic!("BankQueryResponse is not Supply");
-        };
-        coin
-    }
+    generate_as!(Supply => Coin);
 
-    pub fn as_supplies(self) -> Coins {
-        let Self::Supplies(coins) = self else {
-            panic!("BankQueryResponse is not Supplies");
-        };
-        coins
-    }
+    generate_as!(Supplies => Coins);
 
-    pub fn as_code(self) -> Binary {
-        let Self::Code(wasm_byte_code) = self else {
-            panic!("QueryResponse is not Code");
-        };
-        wasm_byte_code
-    }
+    generate_as!(Code => Binary);
 
-    pub fn as_codes(self) -> BTreeMap<Hash256, Binary> {
-        let Self::Codes(hashes) = self else {
-            panic!("QueryResponse is not Codes");
-        };
-        hashes
-    }
+    generate_as!(Codes => BTreeMap<Hash256, Binary>);
 
-    pub fn as_account(self) -> Account {
-        let Self::Account(resp) = self else {
-            panic!("QueryResponse is not Account");
-        };
-        resp
-    }
+    generate_as!(Account => Account);
 
-    pub fn as_accounts(self) -> BTreeMap<Addr, Account> {
-        let Self::Accounts(resp) = self else {
-            panic!("QueryResponse is not Accounts");
-        };
-        resp
-    }
+    generate_as!(Accounts => BTreeMap<Addr, Account>);
 
-    pub fn as_wasm_raw(self) -> Option<Binary> {
-        let Self::WasmRaw(resp) = self else {
-            panic!("QueryResponse is not WasmRaw");
-        };
-        resp
-    }
+    generate_as!(WasmRaw => Option<Binary>);
 
-    pub fn as_wasm_smart(self) -> Json {
-        let Self::WasmSmart(resp) = self else {
-            panic!("QueryResponse is not WasmSmart");
-        };
-        resp
-    }
+    generate_as!(WasmSmart => Json);
 }

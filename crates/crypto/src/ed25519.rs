@@ -1,6 +1,7 @@
 use {
-    crate::{to_sized, CryptoResult, Identity512},
+    crate::{to_sized, CryptoResult, Identity512, SignatureResultExt},
     ed25519_dalek::{DigestVerifier, Signature, VerifyingKey},
+    grug_types::CryptoError,
 };
 
 const ED25519_DIGEST_LEN: usize = 64;
@@ -12,16 +13,16 @@ const ED25519_SIGNATURE_LEN: usize = 64;
 ///
 /// NOTE: This function takes the hash of the message, not the prehash.
 pub fn ed25519_verify(msg_hash: &[u8], sig: &[u8], pk: &[u8]) -> CryptoResult<()> {
-    let msg_hash = to_sized::<ED25519_DIGEST_LEN>(msg_hash)?;
+    let msg_hash = to_sized::<ED25519_DIGEST_LEN>(msg_hash, CryptoError::InvalidMsg)?;
     let msg_hash = Identity512::from(msg_hash);
 
-    let sig = to_sized::<ED25519_SIGNATURE_LEN>(sig)?;
+    let sig = to_sized::<ED25519_SIGNATURE_LEN>(sig, CryptoError::InvalidSig)?;
     let sig = Signature::from(sig);
 
-    let vk = to_sized::<ED25519_PUBKEY_LEN>(pk)?;
-    let vk = VerifyingKey::from_bytes(&vk)?;
+    let vk = to_sized::<ED25519_PUBKEY_LEN>(pk, CryptoError::InvalidPk)?;
+    let vk = VerifyingKey::from_bytes(&vk).crypto_invalid_pk_format()?;
 
-    vk.verify_digest(msg_hash, &sig).map_err(Into::into)
+    vk.verify_digest(msg_hash, &sig).crypto_verify_failed()
 }
 
 /// Verify a batch of Ed25519 signatures with the given _prehash_ messages and
@@ -38,11 +39,11 @@ pub fn ed25519_batch_verify(
         .iter()
         .zip(pks.iter())
         .map(|(sig, pk)| {
-            let sig = to_sized::<ED25519_SIGNATURE_LEN>(sig)?;
+            let sig = to_sized::<ED25519_SIGNATURE_LEN>(sig, CryptoError::InvalidSig)?;
             let sig = Signature::from(sig);
 
-            let vk = to_sized::<ED25519_PUBKEY_LEN>(pk)?;
-            let vk = VerifyingKey::from_bytes(&vk)?;
+            let vk = to_sized::<ED25519_PUBKEY_LEN>(pk, CryptoError::InvalidPk)?;
+            let vk = VerifyingKey::from_bytes(&vk).crypto_verify_failed()?;
 
             Ok((sig, vk))
         })
@@ -52,7 +53,7 @@ pub fn ed25519_batch_verify(
 
     // No need to check the three slices (`msg_hashes`, `sigs`, `pks`) are of the
     // length; `ed25519_dalek::verify_batch` already does this.
-    ed25519_dalek::verify_batch(prehash_msgs, &sigs, &vks).map_err(Into::into)
+    ed25519_dalek::verify_batch(prehash_msgs, &sigs, &vks).crypto_verify_failed()
 }
 
 // ----------------------------------- tests -----------------------------------

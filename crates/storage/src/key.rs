@@ -1,9 +1,9 @@
 use {
     grug_types::{
-        nested_namespaces_with_key, Addr, Bytable, Duration, Hash, StdError, StdResult, Uint128,
-        Uint256, Uint512, Uint64,
+        nested_namespaces_with_key, Addr, Bytable, Duration, Hash, NumberConst, Sign, Signed,
+        StdError, StdResult, Udec, Uint, Uint128, Uint256, Uint512, Uint64,
     },
-    std::{borrow::Cow, mem},
+    std::{borrow::Cow, mem, ops::Sub},
 };
 
 // ------------------------------------ key ------------------------------------
@@ -303,6 +303,80 @@ where
     }
 }
 
+impl<T> Key for Signed<T>
+where
+    T: Key<Output = T> + Sub<Output = T> + Copy,
+    T: NumberConst,
+{
+    type Output = Self;
+    type Prefix = ();
+    type Suffix = ();
+
+    fn raw_keys(&self) -> Vec<Cow<[u8]>> {
+        let (mut keys, sign) = match self.is_negative() {
+            true => {
+                let dif = T::MAX - *self.inner();
+
+                let keys = dif
+                    .raw_keys()
+                    .into_iter()
+                    .map(|val: Cow<[u8]>| Cow::Owned(val.into_owned()))
+                    .collect();
+
+                (keys, 0)
+            },
+            false => (self.inner().raw_keys(), 1),
+        };
+
+        if let Some(first) = keys.first_mut() {
+            match first {
+                Cow::Borrowed(borrowed) => {
+                    let mut bytes = borrowed.to_vec();
+                    bytes.insert(0, sign);
+                    *first = Cow::Owned(bytes);
+                },
+                Cow::Owned(owned) => owned.insert(0, sign),
+            }
+        }
+
+        keys
+    }
+
+    fn from_slice(bytes: &[u8]) -> StdResult<Self::Output> {
+        let mut inner = T::from_slice(&bytes[1..])?;
+
+        let negative = match bytes.first() {
+            Some(0) => {
+                inner = T::MAX - inner;
+                true
+            },
+            Some(1) => false,
+            _ => return Err(StdError::deserialize::<Self::Output, _>("missing sign")),
+        };
+
+        Ok(Signed::new(inner, negative))
+    }
+}
+
+impl<T, const S: u32> Key for Udec<T, S>
+where
+    Uint<T>: Key<Output = Uint<T>>,
+{
+    type Output = Self;
+    type Prefix = ();
+    type Suffix = ();
+
+    fn raw_keys(&self) -> Vec<Cow<[u8]>> {
+        let key = self.numerator().raw_keys();
+        key
+    }
+
+    fn from_slice(bytes: &[u8]) -> StdResult<Self::Output> {
+        let numerator = Uint::<T>::from_slice(bytes)?;
+        Ok(Self::raw(numerator))
+    }
+}
+
 /// Given the raw bytes of a tuple key consisting of at least one subkey, each
 /// subkey having one or more key elements, split off the first subkey.
 ///
@@ -356,8 +430,8 @@ pub(crate) fn split_first_key(key_elems: u16, value: &[u8]) -> (Vec<u8>, &[u8]) 
     (first_key, remainder)
 }
 
-macro_rules! impl_integer_key {
-    ($($t:ty),+ $(,)?) => {
+macro_rules! impl_unsigned_integer_key {
+    ($($t:ty),+) => {
         $(impl Key for $t {
             type Prefix = ();
             type Suffix = ();
@@ -382,9 +456,37 @@ macro_rules! impl_integer_key {
     }
 }
 
-impl_integer_key!(
-    u8, u16, u32, u64, u128, i8, i16, i32, i64, i128, Uint64, Uint128, Uint256, Uint512,
-);
+impl_unsigned_integer_key!(u8, u16, u32, u64, u128, Uint64, Uint128, Uint256, Uint512);
+
+macro_rules! impl_signed_integer_key {
+    ($($s:ty => $u:ty),+ ) => {
+        $(impl Key for $s {
+            type Prefix = ();
+            type Suffix = ();
+            type Output = $s;
+
+            fn raw_keys(&self) -> Vec<Cow<[u8]>> {
+                let bytes = (*self as $u ^ <$s>::MIN as $u).to_be_bytes().to_vec();
+                vec![Cow::Owned(bytes)]
+            }
+
+            fn from_slice(bytes: &[u8]) -> StdResult<Self::Output> {
+                let Ok(bytes) = <[u8; mem::size_of::<Self>()]>::try_from(bytes) else {
+                    return Err(StdError::deserialize::<Self::Output, _>(format!(
+                        "wrong number of bytes: expecting {}, got {}",
+                        mem::size_of::<Self>(),
+                        bytes.len(),
+                    )));
+                };
+
+                Ok((Self::from_be_bytes(bytes) as $u ^ <$s>::MIN as $u) as _)
+
+            }
+        })*
+    }
+}
+
+impl_signed_integer_key!(i8 => u8, i16 => u16, i32 => u32, i64 => u64, i128 => u128);
 
 // --------------------------------- prefixer ----------------------------------
 
@@ -466,6 +568,25 @@ where
     }
 }
 
+impl<T, const S: u32> Prefixer for Udec<T, S>
+where
+    Uint<T>: Key<Output = Uint<T>>,
+{
+    fn raw_prefixes(&self) -> Vec<Cow<[u8]>> {
+        self.raw_keys()
+    }
+}
+
+impl<T> Prefixer for Signed<T>
+where
+    T: Key<Output = T> + Sub<Output = T> + Copy,
+    T: NumberConst,
+{
+    fn raw_prefixes(&self) -> Vec<Cow<[u8]>> {
+        self.raw_keys()
+    }
+}
+
 macro_rules! impl_integer_prefixer {
     ($($t:ty),+ $(,)?) => {
         $(impl Prefixer for $t {
@@ -484,7 +605,12 @@ impl_integer_prefixer!(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use {
+        super::*,
+        grug_types::{Dec128, Dec256, Int128, Int256, Int64, NumberConst, Udec128, Udec256},
+        std::{fmt::Debug, str::FromStr},
+        test_case::test_case,
+    };
 
     #[test]
     fn triple_tuple_key() {
@@ -547,5 +673,68 @@ mod tests {
             deserialized,
             ((a, (b.to_string(), c.to_string())), d.to_string())
         );
+
+    }
+
+    /// `len(u32) = 4 | 10_u32.to_be_bytes() | 265_u32.to_be_bytes()`
+    const DOUBLE_TUPLE_BYTES: &[u8] = &[0, 4, 0, 0, 0, 10, 0, 0, 1, 9];
+    /// `len(b"Hello") = 5 | b"Hello" | len(u32) = 4 | 10_u32 | b"World"`
+    const DOUBLE_TRIPLE_BYTES: &[u8] = &[
+        0, 5, 72, 101, 108, 108, 111, 0, 4, 0, 0, 0, 10, 87, 111, 114, 108, 100,
+    ];
+
+    const DEC128_SHIFT: u128 = 10_u128.pow(18);
+
+    fn with_sign<const N: usize>(s: u8, b: [u8; N]) -> Vec<u8> {
+        let mut bytes = vec![s];
+        bytes.extend_from_slice(&b);
+        bytes
+    }
+
+    #[test_case(b"slice".as_slice(), b"slice"; "slice")]
+    #[test_case(b"Vec".to_vec(), b"Vec"; "vec_u8")]
+    #[test_case("str", b"str"; "str")]
+    #[test_case("String".to_string(), b"String"; "string")]
+    #[test_case(Addr::from_array(*b"ThisIsAValidAddress-"), b"ThisIsAValidAddress-"; "addr")]
+    #[test_case(&Addr::from_array(*b"ThisIsAValidAddress-"), b"ThisIsAValidAddress-"; "borrow_addr")]
+    #[test_case(Hash::<32>::from_array([1;32]), &[1; 32]; "hash")]
+    #[test_case(&Hash::<20>::from_array([2;20]), &[2; 20]; "borrow_hash")]
+    #[test_case(Duration::from_nanos(100), &100_u128.to_be_bytes(); "duration")]
+    #[test_case((10_u32, 265_u32 ), &DOUBLE_TUPLE_BYTES; "double_tuple")]
+    #[test_case(("Hello".to_string(), 10_u32, "World".to_string()), &DOUBLE_TRIPLE_BYTES; "triple")]
+    /// ---- Rust native numbers ----
+    #[test_case(10_u64, &10_u64.to_be_bytes(); "u64_10")]
+    #[test_case(-1_i8, &[127]; "i8_neg_1")]
+    #[test_case(1_i8, &[129]; "i8_1")]
+    /// ---- Unisgned integers ----
+    #[test_case(Uint64::new(10), &10_u64.to_be_bytes(); "uint64_10")]
+    #[test_case(Uint128::new(10), &Uint128::new(10).to_be_bytes(); "uint128_10")]
+    #[test_case(Uint256::MIN, &[0; 32]; "uint256_MIN")]
+    #[test_case(Uint512::MAX, &Uint512::MAX.to_be_bytes(); "uint256_MAX")]
+    /// ---- Unisgned Decimals ----
+    #[test_case(Udec128::from_str("10").unwrap(), &(10 * DEC128_SHIFT).to_be_bytes(); "udec128_10")]
+    #[test_case(Udec128::from_str("5.5").unwrap(), &(5 * DEC128_SHIFT + DEC128_SHIFT / 2).to_be_bytes(); "udec128_5.5")]
+    #[test_case(Udec128::MIN, &Uint128::MIN.to_be_bytes(); "udec128_0")]
+    #[test_case(Udec256::MAX, &Uint256::MAX.to_be_bytes(); "udec256_MAX")]
+    /// ---- Signed integers ----
+    #[test_case(Int64::new_positive(10_u64.into()), &with_sign(1, 10_u64.to_be_bytes()); "int64_10")]
+    #[test_case(Int128::new_negative(10_u64.into()), &with_sign(0, (u128::MAX - 10).to_be_bytes()); "int128_neg_10")]
+    #[test_case(Int256::MIN, &with_sign(0, Uint256::MIN.to_be_bytes()); "int256_MIN")]
+    #[test_case(Int256::MAX, &with_sign(1, Uint256::MAX.to_be_bytes()); "int256_MAX")]
+    /// ---- Signed Decimals ----
+    #[test_case(Dec128::MAX, &with_sign(1, Uint128::MAX.to_be_bytes()); "dec128_MAX")]
+    #[test_case(Dec128::MIN, &with_sign(0, Uint128::MIN.to_be_bytes()); "dec128_MIN")]
+    #[test_case(Dec256::from_str("-10.5").unwrap(), &with_sign(0, (Uint256::MAX - Uint256::from(10 * DEC128_SHIFT + DEC128_SHIFT / 2)).to_be_bytes()); "dec128_neg_10_5")]
+    #[test_case(Dec256::from_str("20.75").unwrap(), &with_sign(1, (Uint256::from(20 * DEC128_SHIFT + DEC128_SHIFT / 2 + DEC128_SHIFT / 4)).to_be_bytes()); "dec128_20_75")]
+    fn key<T>(compare: T, bytes: &[u8])
+    where
+        T: Key + PartialEq<<T as Key>::Output> + Debug,
+        <T as Key>::Output: PartialEq<T> + Debug,
+    {
+        let des = T::from_slice(bytes).unwrap();
+        assert_eq!(compare, des);
+
+        let ser = compare.joined_key();
+        assert_eq!(bytes, ser);
     }
 }

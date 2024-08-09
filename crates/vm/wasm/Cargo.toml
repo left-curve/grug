@@ -30,12 +30,17 @@ wasmer-middlewares = { workspace = true }
 [dev-dependencies]
 anyhow        = { workspace = true }
 criterion     = { workspace = true }
+ed25519-dalek = { workspace = true, features = ["batch", "digest"] }
 grug-app      = { path = "../../app", features = ["tracing"] }
 grug-bank     = { path = "../../../contracts/bank", features = ["library"] }
 grug-crypto   = { path = "../../crypto" }
 grug-tester   = { path = "../../../contracts/tester", features = ["library"] }
 grug-testing  = { path = "../../testing" }
 grug-vm-wasm  = { path = ".", features = ["testing"] }
+k256          = { workspace = true }
+p256          = { workspace = true }
+rand          = { workspace = true }
+test-case     = { workspace = true }
 
 [[bench]]
 name = "benchmarks"

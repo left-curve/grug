@@ -51,8 +51,8 @@ impl<U, const S: u32> Udec<U, S> {
         Self(value)
     }
 
-    pub fn numerator(self) -> Uint<U> {
-        self.0
+    pub fn numerator(&self) -> &Uint<U> {
+        &self.0
     }
 }
 
@@ -293,7 +293,7 @@ where
     fn checked_mul(self, other: Self) -> StdResult<Self> {
         let next_result = self
             .0
-            .checked_full_mul(other.numerator())?
+            .checked_full_mul(*other.numerator())?
             .checked_div(Self::decimal_fraction().into())?;
         next_result
             .try_into()
@@ -302,7 +302,7 @@ where
     }
 
     fn checked_div(self, other: Self) -> StdResult<Self> {
-        Udec::checked_from_ratio(self.numerator(), other.numerator())
+        Udec::checked_from_ratio(*self.numerator(), *other.numerator())
     }
 
     fn checked_rem(self, other: Self) -> StdResult<Self> {

@@ -1,5 +1,6 @@
 use {
-    crate::{to_sized, CryptoError, CryptoResult, Identity256},
+    crate::{to_sized, CryptoResult, Identity256, SignatureResultExt},
+    grug_types::CryptoError,
     p256::ecdsa::{signature::DigestVerifier, Signature, VerifyingKey},
 };
 
@@ -9,11 +10,11 @@ const SECP256R1_SIGNATURE_LEN: usize = 64;
 
 /// NOTE: This function takes the hash of the message, not the prehash.
 pub fn secp256r1_verify(msg_hash: &[u8], sig: &[u8], pk: &[u8]) -> CryptoResult<()> {
-    let msg_hash = to_sized::<SECP256R1_DIGEST_LEN>(msg_hash)?;
+    let msg_hash = to_sized::<SECP256R1_DIGEST_LEN>(msg_hash, CryptoError::InvalidMsg)?;
     let msg_hash = Identity256::from(msg_hash);
 
-    let sig = to_sized::<SECP256R1_SIGNATURE_LEN>(sig)?;
-    let mut sig = Signature::from_bytes(&sig.into())?;
+    let sig = to_sized::<SECP256R1_SIGNATURE_LEN>(sig, CryptoError::InvalidSig)?;
+    let mut sig = Signature::from_bytes(&sig.into()).crypto_invalid_sig_format()?;
 
     // High-S signatures require normalization since our verification implementation
     // rejects them by default. If we had a verifier that does not restrict to
@@ -23,15 +24,13 @@ pub fn secp256r1_verify(msg_hash: &[u8], sig: &[u8], pk: &[u8]) -> CryptoResult<
     }
 
     if !SECP256R1_PUBKEY_LENS.contains(&pk.len()) {
-        return Err(CryptoError::IncorrectLengths {
-            expect: &SECP256R1_PUBKEY_LENS,
-            actual: pk.len(),
-        });
+        return Err(CryptoError::InvalidPk);
     }
 
-    VerifyingKey::from_sec1_bytes(pk)?
+    VerifyingKey::from_sec1_bytes(pk)
+        .crypto_invalid_pk_format()?
         .verify_digest(msg_hash, &sig)
-        .map_err(Into::into)
+        .crypto_verify_failed()
 }
 
 // ----------------------------------- tests -----------------------------------
@@ -66,6 +65,10 @@ mod tests {
             assert!(
                 secp256r1_verify(&msg_hash, &false_sig.to_bytes(), &vk.to_sec1_bytes()).is_err()
             );
+
+            let a = secp256r1_verify(&msg_hash, &false_sig.to_bytes(), &vk.to_sec1_bytes())
+                .unwrap_err();
+            println!("{}", a);
         }
 
         // Incorrect public key
