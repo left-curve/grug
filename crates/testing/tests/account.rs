@@ -149,7 +149,7 @@ fn backrunning_works() -> anyhow::Result<()> {
     let (mut suite, accounts) = TestBuilder::new()
         .set_account_code(account, |public_key| grug_account::InstantiateMsg {
             public_key,
-        })?
+        })
         .add_account(
             "sender",
             Coins::one("ugrug", NonZero::new(Uint256::from(50_000_u128))),
@@ -190,7 +190,7 @@ fn backrunning_with_error() -> anyhow::Result<()> {
     let (mut suite, accounts) = TestBuilder::new()
         .set_account_code(bugged_account, |public_key| grug_account::InstantiateMsg {
             public_key,
-        })?
+        })
         .add_account(
             "sender",
             Coins::one("ugrug", NonZero::new(Uint256::from(50_000_u128))),

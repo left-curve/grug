@@ -1,11 +1,12 @@
 use {
     crate::{tracing::setup_tracing_subscriber, TestAccount, TestAccounts, TestSuite, TestVm},
     anyhow::{anyhow, ensure},
+    grug_account::PublicKey,
     grug_app::AppError,
     grug_types::{
-        hash256, Addr, Binary, BlockInfo, Coins, Config, Defined, Duration, GenesisState,
-        MaybeDefined, Message, Permission, Permissions, Timestamp, Udec128, Undefined,
-        GENESIS_BLOCK_HASH, GENESIS_BLOCK_HEIGHT, GENESIS_SENDER,
+        hash256, Addr, Binary, BlockInfo, Coins, Config, Defaulted, Defined, Duration,
+        GenesisState, MaybeDefined, MaybeInitialized, Message, Permission, Permissions, Timestamp,
+        Udec128, Undefined, GENESIS_BLOCK_HASH, GENESIS_BLOCK_HEIGHT, GENESIS_SENDER,
     },
     grug_vm_rust::RustVm,
     serde::Serialize,
@@ -28,7 +29,7 @@ const DEFAULT_FEE_RATE: &str = "0";
 // If the user wishes to use a custom code for account, bank, or taxman, they
 // must provide both the binary code, as well as a function for creating the
 // instantiate message.
-struct CodeOption<B> {
+pub struct CodeOption<B> {
     code: Binary,
     msg_builder: B,
 }
@@ -39,7 +40,7 @@ pub struct TestBuilder<
     M2 = grug_bank::InstantiateMsg,
     M3 = grug_taxman::InstantiateMsg,
     OW = Undefined<Addr>,
-    TA = Undefined<TestAccounts>,
+    TA = Defaulted<DefAccounts>,
 > {
     vm: VM,
     // Basic configs
@@ -50,7 +51,7 @@ pub struct TestBuilder<
     // Owner
     owner: OW,
     // Accounts
-    account_opt: CodeOption<Box<dyn Fn(grug_account::PublicKey) -> M1>>,
+    account_opt: CodeOption<Box<dyn Fn(PublicKey) -> M1>>,
     accounts: TA,
     // Bank
     bank_opt: CodeOption<Box<dyn FnOnce(BTreeMap<Addr, Coins>) -> M2>>,
@@ -100,7 +101,7 @@ where
             genesis_time: None,
             block_time: None,
             owner: Undefined::default(),
-            accounts: Undefined::default(),
+            accounts: Defaulted::new(DefAccounts::default()),
             balances: BTreeMap::new(),
             fee_denom: None,
             fee_rate: None,
@@ -108,13 +109,13 @@ where
     }
 }
 
-impl<VM, M1, M2, M3, OW, TA> TestBuilder<VM, M1, M2, M3, OW, TA>
+impl<VM, M1, M2, M3, OW, TA, ITA> TestBuilder<VM, M1, M2, M3, OW, TA>
 where
-    M1: Serialize,
+    ITA: AccountsBuilder,
     M2: Serialize,
     M3: Serialize,
     OW: MaybeDefined<Inner = Addr>,
-    TA: MaybeDefined<Inner = TestAccounts>,
+    TA: MaybeInitialized<Inner = ITA>,
     VM: TestVm + Clone,
     AppError: From<VM::Error>,
 {
@@ -279,26 +280,20 @@ where
         mut self,
         name: &'static str,
         balances: C,
-    ) -> anyhow::Result<TestBuilder<VM, M1, M2, M3, OW, Defined<TestAccounts>>>
+    ) -> anyhow::Result<TestBuilder<VM, M1, M2, M3, OW, Defined<ITA>>>
     where
         C: TryInto<Coins>,
         anyhow::Error: From<C::Error>,
     {
-        let mut accounts = self.accounts.maybe_inner().unwrap_or_default();
-        ensure!(
-            !accounts.contains_key(name),
-            "account with name {name} already exists"
-        );
+        let mut accounts = self.accounts.initialized_inner();
 
-        // Generate a random new account
-        let account = TestAccount::new_random(hash256(&self.account_opt.code), name.as_bytes());
+        let account_addr = accounts.add_account(name, &self.account_opt.code)?;
 
         // Save account and balances
         let balances = balances.try_into()?;
         if !balances.is_empty() {
-            self.balances.insert(account.address, balances);
+            self.balances.insert(account_addr, balances);
         }
-        accounts.insert(name, account);
 
         Ok(TestBuilder {
             vm: self.vm,
@@ -318,15 +313,64 @@ where
     }
 }
 
-impl<VM, M1, M2, M3, OW> TestBuilder<VM, M1, M2, M3, OW, Undefined<TestAccounts>>
+// `set_owner` can only be called if `add_accounts` has been called at least
+// once, and `set_owner` hasn't already been called.
+impl<VM, M1, M2, M3, ITA> TestBuilder<VM, M1, M2, M3, Undefined<Addr>, Defined<ITA>>
 where
-    M1: Serialize,
-    M2: Serialize,
-    M3: Serialize,
-    OW: MaybeDefined<Inner = Addr>,
-    VM: TestVm + Clone,
-    AppError: From<VM::Error>,
+    ITA: AccountsBuilder,
 {
+    pub fn set_owner(
+        self,
+        name: &'static str,
+    ) -> anyhow::Result<TestBuilder<VM, M1, M2, M3, Defined<Addr>, Defined<ITA>>> {
+        let owner =
+            self.accounts.inner().get(name).ok_or_else(|| {
+                anyhow!("failed to set owner: can't find account with name `{name}`")
+            })?;
+
+        Ok(TestBuilder {
+            vm: self.vm,
+            tracing_level: self.tracing_level,
+            chain_id: self.chain_id,
+            genesis_time: self.genesis_time,
+            block_time: self.block_time,
+            account_opt: self.account_opt,
+            owner: Defined::new(owner.address),
+            accounts: self.accounts,
+            bank_opt: self.bank_opt,
+            balances: self.balances,
+            taxman_opt: self.taxman_opt,
+            fee_denom: self.fee_denom,
+            fee_rate: self.fee_rate,
+        })
+    }
+}
+
+impl<VM, M1, M2, M3, ITA> TestBuilder<VM, M1, M2, M3, Undefined<Addr>, Defaulted<ITA>> {
+    pub fn override_accounts_def<ITA2>(
+        self,
+        accounts: ITA2,
+    ) -> anyhow::Result<TestBuilder<VM, M1, M2, M3, Undefined<Addr>, Defaulted<ITA2>>>
+    where
+        ITA2: AccountsBuilder,
+    {
+        Ok(TestBuilder {
+            vm: self.vm,
+            tracing_level: self.tracing_level,
+            chain_id: self.chain_id,
+            genesis_time: self.genesis_time,
+            block_time: self.block_time,
+            owner: self.owner,
+            account_opt: self.account_opt,
+            accounts: Defaulted::new(accounts),
+            bank_opt: self.bank_opt,
+            balances: self.balances,
+            taxman_opt: self.taxman_opt,
+            fee_denom: self.fee_denom,
+            fee_rate: self.fee_rate,
+        })
+    }
+
     /// Use a custom code for the account instead the default implementation
     /// provided by the Grug test suite.
     ///
@@ -364,12 +408,12 @@ where
         self,
         code: T,
         msg_builder: F,
-    ) -> anyhow::Result<TestBuilder<VM, M1A, M2, M3, OW, Undefined<TestAccounts>>>
+    ) -> TestBuilder<VM, M1A, M2, M3, Undefined<Addr>, Defaulted<ITA>>
     where
         T: Into<Binary>,
-        F: Fn(grug_account::PublicKey) -> M1A + 'static,
+        F: Fn(PublicKey) -> M1A + 'static,
     {
-        Ok(TestBuilder {
+        TestBuilder {
             vm: self.vm,
             tracing_level: self.tracing_level,
             chain_id: self.chain_id,
@@ -380,54 +424,25 @@ where
                 code: code.into(),
                 msg_builder: Box::new(msg_builder),
             },
-            accounts: self.accounts,
+            accounts: Defaulted::new(self.accounts.into_inner()),
             bank_opt: self.bank_opt,
             balances: self.balances,
             taxman_opt: self.taxman_opt,
             fee_denom: self.fee_denom,
             fee_rate: self.fee_rate,
-        })
-    }
-}
-
-// `set_owner` can only be called if `add_accounts` has been called at least
-// once, and `set_owner` hasn't already been called.
-impl<VM, M1, M2, M3> TestBuilder<VM, M1, M2, M3, Undefined<Addr>, Defined<TestAccounts>> {
-    pub fn set_owner(
-        self,
-        name: &'static str,
-    ) -> anyhow::Result<TestBuilder<VM, M1, M2, M3, Defined<Addr>, Defined<TestAccounts>>> {
-        let owner =
-            self.accounts.inner().get(name).ok_or_else(|| {
-                anyhow!("failed to set owner: can't find account with name `{name}`")
-            })?;
-
-        Ok(TestBuilder {
-            vm: self.vm,
-            tracing_level: self.tracing_level,
-            chain_id: self.chain_id,
-            genesis_time: self.genesis_time,
-            block_time: self.block_time,
-            owner: Defined::new(owner.address),
-            account_opt: self.account_opt,
-            accounts: self.accounts,
-            bank_opt: self.bank_opt,
-            balances: self.balances,
-            taxman_opt: self.taxman_opt,
-            fee_denom: self.fee_denom,
-            fee_rate: self.fee_rate,
-        })
+        }
     }
 }
 
 // `build` can only be called if both `owner` and `accounts` have been set.
-impl<VM, M1, M2, M3> TestBuilder<VM, M1, M2, M3, Defined<Addr>, Defined<TestAccounts>>
+impl<VM, M1, M2, M3, ITA> TestBuilder<VM, M1, M2, M3, Defined<Addr>, Defined<ITA>>
 where
     M1: Serialize,
     M2: Serialize,
     M3: Serialize,
     VM: TestVm + Clone,
     AppError: From<VM::Error>,
+    ITA: AccountsBuilder,
 {
     pub fn build(self) -> anyhow::Result<(TestSuite<VM>, TestAccounts)> {
         if let Some(tracing_level) = self.tracing_level {
@@ -463,7 +478,6 @@ where
         // Upload account, bank, and taxman codes,
         // instantiate bank and taxman contracts.
         let mut msgs = vec![
-            Message::upload(self.account_opt.code.clone()),
             Message::upload(self.bank_opt.code.clone()),
             Message::upload(self.taxman_opt.code.clone()),
             Message::instantiate(
@@ -482,16 +496,8 @@ where
             )?,
         ];
 
-        // Instantiate accounts
-        for (name, account) in self.accounts.inner() {
-            msgs.push(Message::instantiate(
-                hash256(&self.account_opt.code),
-                &(self.account_opt.msg_builder)(account.pk),
-                name.to_string(),
-                Coins::new(),
-                Some(account.address),
-            )?);
-        }
+        // Appends the msgs from accounts
+        msgs.extend(self.accounts.inner().finalize_build(self.account_opt)?);
 
         // Predict bank contract address
         let bank = Addr::compute(
@@ -523,6 +529,66 @@ where
         let suite =
             TestSuite::new_with_vm(self.vm, chain_id, block_time, genesis_block, genesis_state)?;
 
-        Ok((suite, self.accounts.into_inner()))
+        Ok((suite, self.accounts.into_inner().consume()))
+    }
+}
+
+pub trait AccountsBuilder {
+    fn add_account(&mut self, name: &'static str, code: &Binary) -> anyhow::Result<Addr>;
+    fn finalize_build<T: Serialize>(
+        &self,
+        account_opt: CodeOption<Box<dyn Fn(PublicKey) -> T>>,
+    ) -> anyhow::Result<Vec<Message>>;
+    fn get(&self, name: &'static str) -> Option<&TestAccount>;
+    fn consume(self) -> TestAccounts;
+}
+
+#[derive(Default)]
+pub struct DefAccounts {
+    pub accounts: TestAccounts,
+}
+
+impl AccountsBuilder for DefAccounts {
+    fn add_account(&mut self, name: &'static str, code: &Binary) -> anyhow::Result<Addr> {
+        ensure!(
+            !self.accounts.contains_key(name),
+            "account with name {name} already exists"
+        );
+
+        // Generate a random new account
+        let account = TestAccount::new_random(hash256(code), name.as_bytes());
+
+        let account_address = account.address.clone();
+
+        self.accounts.insert(name, account);
+
+        Ok(account_address)
+    }
+
+    fn finalize_build<T: Serialize>(
+        &self,
+        account_opt: CodeOption<Box<dyn Fn(PublicKey) -> T>>,
+    ) -> anyhow::Result<Vec<Message>> {
+        let mut msgs = vec![Message::upload(account_opt.code.clone())];
+
+        for (name, account) in &self.accounts {
+            msgs.push(Message::instantiate(
+                hash256(&account_opt.code),
+                &(account_opt.msg_builder)(account.pk),
+                name.to_string(),
+                Coins::new(),
+                Some(account.address),
+            )?);
+        }
+
+        Ok(msgs)
+    }
+
+    fn get(&self, name: &'static str) -> Option<&TestAccount> {
+        self.accounts.get(name)
+    }
+
+    fn consume(self) -> TestAccounts {
+        self.accounts
     }
 }
