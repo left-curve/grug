@@ -1575,6 +1575,7 @@ dependencies = [
  "grug-storage",
  "grug-testing",
  "grug-types",
+ "paste",
  "serde",
  "serde_json",
  "serde_with",

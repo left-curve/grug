@@ -38,4 +38,21 @@ pub enum QueryMsg {
     /// to test whether the VM can properly reject this behavior.
     #[returns(Empty)]
     ForceWrite { key: String, value: String },
+
+    // #[returns(Empty)]
+    // Hello(String),
 }
+
+// #[test]
+// fn asd() {
+//     use grug::AlternativeQuery;
+//     let asd = QueryMsg::ForceWrite { key: "Some".to_string(), value: "None".to_string() };
+
+//     let b = asd.into_alternative();
+
+//     match b {
+        
+//     }
+
+// }
+

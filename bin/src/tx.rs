@@ -117,8 +117,8 @@ impl TxCmd {
                 updates,
                 app_updates,
             } => {
-                let updates = from_json_str(&updates)?;
-                let app_updates = from_json_str(&app_updates)?;
+                let updates = from_json_str(updates)?;
+                let app_updates = from_json_str(app_updates)?;
                 Message::Configure {
                     updates,
                     app_updates,

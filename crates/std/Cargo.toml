@@ -17,6 +17,7 @@ grug-types   = { path = "../types" }
 serde        = { workspace = true, features = ["derive"] }
 serde_json   = { workspace = true }
 serde_with   = { workspace = true }
+paste        = "1"
 
 # The FFI crate is only included when building for WebAssembly.
 [target.'cfg(target_arch = "wasm32")'.dependencies]

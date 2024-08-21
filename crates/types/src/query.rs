@@ -17,6 +17,12 @@ pub trait QueryRequest: Sized {
     type Response;
 }
 
+pub trait AlternativeQuery {
+    type Alternative;
+
+    fn into_alternative(self) -> Self::Alternative;
+}
+
 #[skip_serializing_none]
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]

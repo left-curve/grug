@@ -3,7 +3,7 @@ use {
     super_smart_querier::{QueryBuzzRequest, QueryFooRequest, QueryFuzzRequest},
 };
 
-mod super_smart_querier {
+pub mod super_smart_querier {
     use grug::{
         to_json_value, Addr, Empty, Hash256, ImmutableCtx, Json, MutableCtx, Response, StdResult,
     };

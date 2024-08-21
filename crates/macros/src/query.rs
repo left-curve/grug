@@ -1,6 +1,7 @@
 use {
     core::panic,
     proc_macro::TokenStream,
+    proc_macro2::Span,
     quote::{quote, ToTokens},
     syn::{parse_macro_input, Data, DeriveInput, Fields, Ident, Type},
 };
@@ -25,6 +26,8 @@ pub fn process(input: TokenStream) -> TokenStream {
     // E.g. `QueryMsg`
     let name = input.ident;
 
+    let alternative_name = syn::Ident::new(&format!("Alternative{}", name), Span::call_site());
+
     let Data::Enum(data) = input.data else {
         panic!("query message must be an enum")
     };
@@ -32,6 +35,8 @@ pub fn process(input: TokenStream) -> TokenStream {
     let mut generated_structs = Vec::new();
     let mut impl_into_msg = Vec::new();
     let mut impl_query_request = Vec::new();
+    let mut alternative_enum_varriants = Vec::new();
+    let mut alternative_conversion = Vec::new();
 
     // Iterate through the variants of the query message.
     for variant in data.variants {
@@ -52,11 +57,18 @@ pub fn process(input: TokenStream) -> TokenStream {
             .parse_args()
             .expect("only one type supported");
 
+        alternative_enum_varriants.push(quote! {
+            #variant_name(#request_name),
+        });
+
         // Iterate through fields in the query message variant.
         match variant.fields {
             Fields::Named(variant_ty) => {
                 let mut fields_struct_definition = Vec::new();
                 let mut fields_struct_into = Vec::new();
+
+                let mut fields_named = Vec::new();
+                let mut fields_unnamed = Vec::new();
 
                 for field in variant_ty.named {
                     // E.g. `"bar"`
@@ -70,6 +82,14 @@ pub fn process(input: TokenStream) -> TokenStream {
 
                     fields_struct_into.push(quote! {
                         #field_name: val.#field_name,
+                    });
+
+                    fields_named.push(quote! {
+                        #field_name,
+                    });
+
+                    fields_unnamed.push(quote! {
+                        #field_name,
                     });
                 }
 
@@ -106,6 +126,10 @@ pub fn process(input: TokenStream) -> TokenStream {
                         }
                     }
                 });
+
+                alternative_conversion.push(quote! {
+                    #name::#variant_name { #(#fields_named)* } => #alternative_name::#variant_name(#request_name { #(#fields_unnamed)* }),
+                })
             },
             Fields::Unnamed(variant_ty) => {
                 let unnamed = variant_ty.unnamed.into_token_stream();
@@ -135,6 +159,11 @@ pub fn process(input: TokenStream) -> TokenStream {
                         }
                     }
                 });
+
+                alternative_conversion.push(quote! {
+                    #name::#variant_name(val) => #alternative_name::#variant_name(#request_name(val)),
+
+                })
             },
             Fields::Unit => {
                 // E.g.
@@ -161,6 +190,10 @@ pub fn process(input: TokenStream) -> TokenStream {
                             Self::#variant_name
                         }
                     }
+                });
+
+                alternative_conversion.push(quote! {
+                    #name::#variant_name => #alternative_name::#variant_name(#request_name),
                 })
             },
         };
@@ -173,10 +206,38 @@ pub fn process(input: TokenStream) -> TokenStream {
         });
     }
 
+    let alternative_mod = syn::Ident::new(
+        &format!("__private_{}", name).to_lowercase(),
+        Span::call_site(),
+    );
+
+    // panic!("{alternative_conversion:#?}");
+
     quote! {
         #(#generated_structs)*
         #(#impl_into_msg)*
         #(#impl_query_request)*
+        pub mod #alternative_mod {
+            use super::*;
+
+            pub enum #alternative_name{
+                #(#alternative_enum_varriants)*
+            }
+
+            impl grug::AlternativeQuery for #name {
+                type Alternative = #alternative_name;
+
+                fn into_alternative(self) -> Self::Alternative {
+                    match self {
+                        #(#alternative_conversion)*
+                    }
+                }
+            }
+
+        }
+
+        use #alternative_mod::*;
+
     }
     .into()
 }

@@ -16,5 +16,31 @@ pub use grug_testing::*;
 // Dependencies used by the procedural macros
 #[doc(hidden)]
 pub mod __private {
-    pub use {::borsh, ::serde, ::serde_with};
+    pub use {::borsh, ::serde, ::serde_with, paste::paste};
+}
+
+#[macro_export]
+macro_rules! query_entry_point {
+    ($msg:ty, $($variant:ident($tt:tt) => $fn:ident),*) => {
+        #[cfg_attr(not(feature = "library"), grug::export)]
+        pub fn query(ctx: ImmutableCtx, msg: $msg) -> StdResult<grug::Json> {
+            use {grug::{AlternativeQuery}};
+
+
+            match msg.into_alternative() {
+                $(
+                    grug::__private::paste!{ [<Alternative $msg>] :: $variant(request) } => {
+
+                        let closure_check = |c: &$tt| {};
+
+                        closure_check(&request);
+
+                        let response:<$tt as grug::QueryRequest>::Response = $fn(ctx, request)?;
+
+                        grug::to_json_value(&response)
+                    },
+                )*
+            }
+        }
+    };
 }
