@@ -1,6 +1,5 @@
 use {
-    crate::{EncodedBytes, Encoder},
-    data_encoding::{Encoding, HEXUPPER},
+    crate::{EncodedBytes, HashEncoder},
     grug_math::Inner,
 };
 
@@ -15,16 +14,6 @@ pub type Hash256 = Hash<32>;
 
 /// A 64-byte hash, in uppercase hex encoding.
 pub type Hash512 = Hash<64>;
-
-/// Bytes encoder for hashes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct HashEncoder;
-
-impl Encoder for HashEncoder {
-    const ENCODING: Encoding = HEXUPPER;
-    const NAME: &str = "Hash";
-    const PREFIX: &str = "";
-}
 
 impl<const N: usize> Hash<N> {
     /// The length (number of bytes) of hashes.

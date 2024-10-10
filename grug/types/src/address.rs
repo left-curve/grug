@@ -1,7 +1,5 @@
 use {
-    crate::{EncodedBytes, Encoder, Hash256, HashExt},
-    core::str,
-    data_encoding::{Encoding, HEXLOWER},
+    crate::{AddrEncoder, EncodedBytes, Hash256, HashExt},
     grug_math::Inner,
 };
 #[cfg(feature = "erc55")]
@@ -30,16 +28,6 @@ use {
 /// doesn't throw an error, you can be sure the address is valid. Therefore it
 /// is safe to use `Addr`s in JSON messages.
 pub type Addr = EncodedBytes<[u8; 20], AddrEncoder>;
-
-/// Bytes encoder for addresses.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct AddrEncoder;
-
-impl Encoder for AddrEncoder {
-    const ENCODING: Encoding = HEXLOWER;
-    const NAME: &str = "Addr";
-    const PREFIX: &str = "0x";
-}
 
 impl Addr {
     pub const LENGTH: usize = 20;
