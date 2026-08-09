@@ -3,14 +3,16 @@
 
 use {
     bip32::{Language, Mnemonic, XPrv},
-    rand::rngs::OsRng,
+    k256::elliptic_curve::Generate,
 };
 
 const HD_PATH: &str = "m/44'/60'/0'/0/0";
 
 fn main() {
-    // Generate a random seed phrase
-    let mnemonic = Mnemonic::random(OsRng, Language::English);
+    // Generate a random seed phrase. Generate the entropy ourselves instead of
+    // using bip32's `random` constructor, which requires RNGs of the outdated
+    // rand_core version pinned by bip32.
+    let mnemonic = Mnemonic::from_entropy(<[u8; 32]>::generate(), Language::English);
     let seed = mnemonic.to_seed(""); // empty password
     let path = HD_PATH.parse().unwrap();
 

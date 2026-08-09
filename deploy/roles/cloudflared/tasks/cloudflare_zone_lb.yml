@@ -9,6 +9,7 @@
         lb_name: "{{ svcnet.0 }}-{{ svcnet.1 }}.{{ dango_domain }}"
         pool_name: "pool-{{ svcnet.0 }}-{{ svcnet.1 }}"
         desired_lb_description: "Auto-managed by Ansible: service={{ svcnet.0 }}, network={{ svcnet.1 }}"
+        existing_lb_id: null
 
     - name: Lookup pool id for service/network
       set_fact:
@@ -17,7 +18,7 @@
             (cf_pools.json.result
              | selectattr('name','equalto', pool_name)
              | map(attribute='id')
-             | list | first) | default(omit)
+             | list | first) | default(None)
           }}
 
     - name: Find existing LB by name
@@ -34,8 +35,15 @@
       set_fact:
         existing_lb_id: "{{ existing_lb.id }}"
 
+    - name: Validate Cloudflare pool exists for LB
+      assert:
+        that:
+          - pool_id is string
+          - pool_id | length > 0
+        fail_msg: "Cloudflare pool {{ pool_name }} must exist before creating/updating LB {{ lb_name }}."
+
     - name: Create LB if missing
-      when: (existing_lb_id | default('') | length) == 0 and (pool_id is defined)
+      when: existing_lb_id is not string
       uri:
         url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare_zone_id }}/load_balancers"
         method: POST
@@ -56,13 +64,8 @@
       failed_when: create_lb.status not in [200,409]
       changed_when: create_lb.status == 200
 
-    - name: Skip LB creation when pool_id missing
-      when: (existing_lb_id | default('') | length) == 0 and (pool_id is not defined)
-      debug:
-        msg: "Skipping LB {{ lb_name }} because pool {{ pool_name }} was not found."
-
     - name: Update LB to desired state (always)
-      when: (existing_lb_id | default('') | length) > 0 and (pool_id is defined)
+      when: existing_lb_id is string
       uri:
         url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare_zone_id }}/load_balancers/{{ existing_lb_id }}"
         method: PUT
@@ -89,8 +92,8 @@
           lb: "{{ lb_name }}"
           description: "{{ desired_lb_description }}"
           pool_name: "{{ pool_name }}"
-          pool_id: "{{ pool_id | default('missing') }}"
-          existing_lb_id: "{{ existing_lb_id | default('none') }}"
+          pool_id: "{{ pool_id }}"
+          existing_lb_id: "{{ existing_lb_id }}"
           created_status: "{{ (create_lb.status if (create_lb is defined and create_lb.status is defined) else 'n/a') }}"
           update_status: "{{ (update_lb.status if (update_lb is defined and update_lb.status is defined) else 'n/a') }}"
   delegate_to: localhost

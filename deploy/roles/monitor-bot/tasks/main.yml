@@ -1,0 +1,6 @@
+---
+- name: Deploy monitor-bot instances
+  include_tasks: deploy-instance.yml
+  loop: "{{ monitor_bot_networks }}"
+  loop_control:
+    loop_var: network

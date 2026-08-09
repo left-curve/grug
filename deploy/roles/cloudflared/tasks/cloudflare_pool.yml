@@ -6,12 +6,12 @@
       set_fact:
         pool_name: "pool-{{ pool.name }}-{{ dango_network }}"
         pool_monitor_id: "{{ (monitor_id_map[pool.name] if monitor_id_map is defined and monitor_id_map.get(pool.name) is defined else omit) }}"
-        pool_origins: []
+        pool_origins: "{{ pool_origins_override | default([]) }}"
 
     - name: Initialize per-iteration vars
       set_fact:
-        existing_pool_id: ""
-        created_pool_id: ""
+        existing_pool_id: null
+        created_pool_id: null
 
     - name: Append origin for each cloudflared host
       vars:
@@ -20,8 +20,10 @@
         origin_name: "{{ pool.name }}-{{ dango_network }}-{{ hn }}"
       set_fact:
         pool_origins: "{{ pool_origins + [ { 'name': origin_name, 'address': addr, 'enabled': true, 'header': { 'Host': [ addr ] } } ] }}"
-      loop: "{{ groups['cloudflared'] | default([]) }}"
-      when: dango_network in (hostvars[item].dango_networks | default([]))
+      loop: "{{ (groups['cloudflared'] | default([])) | intersect(groups['full-app'] | default([])) }}"
+      when:
+        - pool_origins_override is not defined
+        - dango_network in (hostvars[item].dango_networks | default([]))
 
     - name: Find existing pool by name
       set_fact:
@@ -38,7 +40,7 @@
         existing_pool_id: "{{ existing_pool.id }}"
 
     - name: Create pool if missing
-      when: (existing_pool_id | default('') | length) == 0
+      when: existing_pool_id is not string
       uri:
         url: "https://api.cloudflare.com/client/v4/accounts/{{ cloudflare_account_id }}/load_balancers/pools"
         method: POST
@@ -72,7 +74,7 @@
         created_pool_id: "{{ create_pool.json.result.id }}"
 
     - name: Update pool to desired state (always)
-      when: (existing_pool_id | default('') | length) > 0
+      when: existing_pool_id is string
       uri:
         url: "https://api.cloudflare.com/client/v4/accounts/{{ cloudflare_account_id }}/load_balancers/pools/{{ existing_pool_id }}"
         method: PUT
@@ -105,8 +107,8 @@
     - debug:
         msg:
           pool_name: "{{ pool_name }}"
-          existing_pool_id: "{{ existing_pool_id | default('none') }}"
-          created_pool_id: "{{ created_pool_id | default('n/a') }}"
+          existing_pool_id: "{{ existing_pool_id }}"
+          created_pool_id: "{{ created_pool_id }}"
           origins: "{{ pool_origins | map(attribute='address') | list }}"
           update_status: "{{ (update_pool.status if (update_pool is defined and update_pool.status is defined) else 'n/a') }}"
   delegate_to: localhost

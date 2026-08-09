@@ -135,13 +135,16 @@ fn apply_opening(
                 .checked_div(position.size.checked_abs()?)?;
         }
     } else {
-        user_state.positions.insert(pair_id.clone(), Position {
-            size: opening_size,
-            entry_price: fill_price,
-            entry_funding_per_unit: pair_state.funding_per_unit,
-            conditional_order_above: None,
-            conditional_order_below: None,
-        });
+        user_state.positions.insert(
+            pair_id.clone(),
+            Position {
+                size: opening_size,
+                entry_price: fill_price,
+                entry_funding_per_unit: pair_state.funding_per_unit,
+                conditional_order_above: None,
+                conditional_order_below: None,
+            },
+        );
     }
 
     Ok(())
@@ -216,13 +219,16 @@ mod tests {
 
     fn make_user_state(size: i128, entry_price: i128) -> UserState {
         let mut positions = BTreeMap::new();
-        positions.insert(pair_id(), Position {
-            size: Quantity::new_int(size),
-            entry_price: UsdPrice::new_int(entry_price),
-            entry_funding_per_unit: FundingPerUnit::ZERO,
-            conditional_order_above: None,
-            conditional_order_below: None,
-        });
+        positions.insert(
+            pair_id(),
+            Position {
+                size: Quantity::new_int(size),
+                entry_price: UsdPrice::new_int(entry_price),
+                entry_funding_per_unit: FundingPerUnit::ZERO,
+                conditional_order_above: None,
+                conditional_order_below: None,
+            },
+        );
         UserState {
             positions,
             ..Default::default()
@@ -446,13 +452,16 @@ mod tests {
         pair_state.long_oi = Quantity::new_int(10);
 
         let mut positions = BTreeMap::new();
-        positions.insert(pair_id(), Position {
-            size: Quantity::new_int(10),
-            entry_price: UsdPrice::new_int(50_000),
-            entry_funding_per_unit: FundingPerUnit::ZERO, // entered at 0
-            conditional_order_above: None,
-            conditional_order_below: None,
-        });
+        positions.insert(
+            pair_id(),
+            Position {
+                size: Quantity::new_int(10),
+                entry_price: UsdPrice::new_int(50_000),
+                entry_funding_per_unit: FundingPerUnit::ZERO, // entered at 0
+                conditional_order_above: None,
+                conditional_order_below: None,
+            },
+        );
         let mut user_state = UserState {
             positions,
             ..Default::default()
@@ -493,13 +502,16 @@ mod tests {
         pair_state.long_oi = Quantity::new_int(10);
 
         let mut positions = BTreeMap::new();
-        positions.insert(pair_id(), Position {
-            size: Quantity::new_int(10),
-            entry_price: UsdPrice::new_int(50_000),
-            entry_funding_per_unit: FundingPerUnit::ZERO,
-            conditional_order_above: None,
-            conditional_order_below: None,
-        });
+        positions.insert(
+            pair_id(),
+            Position {
+                size: Quantity::new_int(10),
+                entry_price: UsdPrice::new_int(50_000),
+                entry_funding_per_unit: FundingPerUnit::ZERO,
+                conditional_order_above: None,
+                conditional_order_below: None,
+            },
+        );
         let mut user_state = UserState {
             positions,
             ..Default::default()

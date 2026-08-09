@@ -426,15 +426,13 @@ describe("privy connector", () => {
           { name: "sender", type: "address" },
           { name: "data", type: "Metadata" },
           { name: "gas_limit", type: "uint32" },
-          { name: "messages", type: "TxMessage[]" },
+          { name: "messages", type: "string[]" },
         ],
         Metadata: [
           { name: "username", type: "string" },
           { name: "chainId", type: "string" },
           { name: "nonce", type: "uint32" },
         ],
-        Transfer: [{ name: "to", type: "address" }],
-        TxMessage: [{ name: "transfer", type: "Transfer" }],
       },
     };
 
@@ -461,6 +459,16 @@ describe("privy connector", () => {
     const txSigned = await connector.signTx(signDoc);
     const txEip712 = txSigned.credential.standard.signature.eip712;
 
+    // The connector binds each message as its canonical JSON string before
+    // signing; the returned `signed` is still the original doc.
+    const eip712SignData = {
+      ...signDoc,
+      message: {
+        ...signDoc.message,
+        messages: [`{"transfer":{"to":"${userAccountAddress}"}}`],
+      },
+    };
+
     expect(txSigned).toEqual({
       credential: {
         standard: {
@@ -475,7 +483,7 @@ describe("privy connector", () => {
       },
       signed: signDoc,
     });
-    expect(decodeTypedData(txEip712.typed_data)).toEqual(signDoc);
+    expect(decodeTypedData(txEip712.typed_data)).toEqual(eip712SignData);
 
     const provider = await connectorMocks.embeddedWalletGetEthereumProvider.mock.results[0].value;
     expect(provider.request).toHaveBeenCalledWith({
@@ -484,7 +492,7 @@ describe("privy connector", () => {
     });
     expect(provider.request).toHaveBeenCalledWith({
       method: "eth_signTypedData_v4",
-      params: [controllerAddress, JSON.stringify(signDoc)],
+      params: [controllerAddress, JSON.stringify(eip712SignData)],
     });
   });
 });

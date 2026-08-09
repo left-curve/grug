@@ -48,8 +48,10 @@ impl Metadata {
         );
 
         let signatures = buf[68..]
-            .chunks_exact(65)
-            .map(|chunk| HexByteArray::from_inner(chunk.try_into().unwrap()))
+            .as_chunks::<65>()
+            .0
+            .iter()
+            .map(|chunk| HexByteArray::from_inner(*chunk))
             .collect();
 
         Ok(Self {

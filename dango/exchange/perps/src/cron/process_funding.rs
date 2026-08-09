@@ -157,18 +157,25 @@ mod tests {
     /// Returns: nothing.
     fn set_vault_position(storage: &mut dyn Storage, pair_id: &PairId, size: i128) {
         let mut positions = BTreeMap::new();
-        positions.insert(pair_id.clone(), Position {
-            size: Quantity::new_int(size),
-            entry_price: UsdPrice::ZERO,
-            entry_funding_per_unit: FundingPerUnit::ZERO,
-            conditional_order_above: None,
-            conditional_order_below: None,
-        });
+        positions.insert(
+            pair_id.clone(),
+            Position {
+                size: Quantity::new_int(size),
+                entry_price: UsdPrice::ZERO,
+                entry_funding_per_unit: FundingPerUnit::ZERO,
+                conditional_order_above: None,
+                conditional_order_below: None,
+            },
+        );
         USER_STATES
-            .save(storage, CONTRACT, &UserState {
-                positions,
-                ..Default::default()
-            })
+            .save(
+                storage,
+                CONTRACT,
+                &UserState {
+                    positions,
+                    ..Default::default()
+                },
+            )
             .unwrap();
     }
 
@@ -186,16 +193,22 @@ mod tests {
         last_funding_time_secs: u128,
     ) {
         PARAM
-            .save(storage, &Param {
-                funding_period: Duration::from_seconds(funding_period_secs),
-                ..Default::default()
-            })
+            .save(
+                storage,
+                &Param {
+                    funding_period: Duration::from_seconds(funding_period_secs),
+                    ..Default::default()
+                },
+            )
             .unwrap();
         STATE
-            .save(storage, &State {
-                last_funding_time: Timestamp::from_seconds(last_funding_time_secs),
-                ..Default::default()
-            })
+            .save(
+                storage,
+                &State {
+                    last_funding_time: Timestamp::from_seconds(last_funding_time_secs),
+                    ..Default::default()
+                },
+            )
             .unwrap();
         PAIR_IDS
             .save(storage, &BTreeSet::from([pair_id.clone()]))
@@ -370,16 +383,22 @@ mod tests {
         let pair_param = default_funding_pair_param();
 
         PARAM
-            .save(&mut storage, &Param {
-                funding_period: Duration::from_seconds(3600),
-                ..Default::default()
-            })
+            .save(
+                &mut storage,
+                &Param {
+                    funding_period: Duration::from_seconds(3600),
+                    ..Default::default()
+                },
+            )
             .unwrap();
         STATE
-            .save(&mut storage, &State {
-                last_funding_time: Timestamp::from_seconds(0),
-                ..Default::default()
-            })
+            .save(
+                &mut storage,
+                &State {
+                    last_funding_time: Timestamp::from_seconds(0),
+                    ..Default::default()
+                },
+            )
             .unwrap();
         PAIR_IDS
             .save(&mut storage, &BTreeSet::from([btc.clone(), eth.clone()]))
@@ -387,39 +406,57 @@ mod tests {
         PAIR_PARAMS.save(&mut storage, &btc, &pair_param).unwrap();
         PAIR_PARAMS.save(&mut storage, &eth, &pair_param).unwrap();
         PAIR_STATES
-            .save(&mut storage, &btc, &PairState {
-                index_price: UsdPrice::new_percent(5_000_000), // $50,000
-                ..Default::default()
-            })
+            .save(
+                &mut storage,
+                &btc,
+                &PairState {
+                    index_price: UsdPrice::new_percent(5_000_000), // $50,000
+                    ..Default::default()
+                },
+            )
             .unwrap();
         PAIR_STATES
-            .save(&mut storage, &eth, &PairState {
-                index_price: UsdPrice::new_percent(300_000), // $3,000
-                ..Default::default()
-            })
+            .save(
+                &mut storage,
+                &eth,
+                &PairState {
+                    index_price: UsdPrice::new_percent(300_000), // $3,000
+                    ..Default::default()
+                },
+            )
             .unwrap();
 
         // Vault: long 50 BTC, short 50 ETH.
         let mut positions = BTreeMap::new();
-        positions.insert(btc.clone(), Position {
-            size: Quantity::new_int(50),
-            entry_price: UsdPrice::ZERO,
-            entry_funding_per_unit: FundingPerUnit::ZERO,
-            conditional_order_above: None,
-            conditional_order_below: None,
-        });
-        positions.insert(eth.clone(), Position {
-            size: Quantity::new_int(-50),
-            entry_price: UsdPrice::ZERO,
-            entry_funding_per_unit: FundingPerUnit::ZERO,
-            conditional_order_above: None,
-            conditional_order_below: None,
-        });
+        positions.insert(
+            btc.clone(),
+            Position {
+                size: Quantity::new_int(50),
+                entry_price: UsdPrice::ZERO,
+                entry_funding_per_unit: FundingPerUnit::ZERO,
+                conditional_order_above: None,
+                conditional_order_below: None,
+            },
+        );
+        positions.insert(
+            eth.clone(),
+            Position {
+                size: Quantity::new_int(-50),
+                entry_price: UsdPrice::ZERO,
+                entry_funding_per_unit: FundingPerUnit::ZERO,
+                conditional_order_above: None,
+                conditional_order_below: None,
+            },
+        );
         USER_STATES
-            .save(&mut storage, CONTRACT, &UserState {
-                positions,
-                ..Default::default()
-            })
+            .save(
+                &mut storage,
+                CONTRACT,
+                &UserState {
+                    positions,
+                    ..Default::default()
+                },
+            )
             .unwrap();
 
         process_funding(&mut storage, Timestamp::from_seconds(3600), CONTRACT).unwrap();

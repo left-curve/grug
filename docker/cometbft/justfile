@@ -1,4 +1,4 @@
-COMETBFT_VERSION := "0.38.21"
+COMETBFT_VERSION := "0.39.3"
 
 build:
   docker buildx build \

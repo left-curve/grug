@@ -1,14 +1,7 @@
 import { getAppConfig } from "#actions/app/queries/getAppConfig.js";
 import { type ExecuteReturnType, execute } from "#actions/app/mutations/execute.js";
 
-import type {
-  Address,
-  Client,
-  Funds,
-  Signer,
-  TxParameters,
-  TypedDataParameter,
-} from "@left-curve/types";
+import type { Address, Client, Funds, Signer, TxParameters } from "@left-curve/types";
 
 export type RegisterAccountParameters = {
   sender: Address;
@@ -28,18 +21,10 @@ export async function registerAccount(
 
   const { addresses } = await getAppConfig(client);
 
-  const typedData: TypedDataParameter = {
-    type: [{ name: "register_account", type: "RegisterAccount" }],
-    extraTypes: {
-      RegisterAccount: [],
-    },
-  };
-
   return await execute(client, {
     execute: {
       contract: addresses.accountFactory,
       msg,
-      typedData,
       funds,
     },
     sender,

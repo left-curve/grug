@@ -88,6 +88,8 @@ pub fn configure(
                 PairState {
                     index_price: price.humanized_price,
                     last_index_time: price.timestamp,
+                    oracle_price: price.humanized_price,
+                    last_oracle_time: price.timestamp,
                     ..Default::default()
                 }
             };
@@ -463,6 +465,7 @@ mod tests {
             referrer_commission_rates: RateSchedule::default(),
             vault_deposit_cap: None,
             max_action_batch_size: 5,
+            trading_enabled: true,
         }
     }
 

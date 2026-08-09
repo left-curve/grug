@@ -1,0 +1,78 @@
+# Static config shared by every archive instance. Per-instance and
+# secret values are injected from the container environment (.env via env_file)
+# as SECTION__FIELD overrides: POSTGRES__URL and BLOCK_SOURCE__LIVE_URL.
+
+# Logging: tracing filter directive and output format (`json` | `plain`).
+log_level  = "info"
+log_format = "json"
+
+[postgres]
+# url is injected from POSTGRES__URL (see header)
+
+[block_source]
+type       = "remote"
+store_path = "data/blocks"          # under --home (/root/.archive)
+# live_url is injected from BLOCK_SOURCE__LIVE_URL (see header)
+
+# Concurrent /block/full/range calls per backfill batch; responses are
+# committed in height order, so the stream the projections see stays
+# ascending. 8 lands the dense-era fetch (~500 blocks/s theoretical) just
+# under the store writer's ~780 blocks/s ceiling — the stage that actually
+# backpressures the fetcher (projections don't: they pull-catch-up behind
+# the frontier at their own pace). Higher values buy nothing downstream and
+# only load the sentinel node, which pays a disk read + JSON serialization
+# per in-flight call on the NIC it shares with consensus p2p — watch its
+# dango CPU / network on deploy. Overridable per instance as
+# BLOCK_SOURCE__FETCHER__PARALLELISM (1 = serial rollback, no rebuild).
+[block_source.fetcher]
+type        = "sentinel"
+parallelism = 8
+
+[httpd]
+enabled = true
+bind    = "0.0.0.0:8080"
+
+[metrics]
+enabled = true
+ip      = "0.0.0.0"
+port    = 9191
+
+# Activity projection, write-time (NOT retroactive — changing these needs a
+# re-backfill via drop-db-archive). Explicit whitelist = the projection's
+# built-in default (blacklist of the address-less system noise) minus `cron`:
+# the cron marker row carries no address/payload anyway, and a cronjob's
+# actual effects (transfer / contract_event children) are indexed on their
+# own. Being a whitelist, a NEW upstream event type stays excluded until
+# added here — deliberate.
+#
+# event_data_filter / involvement_filter: empty blacklists = NO filter —
+# every indexed type gets its payload stored and its participant fan-out
+# (instead of the built-in whitelist [transfer, contract_event]). Deliberate
+# experiment to observe table sizes with everything on; tighten later if the
+# tables grow too much (shrinking existing rows needs drop-db-archive).
+# The involvement_blacklist (system contracts from the node's app_config)
+# keeps its built-in behavior.
+[activity]
+# System contracts MISSING from AppConfig.addresses (the cli auto-blacklists
+# only what app_config carries: account_factory/gateway/hyperlane/oracle/
+# perps/warp). Without these, every bank sent/received and dex order_* event
+# indexes the emitting contract itself as a participant — measured at ~63% of
+# all activity_events rows on testnet. Same addresses on both networks
+# (deterministic deploys). Remove if they ever land in AppConfig.addresses.
+involvement_blacklist = [
+  "0xe0b49f70991ecab05d5d7dc1f71e4ede63c8f2b7", # bank (sent/received/minted)
+  "0xda32476efe31e535207f0ad690d337a4ebf54a22", # dex (order_*, swapped)
+  "0xda70a9c1417aee00f960fe896add9d571f9c365b", # taxman (receive_fee)
+]
+event_type_filter = { whitelist = [
+  "configure",
+  "upgrade",
+  "transfer",
+  "upload",
+  "instantiate",
+  "execute",
+  "migrate",
+  "contract_event",
+] }
+event_data_filter = { blacklist = [] }
+involvement_filter = { blacklist = [] }

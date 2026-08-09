@@ -592,20 +592,23 @@ async fn index_perps_candles_multi_pair() -> anyhow::Result<()> {
 
     // Register oracle prices for both pairs.
     suite
-        .seed_oracle_prices(&mut accounts.owner, btree_map! {
-            usdc::DENOM.clone() => OracleTestEntry {
-                pyth_id: 1,
-                humanized_price: UsdPrice::new_int(1),
+        .seed_oracle_prices(
+            &mut accounts.owner,
+            btree_map! {
+                usdc::DENOM.clone() => OracleTestEntry {
+                    pyth_id: 1,
+                    humanized_price: UsdPrice::new_int(1),
+                },
+                eth_pair.clone() => OracleTestEntry {
+                    pyth_id: 2,
+                    humanized_price: UsdPrice::new_int(2_000),
+                },
+                btc_pair.clone() => OracleTestEntry {
+                    pyth_id: 3,
+                    humanized_price: UsdPrice::new_int(60_000),
+                },
             },
-            eth_pair.clone() => OracleTestEntry {
-                pyth_id: 2,
-                humanized_price: UsdPrice::new_int(2_000),
-            },
-            btc_pair.clone() => OracleTestEntry {
-                pyth_id: 3,
-                humanized_price: UsdPrice::new_int(60_000),
-            },
-        })
+        )
         .await;
 
     // Register the BTC pair via MaintainerMsg::Configure (ETH pair already

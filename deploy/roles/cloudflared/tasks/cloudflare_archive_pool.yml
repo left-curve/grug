@@ -1,0 +1,30 @@
+# expects: archive_network, cf_pools, monitor_id_map, cloudflare_account_id, cloudflare_api_token
+
+- name: Initialize archive pool origins
+  set_fact:
+    archive_pool_origins: []
+
+- name: Append origin for each archive host
+  vars:
+    archive_instance: >-
+      {{
+        (hostvars[item].archive_lb_instances | default([])
+         | selectattr('name','equalto', archive_network)
+         | list | first) | default(None)
+      }}
+    hn: "{{ hostvars[item].hostname }}"
+    addr: "api-archive-{{ archive_network }}-{{ hn }}.{{ dango_domain }}"
+    origin_name: "api-archive-{{ archive_network }}-{{ hn }}"
+  set_fact:
+    archive_pool_origins: "{{ archive_pool_origins + [ { 'name': origin_name, 'address': addr, 'enabled': true, 'header': { 'Host': [ addr ] } } ] }}"
+  loop: "{{ archive_cf_lb_hosts }}"
+  when:
+    - archive_instance is mapping
+
+- name: Ensure Cloudflare pool for archive service
+  vars:
+    dango_network: "{{ archive_network }}"
+    pool: { name: "api-archive" }
+    pool_origins_override: "{{ archive_pool_origins }}"
+  include_tasks: cloudflare_pool.yml
+  when: archive_pool_origins | length > 0

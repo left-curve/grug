@@ -1,11 +1,9 @@
 use {
     crate::{
-        Cache, Environment, Gatekeeper, LimitingTunables, VmError, VmResult, blake2b_512,
-        blake2s_256, blake3, db_next, db_next_key, db_next_value, db_read, db_remove,
-        db_remove_range, db_scan, db_write, debug, ed25519_batch_verify, ed25519_verify, keccak256,
+        Cache, Environment, Gatekeeper, LimitingTunables, VmError, VmResult, db_next, db_next_key,
+        db_next_value, db_read, db_remove, db_remove_range, db_scan, db_write, debug, keccak256,
         query_chain, read_then_wipe, secp256k1_pubkey_recover, secp256k1_verify, secp256r1_verify,
-        sha2_256, sha2_512, sha2_512_truncated, sha3_256, sha3_512, sha3_512_truncated,
-        write_to_memory,
+        sha2_256, write_to_memory,
     },
     dango_app::{GasTracker, Instance, QuerierProvider, StorageProvider, Vm},
     dango_primitives::{BorshSerExt, Context, Hash256},
@@ -132,18 +130,8 @@ impl Vm for WasmVm {
                 "secp256k1_verify"         => Function::new_typed_with_env(&mut store, &fe, secp256k1_verify),
                 "secp256r1_verify"         => Function::new_typed_with_env(&mut store, &fe, secp256r1_verify),
                 "secp256k1_pubkey_recover" => Function::new_typed_with_env(&mut store, &fe, secp256k1_pubkey_recover),
-                "ed25519_verify"           => Function::new_typed_with_env(&mut store, &fe, ed25519_verify),
-                "ed25519_batch_verify"     => Function::new_typed_with_env(&mut store, &fe, ed25519_batch_verify),
                 "sha2_256"                 => Function::new_typed_with_env(&mut store, &fe, sha2_256),
-                "sha2_512"                 => Function::new_typed_with_env(&mut store, &fe, sha2_512),
-                "sha2_512_truncated"       => Function::new_typed_with_env(&mut store, &fe, sha2_512_truncated),
-                "sha3_256"                 => Function::new_typed_with_env(&mut store, &fe, sha3_256),
-                "sha3_512"                 => Function::new_typed_with_env(&mut store, &fe, sha3_512),
-                "sha3_512_truncated"       => Function::new_typed_with_env(&mut store, &fe, sha3_512_truncated),
                 "keccak256"                => Function::new_typed_with_env(&mut store, &fe, keccak256),
-                "blake2s_256"              => Function::new_typed_with_env(&mut store, &fe, blake2s_256),
-                "blake2b_512"              => Function::new_typed_with_env(&mut store, &fe, blake2b_512),
-                "blake3"                   => Function::new_typed_with_env(&mut store, &fe, blake3),
                 "debug"                    => Function::new_typed_with_env(&mut store, &fe, debug),
                 "query_chain"              => Function::new_typed_with_env(&mut store, &fe, query_chain),
             }
@@ -280,11 +268,11 @@ impl Instance for WasmInstance {
             let param1_ptr = write_to_memory(env, store, param1.as_ref())?;
             let param2_ptr = write_to_memory(env, store, param2.as_ref())?;
             let res_ptr: u32 = env
-                .call_function1(store, name, &[
-                    ctx_ptr.into(),
-                    param1_ptr.into(),
-                    param2_ptr.into(),
-                ])?
+                .call_function1(
+                    store,
+                    name,
+                    &[ctx_ptr.into(), param1_ptr.into(), param2_ptr.into()],
+                )?
                 .try_into()
                 .map_err(VmError::return_type)?;
             let data = read_then_wipe(env, store, res_ptr)?;

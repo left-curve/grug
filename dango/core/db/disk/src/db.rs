@@ -147,12 +147,16 @@ impl<T> DiskDb<T> {
         let cf_opts = new_state_cf_options();
         let wasm_cf_opts = new_wasm_cf_options(cf_opts.clone());
         let storage_cf_opts = new_storage_cf_options(cf_opts.clone());
-        let db = DB::open_cf_with_opts(&opts, data_dir, [
-            (CF_NAME_DEFAULT, Options::default()),
-            (CF_NAME_STATE_STORAGE, storage_cf_opts),
-            (CF_NAME_STATE_COMMITMENT, cf_opts),
-            (CF_NAME_WASM_STORAGE, wasm_cf_opts),
-        ])?;
+        let db = DB::open_cf_with_opts(
+            &opts,
+            data_dir,
+            [
+                (CF_NAME_DEFAULT, Options::default()),
+                (CF_NAME_STATE_STORAGE, storage_cf_opts),
+                (CF_NAME_STATE_COMMITMENT, cf_opts),
+                (CF_NAME_WASM_STORAGE, wasm_cf_opts),
+            ],
+        )?;
 
         // If `priority_range` is specified, load the data in that range into memory.
         let priority_data = priority_range.map(|(min, max)| {
@@ -314,7 +318,7 @@ where
 
     fn prove(&self, key: &[u8], version: Option<u64>) -> DbResult<Self::Proof> {
         let version = version.unwrap_or_else(|| self.latest_version().unwrap_or(0));
-        Ok(T::prove(&self.state_commitment(), key.hash256(), version)?)
+        Ok(T::prove(&self.state_commitment(), key.sha2_256(), version)?)
     }
 
     fn flush_but_not_commit(&self, batch: Batch) -> DbResult<(u64, Option<Hash256>)> {
@@ -837,11 +841,14 @@ impl Storage for StateStorage {
 
             #[cfg(feature = "metrics")]
             {
-                let iter = iter.with_metrics(DISK_DB_LABEL, [
-                    ("operation", "next"),
-                    ("comment", self.comment),
-                    ("source", PRIORITY_DATA_LABEL),
-                ]);
+                let iter = iter.with_metrics(
+                    DISK_DB_LABEL,
+                    [
+                        ("operation", "next"),
+                        ("comment", self.comment),
+                        ("source", PRIORITY_DATA_LABEL),
+                    ],
+                );
 
                 metrics::histogram!(
                     DISK_DB_LABEL,
@@ -981,11 +988,14 @@ fn create_wasm_iter<'a>(
         });
 
     #[cfg(feature = "metrics")]
-    let iter = iter.with_metrics(DISK_DB_LABEL, [
-        ("operation", "next"),
-        ("comment", comment),
-        ("source", WASM_STORAGE_LABEL),
-    ]);
+    let iter = iter.with_metrics(
+        DISK_DB_LABEL,
+        [
+            ("operation", "next"),
+            ("comment", comment),
+            ("source", WASM_STORAGE_LABEL),
+        ],
+    );
 
     #[cfg(feature = "metrics")]
     {
@@ -1024,11 +1034,14 @@ fn create_state_iter<'a>(
         });
 
     #[cfg(feature = "metrics")]
-    let iter = iter.with_metrics(DISK_DB_LABEL, [
-        ("operation", "next"),
-        ("comment", comment),
-        ("source", STATE_STORAGE_LABEL),
-    ]);
+    let iter = iter.with_metrics(
+        DISK_DB_LABEL,
+        [
+            ("operation", "next"),
+            ("comment", comment),
+            ("source", STATE_STORAGE_LABEL),
+        ],
+    );
 
     #[cfg(feature = "metrics")]
     {
@@ -1552,8 +1565,8 @@ mod tests_jmt {
                 None,
                 Proof::NonMembership(NonMembershipProof {
                     node: ProofNode::Leaf {
-                        key_hash: "jake".hash256(),
-                        value_hash: "shepherd".hash256(),
+                        key_hash: "jake".sha2_256(),
+                        value_hash: "shepherd".sha2_256(),
                     },
                     sibling_hashes: vec![Some(v0::HASH_0)],
                 }),
@@ -1580,8 +1593,8 @@ mod tests_jmt {
                 None,
                 Proof::NonMembership(NonMembershipProof {
                     node: ProofNode::Leaf {
-                        key_hash: "donald".hash256(),
-                        value_hash: "duck".hash256(),
+                        key_hash: "donald".sha2_256(),
+                        value_hash: "duck".sha2_256(),
                     },
                     sibling_hashes: vec![Some(v1::HASH_00), Some(v1::HASH_1)],
                 }),
@@ -1614,8 +1627,8 @@ mod tests_jmt {
             assert!(
                 verify_proof(
                     root_hash,
-                    key.as_bytes().hash256(),
-                    value.map(|v| v.hash256()),
+                    key.as_bytes().sha2_256(),
+                    value.map(|v| v.sha2_256()),
                     &found_proof,
                 )
                 .is_ok()
@@ -1928,10 +1941,10 @@ mod tests_simple {
 
         let buffer = Shared::new(Buffer::new_unnamed(MockStorage::new(), None));
 
-        let mut provider = StorageProvider::new(Box::new(buffer.clone()), &[
-            CONTRACT_NAMESPACE,
-            &Addr::mock(0),
-        ]);
+        let mut provider = StorageProvider::new(
+            Box::new(buffer.clone()),
+            &[CONTRACT_NAMESPACE, &Addr::mock(0)],
+        );
 
         MAP.save(&mut provider, "foo", &1).unwrap();
 
@@ -1984,10 +1997,10 @@ mod tests_simple {
     #[test]
     fn storage_provider_prefix_length_is_correct() {
         assert_eq!(
-            StorageProvider::new(Box::new(MockStorage::new()), &[
-                CONTRACT_NAMESPACE,
-                &Addr::mock(0),
-            ])
+            StorageProvider::new(
+                Box::new(MockStorage::new()),
+                &[CONTRACT_NAMESPACE, &Addr::mock(0),]
+            )
             .namespace()
             .len(),
             WASM_PREFIX_LEN,
@@ -2141,10 +2154,12 @@ mod test_deadlock {
         std::time::Duration,
     };
 
-    const PERSONS: IndexedMap<String, String, PersonIndexes> =
-        IndexedMap::new("person", PersonIndexes {
+    const PERSONS: IndexedMap<String, String, PersonIndexes> = IndexedMap::new(
+        "person",
+        PersonIndexes {
             race: MultiIndex::new(|_name, race| race.clone(), "person", "person__race"),
-        });
+        },
+    );
 
     struct PersonIndexes<'a> {
         pub race: MultiIndex<'a, String, String, String>,
@@ -2278,15 +2293,18 @@ mod test_deadlock {
                 })
                 .collect::<Vec<_>>();
 
-            assert_eq!(names, [
-                "Aela the Huntress",
-                "Astrid",
-                "Balimund",
-                "Brynjolf",
-                "Farengar Secret-Fire",
-                "Kodlak Whitemane",
-                "Ulfric Stormcloak",
-            ]);
+            assert_eq!(
+                names,
+                [
+                    "Aela the Huntress",
+                    "Astrid",
+                    "Balimund",
+                    "Brynjolf",
+                    "Farengar Secret-Fire",
+                    "Kodlak Whitemane",
+                    "Ulfric Stormcloak",
+                ]
+            );
         }
     }
 }

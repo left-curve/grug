@@ -1,7 +1,7 @@
 import { getAppConfig } from "#actions/app/queries/getAppConfig.js";
 import { execute } from "#actions/app/mutations/execute.js";
 
-import type { Address, Client, Signer, TypedDataParameter } from "@left-curve/types";
+import type { Address, Client, Signer } from "@left-curve/types";
 import type { SignAndBroadcastTxReturnType } from "#actions/app/mutations/signAndBroadcastTx.js";
 
 export type WithdrawMarginParameters = {
@@ -27,19 +27,10 @@ export async function withdrawMargin(
     },
   };
 
-  const typedData: TypedDataParameter = {
-    type: [{ name: "trade", type: "Trade" }],
-    extraTypes: {
-      Trade: [{ name: "withdraw", type: "Withdraw" }],
-      Withdraw: [{ name: "amount", type: "string" }],
-    },
-  };
-
   return await execute(client, {
     sender,
     execute: {
       msg,
-      typedData,
       contract: addresses.perps,
     },
   });

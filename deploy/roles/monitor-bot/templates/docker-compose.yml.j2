@@ -1,0 +1,40 @@
+# Explicit project name so this stack doesn't collide with other bots that
+# share a "<bot>/{{ network }}" directory layout (Compose otherwise derives the
+# project name from the parent dir, "{{ network }}", and treats their
+# containers as orphans of each other).
+name: monitor-bot-{{ network }}
+
+services:
+  monitor:
+    image: {{ monitor_bot_image }}:{{ monitor_bot_tag }}
+    pull_policy: always
+    container_name: monitor-bot-{{ network }}
+    restart: always
+    # Docker labels promtail turns into Loki labels (docker_sd relabeling) —
+    # same keys the full-app stack uses.
+    labels:
+      service_name: "monitor_bot"
+      dango_network: "{{ network }}"
+      environment: "production"
+    env_file:
+      - .env
+{% if monitor_bot_host_overrides | length > 0 %}
+    # Resolve API hostnames to internal IPs (see monitor_bot_host_overrides in
+    # the role defaults for why this is off by default).
+    extra_hosts:
+{% for entry in monitor_bot_host_overrides %}
+      - "{{ entry }}"
+{% endfor %}
+{% endif %}
+    volumes:
+      - ./config.json:/root/.dango-monitor/config.json
+      # The bot's persistent store (RocksDB), holding the checks' scan
+      # checkpoints — must survive container recreates so e.g. the fill_price
+      # check resumes where it left off instead of re-deriving a start height.
+      - ./data:/root/.dango-monitor/data
+    ports:
+      # Health/status/metrics on the wireguard IP for the Prometheus scrape
+      # (ovh3 resolves hosts to wireguard IPs) and on the tailscale IP for
+      # laptop debugging — same dual binding as the archive role.
+      - "{{ wireguard_ip }}:{{ monitor_bot_http_ports[network] }}:8080"
+      - "{{ tailscale_ip }}:{{ monitor_bot_http_ports[network] }}:8080"

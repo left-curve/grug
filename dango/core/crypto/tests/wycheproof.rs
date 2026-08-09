@@ -1,10 +1,7 @@
 mod shared;
 
 use {
-    dango_crypto::{
-        secp256k1_verify, secp256r1_verify, sha2_256, sha2_512_truncated, sha3_256,
-        sha3_512_truncated,
-    },
+    dango_crypto::{secp256k1_verify, secp256r1_verify, sha2_256},
     serde::{Deserialize, de},
     shared::{read_file, validate_recover_secp256k1, validate_recover_secp256r1},
 };
@@ -50,11 +47,11 @@ impl<'de> de::Deserialize<'de> for Key {
         let compressed =
             // Secp256k1
             if let Ok(vk) = k256::ecdsa::VerifyingKey::from_sec1_bytes(&uncompressed_byte) {
-                vk.to_encoded_point(true).to_bytes()
+                vk.to_sec1_point(true).to_bytes()
             }
             // Secp256r1
             else if let Ok(vk) = p256::ecdsa::VerifyingKey::from_sec1_bytes(&uncompressed_byte) {
-                vk.to_encoded_point(true).to_bytes()
+                vk.to_sec1_point(true).to_bytes()
             } else {
                 Err(de::Error::custom(format!("Key {} is not in sep256k1 or sep256r1 format", temp.uncompressed)))?
             };
@@ -315,9 +312,6 @@ fn pad_to_32(input: &[u8]) -> [u8; 32] {
 // ------------------------------ secp256k1 tests ------------------------------
 
 const SECP256K1_SHA256: &str = "./testdata/wycheproof/ecdsa_secp256k1_sha256_test.json";
-const SECP256K1_SHA512: &str = "./testdata/wycheproof/ecdsa_secp256k1_sha512_test.json";
-const SECP256K1_SHA3_256: &str = "./testdata/wycheproof/ecdsa_secp256k1_sha3_256_test.json";
-const SECP256K1_SHA3_512: &str = "./testdata/wycheproof/ecdsa_secp256k1_sha3_512_test.json";
 
 wycheproof_test!(K1 =>
     ecdsa_secp256k1_sha256_compressed,
@@ -333,54 +327,9 @@ wycheproof_test!(K1 =>
     uncompressed
 );
 
-wycheproof_test!(K1 =>
-    ecdsa_secp256k1_sha512_compressed,
-    SECP256K1_SHA512,
-    sha2_512_truncated,
-    compressed
-);
-
-wycheproof_test!(K1 =>
-    ecdsa_secp256k1_sha512_uncompressed,
-    SECP256K1_SHA512,
-    sha2_512_truncated,
-    uncompressed
-);
-
-wycheproof_test!(K1 =>
-    ecdsa_secp256k1_sha3_256_compressed,
-    SECP256K1_SHA3_256,
-    sha3_256,
-    compressed
-);
-
-wycheproof_test!(K1 =>
-    ecdsa_secp256k1_sha3_256_uncompressed,
-    SECP256K1_SHA3_256,
-    sha3_256,
-    uncompressed
-);
-
-wycheproof_test!(K1 =>
-    ecdsa_secp256k1_sha3_512_compressed,
-    SECP256K1_SHA3_512,
-    sha3_512_truncated,
-    compressed
-);
-
-wycheproof_test!(K1 =>
-    ecdsa_secp256k1_sha3_512_uncompressed,
-    SECP256K1_SHA3_512,
-    sha3_512_truncated,
-    uncompressed
-);
-
 // ------------------------------ secp256r1 tests ------------------------------
 
 const SECP256R1_SHA256: &str = "./testdata/wycheproof/ecdsa_secp256r1_sha256_test.json";
-const SECP256R1_SHA512: &str = "./testdata/wycheproof/ecdsa_secp256r1_sha512_test.json";
-const SECP256R1_SHA3_256: &str = "./testdata/wycheproof/ecdsa_secp256r1_sha3_256_test.json";
-const SECP256R1_SHA3_512: &str = "./testdata/wycheproof/ecdsa_secp256r1_sha3_512_test.json";
 
 wycheproof_test!(R1 =>
     ecdsa_secp256r1_sha256_compressed,
@@ -393,47 +342,5 @@ wycheproof_test!(R1 =>
     ecdsa_secp256r1_sha256_uncompressed,
     SECP256R1_SHA256,
     sha2_256,
-    uncompressed
-);
-
-wycheproof_test!(R1 =>
-    ecdsa_secp256r1_sha512_compressed,
-    SECP256R1_SHA512,
-    sha2_512_truncated,
-    compressed
-);
-
-wycheproof_test!(R1 =>
-    ecdsa_secp256r1_sha512_uncompressed,
-    SECP256R1_SHA512,
-    sha2_512_truncated,
-    uncompressed
-);
-
-wycheproof_test!(R1 =>
-    ecdsa_secp256r1_sha3_256_compressed,
-    SECP256R1_SHA3_256,
-    sha3_256,
-    compressed
-);
-
-wycheproof_test!(R1 =>
-    ecdsa_secp256r1_sha3_256_uncompressed,
-    SECP256R1_SHA3_256,
-    sha3_256,
-    uncompressed
-);
-
-wycheproof_test!(R1 =>
-    ecdsa_secp256r1_sha3_512_compressed,
-    SECP256R1_SHA3_512,
-    sha3_512_truncated,
-    compressed
-);
-
-wycheproof_test!(R1 =>
-    ecdsa_secp256r1_sha3_512_uncompressed,
-    SECP256R1_SHA3_512,
-    sha3_512_truncated,
     uncompressed
 );

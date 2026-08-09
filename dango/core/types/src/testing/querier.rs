@@ -100,7 +100,7 @@ impl MockQuerier {
         T: Into<Binary>,
     {
         let code = code.into();
-        let code_hash = code.hash256();
+        let code_hash = code.sha2_256();
 
         self.codes.insert(code_hash, Code { code, status });
         self

@@ -1,7 +1,4 @@
-use {
-    dango_identity::Identity256,
-    sha3::{Digest, Keccak256},
-};
+use sha3::{Digest, Keccak256};
 
 /// An Ethereum address.
 pub type Address = [u8; 20];
@@ -17,7 +14,7 @@ pub type Signature = [u8; 65];
 
 /// Derive an Ethereum address from a Secp256k1 public key.
 pub fn derive_address(vk: &k256::ecdsa::VerifyingKey) -> Address {
-    let vk_raw = vk.to_encoded_point(false);
+    let vk_raw = vk.to_sec1_point(false);
     let vk_hash = keccak256(&vk_raw.as_bytes()[1..]);
     let address = &vk_hash[12..];
     address.try_into().unwrap()
@@ -26,9 +23,7 @@ pub fn derive_address(vk: &k256::ecdsa::VerifyingKey) -> Address {
 /// Sign the given _hashed_ message with the given private key, and pack the
 /// signature into the format expected by Ethereum.
 pub fn sign_digest(msg_hash: [u8; 32], sk: &k256::ecdsa::SigningKey) -> Signature {
-    let (signature, recovery_id) = sk
-        .sign_digest_recoverable(Identity256::from(msg_hash))
-        .unwrap();
+    let (signature, recovery_id) = sk.sign_prehash_recoverable(&msg_hash);
     pack_signature(signature, recovery_id)
 }
 

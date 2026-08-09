@@ -1,0 +1,21 @@
+# Explicit project name so this stack doesn't collide with other bots that
+# share a "<bot>/{{ network }}" directory layout (Compose otherwise derives the
+# project name from the parent dir, "{{ network }}", and treats their
+# containers as orphans of each other).
+name: block-cleanup-{{ network }}
+
+services:
+  block-cleanup:
+    image: {{ block_cleanup_image }}:{{ block_cleanup_tag }}
+    pull_policy: always
+    container_name: block-cleanup-{{ network }}
+    # One-shot job: deletes the configured height range and exits.
+    restart: "no"
+    labels:
+      dango_network: "{{ network }}"
+      service_name: "block_cleanup"
+    env_file:
+      - .env
+    volumes:
+      # Read-write: the bot deletes block files in place.
+      - {{ block_cleanup_resolved_blocks_dir }}:/data/blocks

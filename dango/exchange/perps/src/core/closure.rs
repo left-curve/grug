@@ -1054,13 +1054,16 @@ mod tests {
         // bp = 46k - (-1k)/1 = 47k.
         let user_state = UserState {
             margin: UsdValue::new_int(3_000),
-            positions: BTreeMap::from([(pair_btc(), Position {
-                size: Quantity::new_int(1),
-                entry_price: UsdPrice::new_int(50_000),
-                entry_funding_per_unit: FundingPerUnit::ZERO,
-                conditional_order_above: None,
-                conditional_order_below: None,
-            })]),
+            positions: BTreeMap::from([(
+                pair_btc(),
+                Position {
+                    size: Quantity::new_int(1),
+                    entry_price: UsdPrice::new_int(50_000),
+                    entry_funding_per_unit: FundingPerUnit::ZERO,
+                    conditional_order_above: None,
+                    conditional_order_below: None,
+                },
+            )]),
             ..Default::default()
         };
 
@@ -1085,13 +1088,16 @@ mod tests {
         // bp = 54k + (-1k)/1 = 53k.
         let user_state = UserState {
             margin: UsdValue::new_int(3_000),
-            positions: BTreeMap::from([(pair_btc(), Position {
-                size: Quantity::new_int(-1),
-                entry_price: UsdPrice::new_int(50_000),
-                entry_funding_per_unit: FundingPerUnit::ZERO,
-                conditional_order_above: None,
-                conditional_order_below: None,
-            })]),
+            positions: BTreeMap::from([(
+                pair_btc(),
+                Position {
+                    size: Quantity::new_int(-1),
+                    entry_price: UsdPrice::new_int(50_000),
+                    entry_funding_per_unit: FundingPerUnit::ZERO,
+                    conditional_order_above: None,
+                    conditional_order_below: None,
+                },
+            )]),
             ..Default::default()
         };
 
@@ -1125,20 +1131,26 @@ mod tests {
         let user_state = UserState {
             margin: UsdValue::new_int(5_000),
             positions: BTreeMap::from([
-                (pair_btc(), Position {
-                    size: Quantity::new_int(1),
-                    entry_price: UsdPrice::new_int(50_000),
-                    entry_funding_per_unit: FundingPerUnit::ZERO,
-                    conditional_order_above: None,
-                    conditional_order_below: None,
-                }),
-                (pair_eth(), Position {
-                    size: Quantity::new_int(10),
-                    entry_price: UsdPrice::new_int(3_000),
-                    entry_funding_per_unit: FundingPerUnit::ZERO,
-                    conditional_order_above: None,
-                    conditional_order_below: None,
-                }),
+                (
+                    pair_btc(),
+                    Position {
+                        size: Quantity::new_int(1),
+                        entry_price: UsdPrice::new_int(50_000),
+                        entry_funding_per_unit: FundingPerUnit::ZERO,
+                        conditional_order_above: None,
+                        conditional_order_below: None,
+                    },
+                ),
+                (
+                    pair_eth(),
+                    Position {
+                        size: Quantity::new_int(10),
+                        entry_price: UsdPrice::new_int(3_000),
+                        entry_funding_per_unit: FundingPerUnit::ZERO,
+                        conditional_order_above: None,
+                        conditional_order_below: None,
+                    },
+                ),
             ]),
             ..Default::default()
         };
@@ -1187,13 +1199,16 @@ mod tests {
     fn bankruptcy_price_partial_close_long() {
         let user_state = UserState {
             margin: UsdValue::new_int(2_000),
-            positions: BTreeMap::from([(pair_btc(), Position {
-                size: Quantity::new_int(10),
-                entry_price: UsdPrice::new_int(2_000),
-                entry_funding_per_unit: FundingPerUnit::ZERO,
-                conditional_order_above: None,
-                conditional_order_below: None,
-            })]),
+            positions: BTreeMap::from([(
+                pair_btc(),
+                Position {
+                    size: Quantity::new_int(10),
+                    entry_price: UsdPrice::new_int(2_000),
+                    entry_funding_per_unit: FundingPerUnit::ZERO,
+                    conditional_order_above: None,
+                    conditional_order_below: None,
+                },
+            )]),
             ..Default::default()
         };
 
@@ -1225,13 +1240,16 @@ mod tests {
     fn bankruptcy_price_partial_close_short() {
         let user_state = UserState {
             margin: UsdValue::new_int(2_000),
-            positions: BTreeMap::from([(pair_btc(), Position {
-                size: Quantity::new_int(-10),
-                entry_price: UsdPrice::new_int(2_000),
-                entry_funding_per_unit: FundingPerUnit::ZERO,
-                conditional_order_above: None,
-                conditional_order_below: None,
-            })]),
+            positions: BTreeMap::from([(
+                pair_btc(),
+                Position {
+                    size: Quantity::new_int(-10),
+                    entry_price: UsdPrice::new_int(2_000),
+                    entry_funding_per_unit: FundingPerUnit::ZERO,
+                    conditional_order_above: None,
+                    conditional_order_below: None,
+                },
+            )]),
             ..Default::default()
         };
 

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [".claude/rules/*.md"],
+  "permission": {
+    "read": { "*.env": "deny", "*.env.*": "deny" },
+    "edit": { "*.env": "deny", "*.env.*": "deny" },
+    "bash": {
+      "cat *.env*": "deny",
+      "head *.env*": "deny",
+      "tail *.env*": "deny",
+      "less *.env*": "deny",
+      "more *.env*": "deny",
+      "grep *.env*": "deny"
+    }
+  }
+}

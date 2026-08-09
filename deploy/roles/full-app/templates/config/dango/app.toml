@@ -32,24 +32,8 @@ priority_range = [
 
 [indexer]
 
-# Whether to enable indexer.
-enabled = true
-
 # Whether to store block respnonses.
 keep_blocks = true
-
-[indexer.s3]
-# Optional S3-compatible storage for cached blocks
-# If left empty, S3 upload is disabled.
-enabled = false
-# Optional path/prefix within the bucket for stored blocks
-# For example: "dango/blocks" will store keys under that path.
-access_key = ""
-bucket     = ""
-endpoint   = ""
-path       = ""
-region     = ""
-secret_key = ""
 
 [indexer.database]
 

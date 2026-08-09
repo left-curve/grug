@@ -3,7 +3,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useApp } from "@left-curve/foundation";
 import {
   useExplorerContract,
-  useExplorerTransactionsBySender,
+  useExplorerTransactionsByAddress,
   usePrices,
 } from "@left-curve/store";
 
@@ -26,10 +26,11 @@ export default function ContractExplorerScreen() {
   const { settings } = useApp();
   const { calculateBalance } = usePrices();
 
-  const { data: txData, pagination, isLoading: txsLoading } = useExplorerTransactionsBySender(
-    address as `0x${string}`,
-    !!contract,
-  );
+  const {
+    data: txData,
+    pagination,
+    isLoading: txsLoading,
+  } = useExplorerTransactionsByAddress(address as `0x${string}`, !!contract);
 
   const totalCoins = contract ? Object.values(contract.balances).length : 0;
   const totalBalance = contract
@@ -56,7 +57,8 @@ export default function ContractExplorerScreen() {
           title={m["explorer.contracts.notFound.title"]()}
           description={
             <>
-              {m["explorer.contracts.notFound.pre"]()} <GlobalText className="underline">{address}</GlobalText>{" "}
+              {m["explorer.contracts.notFound.pre"]()}{" "}
+              <GlobalText className="underline">{address}</GlobalText>{" "}
               {m["explorer.contracts.notFound.description"]()}
             </>
           }

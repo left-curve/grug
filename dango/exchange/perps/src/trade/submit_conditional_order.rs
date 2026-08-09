@@ -1,5 +1,5 @@
 use {
-    crate::{PAIR_PARAMS, USER_STATES},
+    crate::{PAIR_PARAMS, USER_STATES, state::PARAM, trade::ensure_trading_enabled},
     anyhow::{anyhow, ensure},
     dango_math::NumberConst,
     dango_order_book::{
@@ -17,6 +17,8 @@ pub fn submit_conditional_order(
     trigger_direction: TriggerDirection,
     max_slippage: Dimensionless,
 ) -> anyhow::Result<Response> {
+    ensure_trading_enabled(&PARAM.load(ctx.storage)?)?;
+
     let mut user_state = USER_STATES.load(ctx.storage, ctx.sender)?;
     let pair_param = PAIR_PARAMS.load(ctx.storage, &pair_id)?;
 

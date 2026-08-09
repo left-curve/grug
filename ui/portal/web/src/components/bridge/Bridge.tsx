@@ -1,30 +1,24 @@
 import {
   useAccount,
-  useAppConfig,
   useBalances,
-  useBridgeEvmDeposit,
   useBridgeState,
   useBridgeWithdraw,
-  useEvmBalances,
   usePrices,
 } from "@left-curve/store";
 
 import {
   AssetInputWithRange,
-  ConnectWalletWithModal,
   createContext,
-  DepositAddressBox,
   FormattedNumber,
   IconDisconnect,
   Modals,
-  TruncateText,
   useApp,
   useInputs,
 } from "@left-curve/applets-kit";
 
 import { Link } from "@tanstack/react-router";
 import { m } from "@left-curve/foundation/paraglide/messages.js";
-import { Decimal, formatUnits, parseUnits } from "@left-curve/utils";
+import { Decimal, formatUnits } from "@left-curve/utils";
 import { Image } from "~/components/foundation/Image";
 
 import {
@@ -38,12 +32,10 @@ import {
   WarningContainer,
 } from "@left-curve/applets-kit";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type React from "react";
 import type { PropsWithChildren } from "react";
 import type { AnyCoin } from "@left-curve/store/types";
-import type { NonNullablePropertiesBy } from "@left-curve/types";
-import { DepositFreeBadge, MoreDepositOptionsCard } from "./DepositOptions";
 import { SwapperDeposit } from "./SwapperDeposit";
 
 const [BridgeProvider, useBridge] = createContext<{
@@ -72,18 +64,6 @@ const formatCompactTokenAmount = (amount: string) => {
 const formatWithdrawLiquidity = (rawBalance: string, coin: AnyCoin) => {
   const amount = formatUnits(rawBalance, coin.decimals);
   return `${m["bridge.withdrawLiquidity"]()}: ${formatCompactTokenAmount(amount)} ${coin.symbol}`;
-};
-
-const MoreDepositOptionsGate: React.FC<{ onClick: () => void }> = ({ onClick }) => {
-  const { isConnected } = useAccount();
-  const { showModal } = useApp();
-  const handleSignin = () => showModal(Modals.Authenticate, { action: "signin" });
-
-  if (!isConnected) {
-    return <MoreDepositOptionsCard cta={m["common.signin"]()} onClick={handleSignin} />;
-  }
-
-  return <MoreDepositOptionsCard onClick={onClick} />;
 };
 
 const BridgeContainer: React.FC<PropsWithChildren<BridgeProps>> = ({
@@ -115,45 +95,28 @@ const BridgeContainer: React.FC<PropsWithChildren<BridgeProps>> = ({
 
 const BridgeDeposit: React.FC = () => {
   const { state } = useBridge();
-  const { action, network, coin, config, connector } = state;
-  const [showSwapperDeposit, setShowSwapperDeposit] = useState(false);
-
-  useEffect(() => {
-    if (action !== "deposit") setShowSwapperDeposit(false);
-  }, [action]);
+  const { action, connector } = state;
+  const { isConnected } = useAccount();
+  const { showModal } = useApp();
+  const handleSignin = () => showModal(Modals.Authenticate, { action: "signin" });
 
   if (action !== "deposit") return null;
 
-  if (showSwapperDeposit) {
+  if (!isConnected) {
     return (
-      <SwapperDeposit signerConnector={connector} onBack={() => setShowSwapperDeposit(false)} />
+      <>
+        <WarningContainer description={m["bridge.rateLimitWarning"]()} />
+        <Button fullWidth onClick={handleSignin}>
+          {m["common.signin"]()}
+        </Button>
+      </>
     );
   }
-
-  const isEvmNetwork = !!network && !["bitcoin", "solana"].includes(network);
-  const showUnsupportedFallback = isEvmNetwork && !!coin && !config?.router;
-  const openSwapperDeposit = () => setShowSwapperDeposit(true);
 
   return (
     <>
       <WarningContainer description={m["bridge.rateLimitWarning"]()} />
-
-      <BridgeSelectors showCoinSelector={false} />
-
-      {network === "bitcoin" && <BitcoinDeposit />}
-
-      {isEvmNetwork && config?.router && <EvmDeposit onMoreOptionsClick={openSwapperDeposit} />}
-
-      {showUnsupportedFallback && (
-        <div className="flex flex-col gap-4">
-          <WarningContainer description={m["bridge.unsupportedAsset"]()} />
-          <MoreDepositOptionsGate onClick={openSwapperDeposit} />
-        </div>
-      )}
-
-      {!isEvmNetwork && network !== "bitcoin" && (
-        <MoreDepositOptionsGate onClick={openSwapperDeposit} />
-      )}
+      <SwapperDeposit signerConnector={connector} />
     </>
   );
 };
@@ -202,166 +165,6 @@ const BridgeSelectors: React.FC<{ showCoinSelector?: boolean }> = ({ showCoinSel
         networks={networkOptions}
       />
     </>
-  );
-};
-
-const BitcoinDeposit: React.FC = () => {
-  const depositAddress = "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh";
-  return <DepositAddressBox address={depositAddress} network="bitcoin" />;
-};
-
-const EvmDeposit: React.FC<{ onMoreOptionsClick: () => void }> = ({ onMoreOptionsClick }) => {
-  const { userStatus } = useAccount();
-  const { getPrice } = usePrices();
-  const { showModal } = useApp();
-
-  const { controllers, state } = useBridge();
-  const { inputs, errors } = controllers;
-
-  const { data: appConfig } = useAppConfig();
-  const { minimumDeposit } = appConfig;
-
-  const { coin, connector, setConnectorId, config, reset } = state as NonNullablePropertiesBy<
-    typeof state,
-    "coin" | "config"
-  >;
-
-  const amount = inputs.amount?.value || "0";
-  const parsedAmount = BigInt(parseUnits(amount, coin.decimals));
-
-  const { wallet, allowanceQuery, allowanceMutation, deposit } = useBridgeEvmDeposit({
-    config,
-    connector,
-    coin,
-    amount,
-  });
-
-  const requiresAllowance = allowanceQuery.data < parsedAmount;
-
-  const evmAddress = wallet.data?.account.address;
-
-  const { data: balances = {}, refetch: refreshBalances } = useEvmBalances({
-    chain: config.chain,
-    address: evmAddress,
-    rpcUrl: config.bridger?.rpcUrl,
-  });
-
-  if (!connector || !coin) {
-    return (
-      <div className="flex w-full flex-col gap-4">
-        <ConnectWalletWithModal fullWidth onWalletSelected={(id) => setConnectorId(id)} />
-        <MoreDepositOptionsGate onClick={onMoreOptionsClick} />
-      </div>
-    );
-  }
-
-  const handleDeposit = () =>
-    showModal(Modals.BridgeDeposit, {
-      coin,
-      config,
-      amount,
-      allowanceMutation,
-      requiresAllowance,
-      deposit,
-      reset: () => {
-        refreshBalances();
-        reset();
-      },
-    });
-
-  return (
-    <div className="flex flex-col items-center justify-center gap-6">
-      <div className="flex flex-col items-center gap-2 w-full">
-        <AssetInputWithRange
-          name="amount"
-          asset={coin}
-          balances={balances}
-          controllers={controllers}
-          showRange
-          shouldValidate
-          extendValidation={(v) => {
-            if (userStatus === "active") return true;
-            const minDeposit = minimumDeposit[coin.denom as keyof typeof minimumDeposit];
-            if (!minDeposit) return true;
-
-            const amount = formatUnits(minDeposit, coin.decimals);
-            if (Number(v) < Number(amount))
-              return m["bridge.activeAccount"]({ amount: `${amount} ${coin.symbol}` });
-            return true;
-          }}
-          label={
-            <div className="flex justify-between w-full items-center">
-              <p className="exposure-sm-italic text-ink-secondary-700">
-                {m["bridge.youDeposit"]()}
-              </p>
-
-              <div className="flex gap-2 items-center">
-                <Image src={connector.icon} alt={connector.name} className="w-4 h-4 inline-block" />
-                <TruncateText
-                  start={4}
-                  end={4}
-                  text={evmAddress || ""}
-                  className="diatype-sm-medium text-ink-tertiary-500"
-                />
-                <IconDisconnect
-                  className="w-4 h-4 inline-block text-ink-tertiary-500 hover:cursor-pointer hover:text-ink-primary-900"
-                  onClick={() => setConnectorId(null)}
-                />
-              </div>
-            </div>
-          }
-        />
-        <div className="flex items-center justify-center mt-2">
-          <div className="flex items-center justify-center border border-fg-tertiary-400 rounded-full h-5 w-5">
-            <IconArrowDown className="h-3 w-3 text-ink-tertiary-500" />
-          </div>
-        </div>
-        <Input
-          placeholder="0"
-          readOnly
-          label={m["bridge.youGet"]()}
-          value={amount}
-          classNames={{
-            base: "z-20",
-            inputWrapper: "pl-0 py-3 flex-col h-auto gap-[6px] hover:bg-surface-secondary-rice",
-            inputParent: "h-[34px] h3-bold",
-            input: "!h3-bold",
-          }}
-          startText="right"
-          startContent={
-            <div className="inline-flex flex-row items-center gap-3 diatype-m-regular h-[46px] rounded-md min-w-14 p-3 bg-transparent justify-start">
-              <div className="flex gap-2 items-center font-semibold">
-                <Image src={coin.logoURI} alt={coin.symbol} className="w-8 h-8" />
-                <p>{coin.symbol}</p>
-              </div>
-            </div>
-          }
-          insideBottomComponent={
-            <div className="flex justify-end w-full h-[22px] text-ink-tertiary-500 diatype-sm-regular">
-              <FormattedNumber
-                number={getPrice(amount, coin.denom)}
-                formatOptions={{ currency: "USD" }}
-                as="p"
-              />
-            </div>
-          }
-        />
-      </div>
-
-      <Button
-        fullWidth
-        onClick={handleDeposit}
-        isDisabled={!!errors.amount || amount === "0"}
-        className="mt-4"
-      >
-        <span className="flex items-center justify-center gap-2">
-          <span>{m["bridge.deposit.title"]()}</span>
-          <DepositFreeBadge />
-        </span>
-      </Button>
-
-      <MoreDepositOptionsGate onClick={onMoreOptionsClick} />
-    </div>
   );
 };
 

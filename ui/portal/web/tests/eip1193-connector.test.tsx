@@ -387,19 +387,28 @@ describe("eip1193 connector", () => {
           { name: "sender", type: "address" },
           { name: "data", type: "Metadata" },
           { name: "gas_limit", type: "uint32" },
-          { name: "messages", type: "TxMessage[]" },
+          { name: "messages", type: "string[]" },
         ],
         Metadata: [
           { name: "username", type: "string" },
           { name: "chainId", type: "string" },
           { name: "nonce", type: "uint32" },
         ],
-        TxMessage: [{ name: "transfer", type: "Transfer" }],
-        Transfer: [{ name: "to", type: "address" }],
       },
     };
 
     const signed = await connector.signTx(signDoc);
+
+    // The connector binds each message as its canonical JSON string before
+    // signing (EIP-712 can't express the `Message` enum as a struct). The
+    // returned `signed` is still the original doc (message objects).
+    const eip712SignData = {
+      ...signDoc,
+      message: {
+        ...signDoc.message,
+        messages: [`{"transfer":{"to":"${userAccountAddress}"}}`],
+      },
+    };
 
     expect(signed).toEqual({
       credential: {
@@ -416,11 +425,11 @@ describe("eip1193 connector", () => {
       signed: signDoc,
     });
     expect(decodeTypedData(signed.credential.standard.signature.eip712.typed_data)).toEqual(
-      signDoc,
+      eip712SignData,
     );
     expect(provider.request).toHaveBeenCalledWith({
       method: "eth_signTypedData_v4",
-      params: [walletAddress, JSON.stringify(signDoc)],
+      params: [walletAddress, JSON.stringify(eip712SignData)],
     });
 
     await expect(connector.getAccounts()).rejects.toThrow("eip1193: user index not found");

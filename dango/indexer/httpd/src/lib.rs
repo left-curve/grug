@@ -5,6 +5,7 @@ pub mod graphql;
 #[cfg(feature = "metrics")]
 pub mod metrics;
 pub mod middlewares;
+pub mod query_memo;
 pub mod request_ip;
 pub mod routes;
 pub mod server;

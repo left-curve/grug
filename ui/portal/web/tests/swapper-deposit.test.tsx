@@ -45,10 +45,6 @@ const swapperDepositMocks = vi.hoisted(() => ({
   }>,
 }));
 
-vi.mock("../src/components/bridge/DepositOptions", () => ({
-  DepositFeeBadge: () => <span data-testid="deposit-fee" />,
-}));
-
 vi.mock("@left-curve/store", () => ({
   isEvmProviderConnector: (connector?: MockConnector | null) =>
     !!connector &&

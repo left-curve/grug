@@ -193,5 +193,5 @@ Telemetry details (OTLP + Sentry, graceful shutdown): see `telemetry.md`.
 ## Config Changes
 
 1. Add serde structs/fields in the relevant `config.rs`
-2. Update both templates: `localdango/configs/` and `deploy/roles/`
+2. Update both templates: `docker/ci-stack/configs/` and `deploy/roles/`
 3. Parse with `dango_config_parser::parse_config` in the target binary

@@ -25,6 +25,13 @@ jobs:
         with:
           persist-credentials: false
       - uses: astral-sh/setup-uv@61cb8a9741eeb8a550a1b8544337180c0fc8476b # v7.2.0
+        with:
+          # Pin the uv version so setup-uv constructs the release download
+          # URL directly. Left unpinned, it resolves the latest release
+          # through a GitHub API call at runtime, and an API disruption
+          # then fails this job — taking the entire gated pipeline (lint,
+          # tests, image builds) down with it.
+          version: "0.11.29"
       - name: Run zizmor (SARIF)
         if: always()
         run: uvx zizmor --config .github/zizmor.yml --format=sarif .github/workflows/ > results.sarif

@@ -3,13 +3,7 @@ import { execute } from "#actions/app/mutations/execute.js";
 
 import type { Address } from "@left-curve/types";
 import type { SignAndBroadcastTxReturnType } from "#actions/app/mutations/signAndBroadcastTx.js";
-import type {
-  ChildOrder,
-  Client,
-  PerpsOrderKind,
-  Signer,
-  TypedDataParameter,
-} from "@left-curve/types";
+import type { ChildOrder, Client, PerpsOrderKind, Signer } from "@left-curve/types";
 
 export type SubmitPerpsOrderParameters = {
   sender: Address;
@@ -37,10 +31,9 @@ export async function submitPerpsOrder(
     ...(child.size ? { size: child.size } : {}),
   });
 
-  // Strip a `null` / `undefined` `clientOrderId` from the limit body so
-  // the JSON message and the EIP-712 typed-data structure agree on
-  // whether the field is present. The typed-data builder below uses the
-  // same `!= null` check.
+  // Strip a `null` / `undefined` `clientOrderId` from the limit body so it's
+  // absent (not `null`) in the JSON message, keeping the signed canonical form
+  // stable.
   const limitHasClientOrderId = "limit" in kind && kind.limit.clientOrderId != null;
   const normalizedKind: PerpsOrderKind =
     "limit" in kind
@@ -66,54 +59,10 @@ export async function submitPerpsOrder(
     },
   };
 
-  const kindTypedData =
-    "market" in kind
-      ? {
-          kind: [{ name: "market", type: "Market" }],
-          Market: [{ name: "max_slippage", type: "string" }],
-        }
-      : {
-          kind: [{ name: "limit", type: "Limit" }],
-          Limit: [
-            { name: "limit_price", type: "string" },
-            { name: "time_in_force", type: "string" },
-            ...(limitHasClientOrderId ? [{ name: "client_order_id", type: "string" }] : []),
-          ],
-        };
-
-  const childOrderTypeFor = (child: ChildOrder) => [
-    { name: "trigger_price", type: "string" },
-    { name: "max_slippage", type: "string" },
-    ...(child.size ? [{ name: "size", type: "string" }] : []),
-  ];
-
-  const submitOrderFields = [
-    { name: "pair_id", type: "string" },
-    { name: "size", type: "string" },
-    { name: "kind", type: "Kind" },
-    { name: "reduce_only", type: "bool" },
-    ...(tp ? [{ name: "tp", type: "ChildOrderTp" }] : []),
-    ...(sl ? [{ name: "sl", type: "ChildOrderSl" }] : []),
-  ];
-
-  const typedData: TypedDataParameter = {
-    type: [{ name: "trade", type: "Trade" }],
-    extraTypes: {
-      Trade: [{ name: "submit_order", type: "SubmitOrder" }],
-      SubmitOrder: submitOrderFields,
-      Kind: kindTypedData.kind,
-      ...(kindTypedData.Market ? { Market: kindTypedData.Market } : {}),
-      ...(kindTypedData.Limit ? { Limit: kindTypedData.Limit } : {}),
-      ...(tp ? { ChildOrderTp: childOrderTypeFor(tp) } : {}),
-      ...(sl ? { ChildOrderSl: childOrderTypeFor(sl) } : {}),
-    },
-  };
-
   return await execute(client, {
     sender,
     execute: {
       msg,
-      typedData,
       contract: addresses.perps,
     },
   });

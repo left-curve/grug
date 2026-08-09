@@ -2,6 +2,11 @@
 
 - name: Ensure Cloudflare monitor
   block:
+    - name: Initialize monitor vars
+      set_fact:
+        existing_id: null
+        created_id: null
+
     - name: Build desired monitor spec (typed)
       set_fact:
         desired_monitor: >-
@@ -34,7 +39,7 @@
         existing_id: "{{ existing_mon.id }}"
 
     - name: Create monitor if missing
-      when: existing_id is not defined
+      when: existing_id is not string
       uri:
         url: "https://api.cloudflare.com/client/v4/accounts/{{ cloudflare_account_id }}/load_balancers/monitors"
         method: POST
@@ -47,10 +52,11 @@
 
     - name: Expose monitor id fact per service
       set_fact:
-        "monitor_id_{{ mon.name }}": "{{ existing_id | default(create_mon.json.result.id) }}"
+        "monitor_id_{{ mon.name | regex_replace('[^A-Za-z0-9_]', '_') }}": >-
+          {{ existing_id if existing_id is string else create_mon.json.result.id }}
 
     - name: Update monitor to desired state (always)
-      when: existing_id is defined
+      when: existing_id is string
       uri:
         url: "https://api.cloudflare.com/client/v4/accounts/{{ cloudflare_account_id }}/load_balancers/monitors/{{ existing_id }}"
         method: PUT
@@ -72,8 +78,8 @@
         msg:
           name: "{{ mon.name }}"
           path: "{{ mon.path }}"
-          existing_id: "{{ existing_id | default('none') }}"
-          created_id: "{{ created_id | default('n/a') }}"
+          existing_id: "{{ existing_id }}"
+          created_id: "{{ created_id }}"
           update_status: "{{ (update_mon.status if (update_mon is defined and update_mon.status is defined) else 'n/a') }}"
   delegate_to: localhost
   become: false

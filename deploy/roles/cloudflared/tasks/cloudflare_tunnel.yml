@@ -67,6 +67,9 @@
     tunnel_id: "{{ (cloudflare_tunnel_token | b64decode | from_json).t }}"
   when: tunnel_id is not defined
 
+- name: Normalize archive instances
+  include_tasks: archive_instances.yml
+
 - name: Create cloudflared directory
   file:
     path: "{{ cloudflared_dir }}"
@@ -154,6 +157,21 @@
     proxied: true
     state: present
     api_token: "{{ cloudflare_api_token }}"
+  retries: 3
+  delay: 5
+
+- name: Ensure per-host archive CNAME → tunnel
+  community.general.cloudflare_dns:
+    zone: "{{ dango_domain }}"
+    record: "api-archive-{{ item.name }}-{{ hostname }}"
+    type: CNAME
+    value: "{{ tunnel_id }}.cfargotunnel.com"
+    proxied: true
+    state: present
+    api_token: "{{ cloudflare_api_token }}"
+  loop: "{{ archive_public_instances }}"
+  loop_control:
+    label: "api-archive-{{ item.name }}-{{ hostname }}"
   retries: 3
   delay: 5
 

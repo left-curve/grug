@@ -1,11 +1,4 @@
-import type {
-  Address,
-  Client,
-  GetTxMessage,
-  Signer,
-  TxMessageType,
-  TypedDataParameter,
-} from "@left-curve/types";
+import type { Address, Client, GetTxMessage, Signer } from "@left-curve/types";
 import { type SignAndBroadcastTxReturnType, signAndBroadcastTx } from "./signAndBroadcastTx.js";
 
 type Message = GetTxMessage<"upgrade">;
@@ -31,17 +24,5 @@ export async function upgrade(
     },
   };
 
-  const typedData: TypedDataParameter<TxMessageType> = {
-    type: [{ name: "upgrade", type: "Upgrade" }],
-    extraTypes: {
-      upgrade: [
-        { name: "height", type: "uint32" },
-        { name: "cargo_version", type: "string" },
-        ...(gitTag ? [{ name: "git_tag", type: "string" }] : []),
-        ...(url ? [{ name: "url", type: "string" }] : []),
-      ],
-    },
-  };
-
-  return await signAndBroadcastTx(client, { sender, messages: [message], typedData });
+  return await signAndBroadcastTx(client, { sender, messages: [message] });
 }

@@ -1,16 +1,5 @@
 import { encodeBase64 } from "@left-curve/encoding";
-import type {
-  Address,
-  Base64,
-  Client,
-  Funds,
-  Hex,
-  Json,
-  Signer,
-  TxMessageType,
-  TypedDataParameter,
-} from "@left-curve/types";
-import { getCoinsTypedData } from "@left-curve/utils";
+import type { Address, Base64, Client, Funds, Hex, Json, Signer } from "@left-curve/types";
 import { computeAddress } from "#account/address.js";
 import { type SignAndBroadcastTxReturnType, signAndBroadcastTx } from "./signAndBroadcastTx.js";
 
@@ -22,7 +11,6 @@ export type StoreCodeAndInstantiateParameters = {
   funds?: Funds;
   code: Base64;
   admin?: Address;
-  typedData?: TypedDataParameter;
 };
 
 export type StoreCodeAndInstantiateReturnType = Promise<
@@ -46,34 +34,11 @@ export async function storeCodeAndInstantiate(
     },
   };
 
-  const { extraTypes = {}, type = [] } = parameters.typedData || {};
-
-  const typedData: TypedDataParameter<TxMessageType> = {
-    type: [
-      { name: "instantiate", type: "Instantiate" },
-      { name: "upload", type: "Upload" },
-    ],
-    extraTypes: {
-      Instantiate: [
-        { name: "code_hash", type: "string" },
-        { name: "salt", type: "string" },
-        { name: "admin", type: "address" },
-        { name: "funds", type: "Funds" },
-        { name: "msg", type: "InstantiateAndUploadMessage" },
-      ],
-      Upload: [{ name: "code", type: "string" }],
-      Funds: [...getCoinsTypedData(funds)],
-      InstantiateAndUploadMessage: type,
-      ...extraTypes,
-    },
-  };
-
   const storeCodeMsg = { upload: { code } };
 
   const txData = await signAndBroadcastTx(client, {
     sender,
     messages: [storeCodeMsg, instantiateMsg],
-    typedData,
   });
 
   return [address, txData];

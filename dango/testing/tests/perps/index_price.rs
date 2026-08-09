@@ -15,9 +15,10 @@ const ETH_PYTH_ID: u32 = 2;
 
 async fn query_index_price(suite: &TestSuiteNaive, perps_addr: Addr) -> UsdPrice {
     let pair_state: Option<PairState> = suite
-        .query_wasm_smart(perps_addr, perps::QueryPairStateRequest {
-            pair_id: pair_id(),
-        })
+        .query_wasm_smart(
+            perps_addr,
+            perps::QueryPairStateRequest { pair_id: pair_id() },
+        )
         .should_succeed();
 
     pair_state.unwrap().index_price
@@ -345,4 +346,103 @@ async fn e6_oracle_flapping() {
 
     let index5 = query_index_price(&suite, contracts.perps).await;
     assert_eq!(index5, UsdPrice::new_int(1_999));
+}
+
+/// During a closed session the index cannot be walked arbitrarily far from the
+/// last oracle price, and the order price band stays anchored to that oracle
+/// rather than re-centring on the drifting index. With the default 10% initial
+/// margin ratio the closed-session drift is capped at oracle × (1 + 0.1) =
+/// 2200, and a bid outside the band is rejected relative to the oracle (2000),
+/// not the drifted mark.
+#[tokio::test]
+async fn e7_closed_session_drift_bounded_and_band_anchored_to_oracle() {
+    let (mut suite, mut accounts, _, contracts, _) = setup_test_naive(TestOption::default());
+
+    // Regular@2000 -> index snaps to 2000 and records it as the oracle anchor.
+    register_oracle_prices(&mut suite, &mut accounts, 2_000).await;
+    assert_eq!(
+        query_index_price(&suite, contracts.perps).await,
+        UsdPrice::new_int(2_000)
+    );
+
+    // Fund the attacker and rest a large bid near the (50%) band ceiling. Its
+    // notional dwarfs impact_size, so it fully sets the impact bid.
+    suite
+        .execute(
+            &mut accounts.user1,
+            contracts.perps,
+            &perps::ExecuteMsg::Trade(perps::TraderMsg::Deposit { to: None }),
+            Coins::one(usdc::DENOM.clone(), Uint128::new(100_000_000_000)).unwrap(),
+        )
+        .await
+        .should_succeed();
+    suite
+        .execute(
+            &mut accounts.user1,
+            contracts.perps,
+            &perps::ExecuteMsg::Trade(perps::TraderMsg::SubmitOrder(perps::SubmitOrderRequest {
+                pair_id: pair_id(),
+                size: Quantity::new_int(100),
+                kind: OrderKind::Limit {
+                    limit_price: UsdPrice::new_int(2_900),
+                    time_in_force: TimeInForce::PostOnly,
+                    client_order_id: None,
+                },
+                reduce_only: false,
+                tp: None,
+                sl: None,
+            })),
+            Coins::new(),
+        )
+        .await
+        .should_succeed();
+
+    // Close the market and drive many EWMA ticks at the maximum per-tick weight.
+    // Each fed block re-runs `process_index_price`. Even with the impact bid far
+    // above (2900), the mark must never exceed the +10% bound of 2200.
+    suite.block_time = Duration::from_seconds(180);
+    for _ in 0..40 {
+        suite
+            .feed_oracle_prices(
+                &mut accounts.owner,
+                &[(ETH_PYTH_ID, UsdPrice::new_int(2_000), MarketSession::Other)],
+                None,
+            )
+            .await;
+        assert!(
+            query_index_price(&suite, contracts.perps).await <= UsdPrice::new_int(2_200),
+            "closed-session mark exceeded the +10% discovery bound"
+        );
+    }
+
+    // The mark converges to the bound and pins there — the geometric walk is gone.
+    assert_eq!(
+        query_index_price(&suite, contracts.perps).await,
+        UsdPrice::new_int(2_200)
+    );
+
+    // Even though the mark drifted to 2200, the band is still measured against
+    // the oracle (2000): a bid at 3100 is outside [1000, 3000] and is rejected
+    // relative to the oracle, not the drifted mark. Pre-fix the band would have
+    // re-centred on 2200 and admitted it.
+    suite
+        .execute(
+            &mut accounts.user1,
+            contracts.perps,
+            &perps::ExecuteMsg::Trade(perps::TraderMsg::SubmitOrder(perps::SubmitOrderRequest {
+                pair_id: pair_id(),
+                size: Quantity::new_int(1),
+                kind: OrderKind::Limit {
+                    limit_price: UsdPrice::new_int(3_100),
+                    time_in_force: TimeInForce::PostOnly,
+                    client_order_id: None,
+                },
+                reduce_only: false,
+                tp: None,
+                sl: None,
+            })),
+            Coins::new(),
+        )
+        .await
+        .should_fail_with_error("deviates too far from oracle price 2000");
 }

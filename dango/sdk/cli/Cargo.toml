@@ -22,9 +22,9 @@ dango-primitives    = { workspace = true }
 dango-sdk           = { workspace = true }
 dango-types         = { workspace = true }
 dialoguer           = { workspace = true }
+getrandom           = { workspace = true }
 hex                 = { workspace = true }
 home                = { workspace = true }
-rand                = { workspace = true }
 serde               = { workspace = true }
 tokio               = { workspace = true }
 

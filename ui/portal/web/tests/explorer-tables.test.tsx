@@ -40,6 +40,8 @@ vi.mock("@left-curve/foundation", async (importOriginal) => ({
 }));
 
 vi.mock("@left-curve/store", () => ({
+  getExplorerTransactionKey: (transaction: IndexedTransaction) =>
+    `${transaction.blockHeight}:${transaction.transactionType}:${transaction.transactionIdx}`,
   useAccount: () => ({
     accounts: [],
     username: undefined,
@@ -276,6 +278,66 @@ describe("explorer tables", () => {
     fireEvent.click(within(row).getByRole("link", { name: "0" }));
 
     expect(explorerTableMocks.navigate).toHaveBeenCalledWith({ to: "/block/0" });
+  });
+
+  it("shows contextual roles and renders cron units without transaction links", async () => {
+    const sender = "0x73656e6465720000000000000000000000000000";
+    explorerTableMocks.getAccountInfo.mockResolvedValue({ index: 1, username: "alice" });
+    const transaction = {
+      blockHeight: 80,
+      createdAt: "2026-06-08T12:01:00.000Z",
+      errorMessage: "",
+      gasUsed: 1,
+      gasWanted: 1,
+      hash: "0x7478000000000000000000000000000000000000000000000000000000000000",
+      hasSucceeded: true,
+      involvement: ["sender", "participant"] as ("sender" | "participant")[],
+      messages: [createIndexedMessage("execute")],
+      nestedEvents: "[]",
+      sender,
+      transactionIdx: 0,
+      transactionType: "TX" as const,
+    };
+    const cron = {
+      blockHeight: 79,
+      createdAt: "2026-06-08T12:00:00.000Z",
+      errorMessage: "",
+      gasUsed: 1,
+      gasWanted: 0,
+      hash: "",
+      hasSucceeded: true,
+      involvement: ["participant"] as ("sender" | "participant")[],
+      messages: [],
+      nestedEvents: "[]",
+      sender: "" as const,
+      transactionIdx: 1,
+      transactionType: "CRON" as const,
+    };
+
+    renderWithQueryClient(<TransactionsTable transactions={[transaction, cron]} />);
+
+    expect(getHeaderLabels()).toEqual([
+      "Hash",
+      "Block",
+      "Age",
+      "Sender",
+      m["explorer.txs.role"](),
+      "Actions",
+      "Result",
+    ]);
+    expect(screen.getAllByText(m["explorer.txs.roles.sender"]())).toHaveLength(2);
+    expect(screen.getAllByText(m["explorer.txs.roles.participant"]())).toHaveLength(2);
+    await waitFor(() => expect(screen.getByText("alice #1")).toBeInTheDocument());
+
+    const [, cronRow] = getBodyRows();
+    const cronCells = rowCells(cronRow);
+    expect(cronCells[0]).toBe("—");
+    expect(cronCells[3]).toBe("—");
+    expect(cronCells[4]).toBe(m["explorer.txs.roles.participant"]());
+    expect(cronCells[5]).toBe("—");
+    expect(cronRow.querySelector('a[href="/tx/"]')).toBeNull();
+    expect(explorerTableMocks.getAccountInfo).not.toHaveBeenCalledWith({ address: "" });
+    expect(explorerTableMocks.getContractInfo).not.toHaveBeenCalledWith({ address: "" });
   });
 
   it("falls back to the raw 0x sender when backend lookups cannot identify it", async () => {

@@ -166,9 +166,12 @@ async fn liquidation_on_order_book() {
 
     // Verify position: 5 ETH long @ $2,000, margin = $2,990.
     let state = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
     let pos = state
@@ -243,14 +246,17 @@ async fn liquidation_on_order_book() {
 
     // Capture vault margin before liquidation.
     let vault_state_before = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: contracts.perps,
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: contracts.perps,
+            },
+        )
         .should_succeed();
     let vault_margin_before = vault_state_before.unwrap().margin;
 
     // Anyone can call Liquidate.
-    suite
+    let liq_events = suite
         .execute(
             &mut accounts.owner,
             contracts.perps,
@@ -260,13 +266,46 @@ async fn liquidation_on_order_book() {
             Coins::new(),
         )
         .await
-        .should_succeed();
+        .should_succeed()
+        .events;
+
+    // The book absorbed the whole close, so the single Liquidated event takes
+    // the no-ADL shape — and must report the position size left after the
+    // partial close: 5 - 1.689656 = 3.310344 ETH, the same value the state
+    // query asserts below.
+    let liquidated_events = liq_events
+        .search_event::<CheckedContractEvent>()
+        .with_predicate(|e| e.ty == "liquidated")
+        .take()
+        .all()
+        .into_iter()
+        .map(|e| e.event.data.deserialize_json::<Liquidated>().unwrap())
+        .collect::<Vec<_>>();
+
+    assert_eq!(
+        liquidated_events.len(),
+        1,
+        "one Liquidated event for the single scheduled pair"
+    );
+    let liq = &liquidated_events[0];
+    assert_eq!(liq.user, accounts.user1.address());
+    assert_eq!(liq.adl_size, Quantity::ZERO, "book absorbed the close");
+    assert_eq!(liq.adl_price, None, "no ADL, no ADL price");
+    assert_eq!(liq.adl_realized_pnl, UsdValue::ZERO);
+    assert_eq!(
+        liq.remaining_position_size,
+        Some(Quantity::new_raw(3_310_344)),
+        "Liquidated must report the post-close position size on a partial close"
+    );
 
     // Trader position should be reduced from 5 to ~3.310345 ETH (partial close).
     let state = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
     let pos = state
@@ -303,9 +342,12 @@ async fn liquidation_on_order_book() {
 
     // Vault margin should be unchanged (fee goes to insurance fund, not vault).
     let vault_state_after: Option<UserState> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: contracts.perps,
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: contracts.perps,
+            },
+        )
         .should_succeed();
     let vault_margin_after = vault_state_after.unwrap().margin;
 
@@ -316,9 +358,12 @@ async fn liquidation_on_order_book() {
 
     // Bidder (user3) should have ~1.689655 ETH long @ $1,450.
     let bidder_state = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user3.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user3.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
     let bidder_pos = bidder_state
@@ -539,9 +584,12 @@ async fn liquidation_snaps_to_full_close_when_remainder_would_be_dust() {
     // Trader position fully closed (snap fired). USER_STATES entry may
     // survive with remaining margin, but the pair must not appear.
     let trader_state: Option<UserState> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed();
     let state = trader_state.expect("trader user state should still exist with remaining margin");
     assert!(
@@ -570,9 +618,12 @@ async fn liquidation_snaps_to_full_close_when_remainder_would_be_dust() {
 
     // Bidder filled the full 5 ETH, not the ~1.69 ETH partial.
     let bidder_state = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user3.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user3.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
     let bidder_pos = bidder_state
@@ -711,9 +762,12 @@ async fn liquidation_with_adl() {
         .should_succeed();
 
     let state: Option<UserState> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed();
 
     assert_eq!(state.unwrap().margin, UsdValue::new_int(1_090));
@@ -779,9 +833,12 @@ async fn liquidation_with_adl() {
         .should_succeed();
 
     let state = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user3.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user3.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
 
@@ -858,6 +915,12 @@ async fn liquidation_with_adl() {
         "v0.17.0+ Liquidated events always carry Some(adl_realized_funding); \
          with no funding accrued it must be Some(ZERO)"
     );
+    assert_eq!(
+        liq.remaining_position_size,
+        Some(Quantity::ZERO),
+        "liquidation fully closed Trader A's 5-long in this pair, so the \
+         resulting position size must be Some(ZERO)"
+    );
 
     // The Deleveraged event for the counter-party (Trader B) should
     // mirror the split: closing-only `realized_pnl = +$1,090` (Trader B
@@ -887,12 +950,21 @@ async fn liquidation_with_adl() {
         "v0.17.0+ Deleveraged events always carry Some(realized_funding); \
          with no funding accrued it must be Some(ZERO)"
     );
+    assert_eq!(
+        dlv.remaining_position_size,
+        Some(Quantity::ZERO),
+        "ADL closed Trader B's entire 5-short in this pair, so the resulting \
+         position size must be Some(ZERO)"
+    );
 
     // Trader A should have no positions and $0 margin.
     let state = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed();
 
     // User state is empty (margin=0, no positions) — may be pruned.
@@ -905,9 +977,12 @@ async fn liquidation_with_adl() {
     // Step 10: Verify Trader B's position was ADL'd.
     // -------------------------------------------------------------------------
     let state = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user3.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user3.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
 
@@ -926,9 +1001,12 @@ async fn liquidation_with_adl() {
 
     // Vault should be unaffected — no backstop, no bad debt.
     let vault_state = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: contracts.perps,
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: contracts.perps,
+            },
+        )
         .should_succeed()
         .unwrap();
 
@@ -1072,9 +1150,12 @@ async fn liquidation_cancels_conditional_orders() {
 
     // Verify both conditional orders were placed.
     let state: UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
     let pos = state.positions.get(&pair).expect("should have position");
@@ -1137,16 +1218,22 @@ async fn liquidation_cancels_conditional_orders() {
 
     // Step 7: Verify state after liquidation.
     let state: Option<UserState> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed();
 
     // All limit orders should have been canceled during liquidation.
     let all_orders: BTreeMap<OrderId, QueryOrdersByUserResponseItem> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryOrdersByUserRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryOrdersByUserRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed();
 
     assert!(
@@ -1277,9 +1364,12 @@ async fn vault_liquidation_on_order_book() {
         .should_succeed();
 
     let vault_orders: BTreeMap<OrderId, QueryOrdersByUserResponseItem> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryOrdersByUserRequest {
-            user: contracts.perps,
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryOrdersByUserRequest {
+                user: contracts.perps,
+            },
+        )
         .should_succeed();
 
     let vault_bid = vault_orders
@@ -1325,9 +1415,12 @@ async fn vault_liquidation_on_order_book() {
 
     // Verify vault is long.
     let vault_state = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: contracts.perps,
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: contracts.perps,
+            },
+        )
         .should_succeed()
         .unwrap();
 
@@ -1350,16 +1443,19 @@ async fn vault_liquidation_on_order_book() {
 
     // Sanity: verify vault is liquidatable (equity < MM).
     let vault_ext: perps::UserStateExtended = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateExtendedRequest {
-            user: contracts.perps,
-            include_equity: true,
-            include_available_margin: false,
-            include_maintenance_margin: false,
-            include_unrealized_pnl: false,
-            include_unrealized_funding: false,
-            include_liquidation_price: false,
-            include_all: false,
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateExtendedRequest {
+                user: contracts.perps,
+                include_equity: true,
+                include_available_margin: false,
+                include_maintenance_margin: false,
+                include_unrealized_pnl: false,
+                include_unrealized_funding: false,
+                include_liquidation_price: false,
+                include_all: false,
+            },
+        )
         .should_succeed();
 
     let equity = vault_ext.equity.unwrap();
@@ -1444,9 +1540,12 @@ async fn vault_liquidation_on_order_book() {
     // Vault position should be reduced (partial liquidation closes just enough
     // to restore equity above maintenance margin).
     let vault_state_after = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: contracts.perps,
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: contracts.perps,
+            },
+        )
         .should_succeed()
         .unwrap();
 
@@ -1473,16 +1572,19 @@ async fn vault_liquidation_on_order_book() {
     // This holds because liquidation_fee_rate = 0, so no fee erodes the
     // buffer created by the close schedule.
     let vault_ext_after: perps::UserStateExtended = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateExtendedRequest {
-            user: contracts.perps,
-            include_equity: true,
-            include_available_margin: false,
-            include_maintenance_margin: false,
-            include_unrealized_pnl: false,
-            include_unrealized_funding: false,
-            include_liquidation_price: false,
-            include_all: false,
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateExtendedRequest {
+                user: contracts.perps,
+                include_equity: true,
+                include_available_margin: false,
+                include_maintenance_margin: false,
+                include_unrealized_pnl: false,
+                include_unrealized_funding: false,
+                include_liquidation_price: false,
+                include_all: false,
+            },
+        )
         .should_succeed();
 
     let equity_after = vault_ext_after.equity.unwrap();
@@ -1515,9 +1617,12 @@ async fn vault_liquidation_on_order_book() {
 
     // Bidder (user3) should now have a long position from absorbing the vault's close.
     let user3_state = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user3.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user3.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
 
@@ -1755,6 +1860,7 @@ async fn liquidation_book_fills_have_fill_id_adl_does_not() {
     // deserialize fine (extra fields ignored) but this assertion
     // documents the intended shape.
     let deleveraged_events = events
+        .clone()
         .search_event::<CheckedContractEvent>()
         .with_predicate(|e| e.ty == "deleveraged")
         .take()
@@ -1766,5 +1872,33 @@ async fn liquidation_book_fills_have_fill_id_adl_does_not() {
     assert!(
         !deleveraged_events.is_empty(),
         "liquidation should have ADL'd the remainder against a counter-party"
+    );
+
+    // The 3-ETH ADL leg only partially consumes Trader B's 5-ETH short: the
+    // Deleveraged event must report the -2 ETH that survives.
+    assert_eq!(deleveraged_events.len(), 1, "single ADL counter-party");
+    assert_eq!(deleveraged_events[0].user, accounts.user3.address());
+    assert_eq!(
+        deleveraged_events[0].remaining_position_size,
+        Some(Quantity::new_int(-2)),
+        "Deleveraged must report the counter-party's post-ADL position size"
+    );
+
+    // Trader A's full 5-ETH long is closed across the book leg (2) and the
+    // ADL leg (3), so the pair's Liquidated event reports a zero remainder.
+    let liquidated_events = events
+        .search_event::<CheckedContractEvent>()
+        .with_predicate(|e| e.ty == "liquidated")
+        .take()
+        .all()
+        .into_iter()
+        .map(|e| e.event.data.deserialize_json::<Liquidated>().unwrap())
+        .collect::<Vec<_>>();
+
+    assert_eq!(liquidated_events.len(), 1);
+    assert_eq!(
+        liquidated_events[0].remaining_position_size,
+        Some(Quantity::ZERO),
+        "the mixed book+ADL close wipes the whole position"
     );
 }

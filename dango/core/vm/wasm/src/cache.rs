@@ -115,13 +115,13 @@ mod tests {
 
         // Build the 1st contract. Should be a cache miss, and the data is
         // inserted into the cache.
-        let hash1 = CONTRACT.hash256();
+        let hash1 = CONTRACT.sha2_256();
         cache.get_or_build_with(hash1, builder).unwrap();
 
         // Build the 2nd contract. Should also be a cache miss, and the data is
         // inserted. Data of the previous build should have been removed,
         // because the cache only has a capacity of 1.
-        let hash2 = b"jake".hash256();
+        let hash2 = b"jake".sha2_256();
         cache.get_or_build_with(hash2, builder).unwrap();
 
         // Cache should have had 2 misses, with hash2 cached but hash1 not.
@@ -140,7 +140,7 @@ mod tests {
 
         // Build the same contract twice. 1st time should be a cache miss, 2nd
         // time should be a cache hit.
-        let hash = CONTRACT.hash256();
+        let hash = CONTRACT.sha2_256();
         cache.get_or_build_with(hash, builder).unwrap();
         cache.get_or_build_with(hash, builder).unwrap();
 

@@ -9,3 +9,6 @@
   loop_control:
     loop_var: dango_network
   when: cloudflare_lb_enabled
+
+- include_tasks: cloudflare_archive_lb.yml
+  run_once: true

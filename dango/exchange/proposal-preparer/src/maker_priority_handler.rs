@@ -185,10 +185,13 @@ fn classify_submit_or_cancel(req: &SubmitOrCancelOrderRequest) -> MsgClass {
 }
 
 fn is_post_only(kind: &OrderKind) -> bool {
-    matches!(kind, OrderKind::Limit {
-        time_in_force: TimeInForce::PostOnly,
-        ..
-    },)
+    matches!(
+        kind,
+        OrderKind::Limit {
+            time_in_force: TimeInForce::PostOnly,
+            ..
+        },
+    )
 }
 
 // ----------------------------------- tests -----------------------------------

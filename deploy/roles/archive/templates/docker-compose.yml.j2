@@ -1,0 +1,51 @@
+name: archive-{{ instance.name }}
+
+services:
+  archive:
+    image: {{ archive_image }}:{{ archive_tag }}
+    pull_policy: always
+    container_name: archive-{{ instance.name }}
+    restart: always
+    command: ["archive", "start"]
+    # Docker labels promtail turns into Loki labels (docker_sd relabeling) —
+    # same keys the full-app stack uses.
+    labels:
+      service_name: "archive"
+      dango_network: "{{ instance.name }}"
+      environment: "production"
+    # Injected as env vars into the container; config-rs picks up POSTGRES__URL
+    # as an override of [postgres].url in app.toml (it carries the secret).
+    env_file:
+      - .env
+{% if instance.live_host_override is defined %}
+    # Resolve the live_url hostname to an internal IP (wireguard/tailscale) so
+    # block-source traffic hits the source node's traefik directly over the
+    # VPN, bypassing Cloudflare and its rate limits. The Host-based router on
+    # traefik :80 matches api-<network>.dango.zone regardless of how the name
+    # was resolved.
+    extra_hosts:
+      - "{{ instance.live_url | urlsplit('hostname') }}:{{ instance.live_host_override }}"
+{% endif %}
+    volumes:
+      - ./config/app.toml:/root/.archive/config/app.toml:ro
+      - ./data:/root/.archive/data
+    ports:
+      # Metrics on the wireguard IP for the Prometheus scrape (ovh3 resolves
+      # hosts to wireguard IPs) and on the tailscale IP for laptop debugging —
+      # same dual binding as promtail/node-exporter.
+      - "{{ wireguard_ip }}:{{ instance.metrics_host_port }}:9191"
+      - "{{ tailscale_ip }}:{{ instance.metrics_host_port }}:9191"
+      # Read API (GraphQL httpd), VPN-only host bindings. Public traffic enters
+      # through cloudflared -> Traefik -> Docker network instead of these host
+      # ports when a Traefik route is enabled.
+      - "{{ wireguard_ip }}:{{ instance.httpd_host_port }}:8080"
+      - "{{ tailscale_ip }}:{{ instance.httpd_host_port }}:8080"
+    networks:
+      - traefik
+      - postgres
+
+networks:
+  traefik:
+    external: true
+  postgres:
+    external: true

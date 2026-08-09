@@ -14,12 +14,14 @@
 //! - withdraw rate limit.
 
 pub mod bridge;
+mod events;
 mod msgs;
 mod origin;
 mod remote;
 
 pub use {
     dango_hyperlane_types::{Addr32, mailbox::Domain},
+    events::*,
     msgs::*,
     origin::*,
     remote::*,

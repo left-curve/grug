@@ -50,9 +50,12 @@ pub fn set_referral(
             // TODO: refactor to raw query (query_wasm_path).
             let sender_user_index = ctx
                 .querier
-                .query_wasm_smart(account_factory, account_factory::QueryAccountRequest {
-                    address: ctx.sender,
-                })?
+                .query_wasm_smart(
+                    account_factory,
+                    account_factory::QueryAccountRequest {
+                        address: ctx.sender,
+                    },
+                )?
                 .owner;
             sender_user_index == referee
         },
@@ -85,10 +88,14 @@ pub fn set_referral(
     // active, and the old referrer's `referee_count` is not decremented so it
     // continues to read as "users that have been a direct referee of this
     // referrer at one point in time".
-    REFERRER_TO_REFEREE_STATISTICS.save(ctx.storage, (referrer, referee), &RefereeStats {
-        registered_at: ctx.block.timestamp,
-        ..Default::default()
-    })?;
+    REFERRER_TO_REFEREE_STATISTICS.save(
+        ctx.storage,
+        (referrer, referee),
+        &RefereeStats {
+            registered_at: ctx.block.timestamp,
+            ..Default::default()
+        },
+    )?;
 
     // Increment the referrer's referee count.
     {
@@ -324,10 +331,14 @@ mod tests {
             .save(&mut ctx.storage, REFEREE, &OUTSIDER)
             .unwrap();
         REFERRER_TO_REFEREE_STATISTICS
-            .save(&mut ctx.storage, (OUTSIDER, REFEREE), &RefereeStats {
-                registered_at: BLOCK_TIME,
-                ..Default::default()
-            })
+            .save(
+                &mut ctx.storage,
+                (OUTSIDER, REFEREE),
+                &RefereeStats {
+                    registered_at: BLOCK_TIME,
+                    ..Default::default()
+                },
+            )
             .unwrap();
         USER_REFERRAL_DATA
             .save(

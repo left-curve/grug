@@ -4,14 +4,9 @@ use {
         criterion_main,
     },
     dango_crypto::{
-        blake2b_512, blake2s_256, blake3, ed25519_batch_verify, ed25519_verify, keccak256,
-        secp256k1_pubkey_recover, secp256k1_verify, secp256r1_verify, sha2_256, sha2_512, sha3_256,
-        sha3_512,
+        keccak256, secp256k1_pubkey_recover, secp256k1_verify, secp256r1_verify, sha2_256,
     },
-    dango_identity::{Identity256, Identity512},
-    ed25519_dalek::Signer,
-    p256::ecdsa::signature::DigestSigner,
-    rand::{RngCore, rngs::OsRng},
+    p256::{ecdsa::signature::hazmat::PrehashSigner, elliptic_curve::Generate},
     std::{hint::black_box, time::Duration},
 };
 
@@ -43,16 +38,9 @@ const HASH_MSG_LENS: [usize; 5] = [200_000, 400_000, 600_000, 800_000, 1_000_000
 /// just pick a small number.
 const SIGN_MSG_LEN: usize = 10;
 
-/// Batch sizes for benchmarking `ed25519_batch_verify`.
-///
-/// The most common situation this function is called is in the ICS-07 Tendermint
-/// light client, where it verifies block headers. Cosmos chains usually have up
-/// to 150 validators, so we choose a number of batch sizes up to that.
-const ED25519_BATCH_SIZES: [usize; 6] = [25, 50, 75, 100, 125, 150];
-
 fn generate_random_msg(i: usize) -> Vec<u8> {
     let mut vec = vec![0; i];
-    OsRng.fill_bytes(&mut vec);
+    getrandom::fill(&mut vec).unwrap();
     vec
 }
 
@@ -72,58 +60,10 @@ fn bench_hashers(c: &mut Criterion) {
             );
         });
 
-        group.bench_with_input(BenchmarkId::new("sha2_512", size), &size, |b, size| {
-            b.iter_batched(
-                || generate_random_msg(*size),
-                |data| sha2_512(black_box(&data)),
-                BatchSize::SmallInput,
-            );
-        });
-
-        group.bench_with_input(BenchmarkId::new("sha3_256", size), &size, |b, size| {
-            b.iter_batched(
-                || generate_random_msg(*size),
-                |data| sha3_256(black_box(&data)),
-                BatchSize::SmallInput,
-            );
-        });
-
-        group.bench_with_input(BenchmarkId::new("sha3_512", size), &size, |b, size| {
-            b.iter_batched(
-                || generate_random_msg(*size),
-                |data| sha3_512(black_box(&data)),
-                BatchSize::SmallInput,
-            );
-        });
-
         group.bench_with_input(BenchmarkId::new("keccak256", size), &size, |b, size| {
             b.iter_batched(
                 || generate_random_msg(*size),
                 |data| keccak256(black_box(&data)),
-                BatchSize::SmallInput,
-            );
-        });
-
-        group.bench_with_input(BenchmarkId::new("blake2s_256", size), &size, |b, size| {
-            b.iter_batched(
-                || generate_random_msg(*size),
-                |data| blake2s_256(black_box(&data)),
-                BatchSize::SmallInput,
-            );
-        });
-
-        group.bench_with_input(BenchmarkId::new("blake2b_512", size), &size, |b, size| {
-            b.iter_batched(
-                || generate_random_msg(*size),
-                |data| blake2b_512(black_box(&data)),
-                BatchSize::SmallInput,
-            );
-        });
-
-        group.bench_with_input(BenchmarkId::new("blake3", size), &size, |b, size| {
-            b.iter_batched(
-                || generate_random_msg(*size),
-                |data| blake3(black_box(&data)),
                 BatchSize::SmallInput,
             );
         });
@@ -143,18 +83,13 @@ fn bench_verifiers(c: &mut Criterion) {
         b.iter_batched(
             || {
                 let msg = generate_random_msg(SIGN_MSG_LEN);
-                let msg_hash = Identity256::from(sha2_256(&msg));
-                let sk = p256::ecdsa::SigningKey::random(&mut OsRng);
+                let msg_hash = sha2_256(&msg);
+                let sk = p256::ecdsa::SigningKey::generate();
                 let vk = p256::ecdsa::VerifyingKey::from(&sk);
-                // For some reason, we have to explicitly specify the trait here;
-                // the compiler can't infer it.
-                let sig = <p256::ecdsa::SigningKey as DigestSigner<_, p256::ecdsa::Signature>>::sign_digest(
-                    &sk,
-                    msg_hash.clone(),
-                );
+                let sig: p256::ecdsa::Signature = sk.sign_prehash(&msg_hash).unwrap();
 
                 (
-                    msg_hash.as_bytes().to_vec(),
+                    msg_hash.to_vec(),
                     sig.to_bytes().to_vec(),
                     vk.to_sec1_bytes().to_vec(),
                 )
@@ -170,16 +105,13 @@ fn bench_verifiers(c: &mut Criterion) {
         b.iter_batched(
             || {
                 let msg = generate_random_msg(SIGN_MSG_LEN);
-                let msg_hash = Identity256::from(sha2_256(&msg));
-                let sk = k256::ecdsa::SigningKey::random(&mut OsRng);
+                let msg_hash = sha2_256(&msg);
+                let sk = k256::ecdsa::SigningKey::generate();
                 let vk = k256::ecdsa::VerifyingKey::from(&sk);
-                let sig = <k256::ecdsa::SigningKey as DigestSigner<_, k256::ecdsa::Signature>>::sign_digest(
-                    &sk,
-                    msg_hash.clone(),
-                );
+                let sig: k256::ecdsa::Signature = sk.sign_prehash(&msg_hash).unwrap();
 
                 (
-                    msg_hash.as_bytes().to_vec(),
+                    msg_hash.to_vec(),
                     sig.to_bytes().to_vec(),
                     vk.to_sec1_bytes().to_vec(),
                 )
@@ -195,13 +127,13 @@ fn bench_verifiers(c: &mut Criterion) {
         b.iter_batched(
             || {
                 let msg = generate_random_msg(SIGN_MSG_LEN);
-                let msg_hash = Identity256::from(sha2_256(&msg));
-                let sk = k256::ecdsa::SigningKey::random(&mut OsRng);
+                let msg_hash = sha2_256(&msg);
+                let sk = k256::ecdsa::SigningKey::generate();
                 let vk = k256::ecdsa::VerifyingKey::from(&sk);
-                let (sig, recovery_id) = sk.sign_digest_recoverable(msg_hash.clone()).unwrap();
+                let (sig, recovery_id) = sk.sign_prehash_recoverable(&msg_hash);
 
                 (
-                    msg_hash.as_bytes().to_vec(),
+                    msg_hash.to_vec(),
                     sig.to_bytes().to_vec(),
                     vk.to_sec1_bytes().to_vec(),
                     recovery_id.to_byte(),
@@ -217,67 +149,6 @@ fn bench_verifiers(c: &mut Criterion) {
             BatchSize::SmallInput,
         );
     });
-
-    group.bench_function("ed25519_verify", |b| {
-        b.iter_batched(
-            || {
-                let msg = generate_random_msg(SIGN_MSG_LEN);
-                let msg_hash = Identity512::from(sha2_512(&msg));
-                let sk = ed25519_dalek::SigningKey::generate(&mut OsRng);
-                let vk = ed25519_dalek::VerifyingKey::from(&sk);
-                let sig = sk.sign_digest(msg_hash.clone());
-
-                (
-                    msg_hash.to_vec(),
-                    sig.to_bytes().to_vec(),
-                    vk.as_bytes().to_vec(),
-                )
-            },
-            |(msg_hash, sig, vk)| {
-                assert!(ed25519_verify(&msg_hash, &sig, &vk).is_ok());
-            },
-            BatchSize::SmallInput,
-        );
-    });
-
-    for size in ED25519_BATCH_SIZES {
-        group.bench_with_input(
-            BenchmarkId::new("ed25519_batch_verify", size),
-            &size,
-            |b, size| {
-                b.iter_batched(
-                    || {
-                        let mut prehash_msgs = vec![];
-                        let mut sigs = vec![];
-                        let mut vks = vec![];
-
-                        // We use a batch size of 100, because the typical use case of
-                        // `ed25519_batch_verify` is in Tendermint light clients, while
-                        // the average size of validator sets of Cosmos chains is ~100.
-                        for _ in 0..*size {
-                            let prehash_msg = generate_random_msg(SIGN_MSG_LEN);
-                            let sk = ed25519_dalek::SigningKey::generate(&mut OsRng);
-                            let vk = ed25519_dalek::VerifyingKey::from(&sk);
-                            let sig = sk.sign(&prehash_msg);
-
-                            prehash_msgs.push(prehash_msg);
-                            sigs.push(sig.to_bytes().to_vec());
-                            vks.push(vk.to_bytes().to_vec());
-                        }
-
-                        (prehash_msgs, sigs, vks)
-                    },
-                    |(msgs, sigs, vks)| {
-                        let msgs: Vec<_> = msgs.iter().map(|m| m.as_slice()).collect();
-                        let sigs: Vec<_> = sigs.iter().map(|s| s.as_slice()).collect();
-                        let vks: Vec<_> = vks.iter().map(|k| k.as_slice()).collect();
-                        assert!(ed25519_batch_verify(&msgs, &sigs, &vks).is_ok());
-                    },
-                    BatchSize::SmallInput,
-                );
-            },
-        );
-    }
 
     group.finish();
 }

@@ -1,11 +1,4 @@
-import type {
-  Address,
-  Client,
-  GetTxMessage,
-  Signer,
-  TxMessageType,
-  TypedDataParameter,
-} from "@left-curve/types";
+import type { Address, Client, GetTxMessage, Signer } from "@left-curve/types";
 import { type SignAndBroadcastTxReturnType, signAndBroadcastTx } from "./signAndBroadcastTx.js";
 
 type Message = GetTxMessage<"configure">;
@@ -29,17 +22,5 @@ export async function configure(
     },
   };
 
-  const typedData: TypedDataParameter<TxMessageType> = {
-    type: [{ name: "configure", type: "Configure" }],
-    extraTypes: {
-      Configure: [
-        { name: "new_app_cfg", type: "AppConfig" },
-        { name: "new_cfg", type: "Config" },
-      ],
-      AppConfig: [],
-      Config: [],
-    },
-  };
-
-  return await signAndBroadcastTx(client, { sender, messages: [message], typedData });
+  return await signAndBroadcastTx(client, { sender, messages: [message] });
 }

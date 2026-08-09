@@ -1,0 +1,137 @@
+---
+- name: "{{ instance.name }} - Validate required variables"
+  assert:
+    that:
+      - instance.name is defined
+      - instance.live_url is defined
+      - instance.metrics_host_port is defined
+      - instance.httpd_host_port is defined
+      - instance.name is match('^[a-z0-9]([a-z0-9-]*[a-z0-9])?$')
+      - instance.cloudflare is not defined or instance.cloudflare.enabled is defined
+      - instance.cloudflare is not defined or instance.cloudflare.load_balancer is defined
+      - instance.cloudflare is not defined or instance.cloudflare.load_balancer is not defined or not instance.cloudflare.load_balancer or instance.cloudflare.enabled
+      - inventory_hostname in (groups['traefik'] | default([]))
+      - instance.cloudflare is not defined or not instance.cloudflare.enabled or inventory_hostname in (groups['cloudflared'] | default([]))
+      - archive_db_password is defined
+      - archive_db_password | length > 0
+      - postgres_user is defined
+      - postgres_password is defined
+      - ghcr_user is defined
+      - ghcr_token is defined
+    fail_msg: >-
+      archive instance needs a DNS-safe name, live_url, metrics_host_port,
+      httpd_host_port, plus archive_db_password, postgres_user,
+      postgres_password, ghcr_user, ghcr_token. If cloudflare is present it
+      must include enabled and load_balancer. If cloudflare.enabled is true, the
+      host must be in [cloudflared]; all archive hosts must be in [traefik]
+      because the compose stack joins the external traefik network.
+
+- name: "{{ instance.name }} - Derive instance facts"
+  set_fact:
+    archive_instance_dir: "{{ archive_dir }}/{{ instance.name }}"
+    archive_db_name: "archive_{{ instance.name | replace('-', '_') }}"
+    archive_db_user: "archive_{{ instance.name | replace('-', '_') }}"
+
+- name: "{{ instance.name }} - Create instance directories"
+  file:
+    path: "{{ archive_instance_dir }}/{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - ""
+    - "config"
+    - "data"
+
+- name: "{{ instance.name }} - Ensure postgres docker network exists"
+  community.docker.docker_network:
+    name: postgres
+    state: present
+
+- name: "{{ instance.name }} - Ensure traefik docker network exists"
+  community.docker.docker_network:
+    name: traefik
+    state: present
+
+- name: "{{ instance.name }} - Create postgres user"
+  community.postgresql.postgresql_user:
+    name: "{{ archive_db_user }}"
+    password: "{{ archive_db_password }}"
+    login_user: "{{ postgres_user }}"
+    login_password: "{{ postgres_password }}"
+    login_host: "{{ postgres_external_host }}"
+    login_port: "{{ postgres_port }}"
+    state: present
+  no_log: true
+
+- name: "{{ instance.name }} - Create postgres database"
+  community.postgresql.postgresql_db:
+    name: "{{ archive_db_name }}"
+    owner: "{{ archive_db_user }}"
+    login_user: "{{ postgres_user }}"
+    login_password: "{{ postgres_password }}"
+    login_host: "{{ postgres_external_host }}"
+    login_port: "{{ postgres_port }}"
+    state: present
+
+- name: "{{ instance.name }} - Grant privileges on database"
+  community.postgresql.postgresql_privs:
+    type: database
+    privs: ALL
+    roles: "{{ archive_db_user }}"
+    login_db: "{{ archive_db_name }}"
+    login_user: "{{ postgres_user }}"
+    login_password: "{{ postgres_password }}"
+    login_host: "{{ postgres_external_host }}"
+    login_port: "{{ postgres_port }}"
+    state: present
+
+- name: "{{ instance.name }} - Copy app.toml"
+  copy:
+    src: app.toml
+    dest: "{{ archive_instance_dir }}/config/app.toml"
+    mode: "0644"
+
+- name: "{{ instance.name }} - Template .env (env overrides)"
+  template:
+    src: env.j2
+    dest: "{{ archive_instance_dir }}/.env"
+    mode: "0600"
+
+- name: "{{ instance.name }} - Template docker-compose.yml"
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ archive_instance_dir }}/docker-compose.yml"
+    mode: "0644"
+
+- name: "{{ instance.name }} - Login to GHCR"
+  community.docker.docker_login:
+    registry: ghcr.io
+    username: "{{ ghcr_user }}"
+    password: "{{ ghcr_token }}"
+  no_log: true
+
+- name: "{{ instance.name }} - Launch stack"
+  community.docker.docker_compose_v2:
+    project_src: "{{ archive_instance_dir }}"
+    pull: always
+    state: present
+    recreate: always
+
+- name: "{{ instance.name }} - Logout from GHCR"
+  community.docker.docker_login:
+    registry: ghcr.io
+    state: absent
+
+- name: "{{ instance.name }} - Ensure Traefik config directory exists"
+  file:
+    path: "{{ traefik_dir }}/config"
+    state: directory
+    mode: "0755"
+  when: instance.cloudflare is defined and instance.cloudflare.enabled
+
+- name: "{{ instance.name }} - Configure Traefik route"
+  template:
+    src: traefik-archive.yml.j2
+    dest: "{{ traefik_dir }}/config/archive-{{ instance.name }}.yml"
+    mode: "0644"
+  when: instance.cloudflare is defined and instance.cloudflare.enabled

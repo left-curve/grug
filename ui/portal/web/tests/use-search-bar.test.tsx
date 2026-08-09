@@ -1,8 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { m } from "@left-curve/foundation/paraglide/messages.js";
-
 import { useSearchBar } from "../../../store/src/hooks/useSearchBar";
 import { createQueryClientWrapper, createTestQueryClient } from "./utils/query-client";
 
@@ -33,7 +31,7 @@ const applets: Record<string, AppletMetadata> = {
   transfer: {
     id: "transfer",
     img: "/transfer.png",
-    title: m["applets.transfer.title"](),
+    title: "Transfer",
     keywords: ["send"],
     description: "Send funds",
     path: "/transfer",
@@ -81,6 +79,7 @@ function readJson(testId: string) {
 
 describe("useSearchBar", () => {
   const publicClient = {
+    chain: { id: "dev-9" },
     getContractInfo: vi.fn(),
     getAccountInfo: vi.fn(),
     getUser: vi.fn(),
@@ -89,6 +88,7 @@ describe("useSearchBar", () => {
   };
 
   beforeEach(() => {
+    publicClient.chain = { id: "dev-9" };
     storeHookMocks.useAppConfig.mockReturnValue({
       data: {
         accountFactory: {
@@ -108,7 +108,15 @@ describe("useSearchBar", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+    vi.unstubAllGlobals();
   });
+
+  function jsonResponse(body: unknown, status = 200) {
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { "content-type": "application/json" },
+    });
+  }
 
   it("starts with favorite applets, non-favorite applets, and known contracts", async () => {
     renderUseSearchBar();
@@ -175,6 +183,89 @@ describe("useSearchBar", () => {
     expect(queryClient.getQueryData(["block", "0"])).toEqual(block);
   });
 
+  it.each([
+    ["mainnet", "dango-1", "https://api-archive-mainnet.dango.zone"],
+    ["testnet", "dango-testnet-1", "https://api-archive-testnet.dango.zone"],
+  ])(
+    "uses archive lookups for %s block and transaction searches",
+    async (_, chainId, archiveUrl) => {
+      publicClient.chain = { id: chainId };
+      const queryClient = renderUseSearchBar();
+      const hash = "a".repeat(64);
+      const sender = "0x73656e6465720000000000000000000000000000";
+      const fetchMock = vi.fn((input: URL) => {
+        if (input.pathname === "/blocks/123") {
+          return Promise.resolve(
+            jsonResponse({
+              block: {
+                info: {
+                  height: 123,
+                  timestamp: "2026-06-08T12:00:00Z",
+                  hash: "archive-block",
+                },
+                txs: [],
+              },
+              outcome: {
+                app_hash: "archive-app-hash",
+                cron_outcomes: [],
+                tx_outcomes: [],
+              },
+            }),
+          );
+        }
+
+        return Promise.resolve(
+          jsonResponse([
+            {
+              blockHeight: 123,
+              idx: 0,
+              kind: "transaction",
+              hash,
+              sender,
+              success: true,
+              timestamp: "2026-06-08T12:00:00Z",
+              tx: { sender, gas_limit: 1, msgs: [] },
+              outcome: {
+                transaction: { gas_limit: 1, gas_used: 1, result: { ok: null }, events: [] },
+              },
+            },
+          ]),
+        );
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      fireEvent.change(screen.getByLabelText("Search"), {
+        target: { value: "123" },
+      });
+
+      await waitFor(() => {
+        expect(readJson("result").block).toMatchObject({
+          blockHeight: 123,
+          hash: "archive-block",
+        });
+      });
+      expect(publicClient.queryBlock).not.toHaveBeenCalled();
+      expect(queryClient.getQueryData(["block", "123"])).toMatchObject({
+        blockHeight: 123,
+        hash: "archive-block",
+      });
+
+      fireEvent.change(screen.getByLabelText("Search"), {
+        target: { value: hash },
+      });
+
+      await waitFor(() => {
+        expect(readJson("result").txs).toMatchObject([{ hash, sender }]);
+      });
+      expect(publicClient.searchTxs).not.toHaveBeenCalled();
+      expect(queryClient.getQueryData(["tx", hash])).toMatchObject({ hash, sender });
+      expect(fetchMock.mock.calls.map(([url]) => (url as URL).toString())).toEqual([
+        `${archiveUrl}/blocks/123`,
+        `${archiveUrl}/transactions/${hash.toUpperCase()}`,
+      ]);
+    },
+  );
+
   it("clears backend-derived search results when the search text is cleared", async () => {
     const block = { height: 123, hash: "block-hash" };
     publicClient.queryBlock.mockResolvedValue(block);
@@ -225,6 +316,24 @@ describe("useSearchBar", () => {
     });
     expect(publicClient.searchTxs).toHaveBeenCalledWith({ hash });
     expect(queryClient.getQueryData(["tx", hash])).toEqual(tx);
+  });
+
+  it("normalizes 0x-prefixed transaction hashes before searching", async () => {
+    const queryClient = renderUseSearchBar();
+    const hash = "a".repeat(64);
+    const prefixedHash = `0x${hash}`;
+    const tx = { hash, sender: "0x73656e6465720000000000000000000000000000" };
+    publicClient.searchTxs.mockResolvedValue({ nodes: [tx] });
+
+    fireEvent.change(screen.getByLabelText("Search"), {
+      target: { value: prefixedHash },
+    });
+
+    await waitFor(() => {
+      expect(readJson("result").txs).toEqual([tx]);
+    });
+    expect(publicClient.searchTxs).toHaveBeenCalledWith({ hash });
+    expect(queryClient.getQueryData(["tx", prefixedHash])).toEqual(tx);
   });
 
   it("keeps transaction search empty when the backend returns no matching hash", async () => {

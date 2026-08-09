@@ -1,6 +1,6 @@
 import {
   useExplorerContract,
-  useExplorerTransactionsBySender,
+  useExplorerTransactionsByAddress,
   usePrices,
 } from "@left-curve/store";
 import { createContext, useContext } from "react";
@@ -129,7 +129,7 @@ const Assets: React.FC = () => {
 
 const Transactions: React.FC = () => {
   const { isLoading, data: contract, address } = useContractExplorer();
-  const { data, pagination, ...transactions } = useExplorerTransactionsBySender(
+  const { data, pagination, ...transactions } = useExplorerTransactionsByAddress(
     address,
     !!contract,
   );

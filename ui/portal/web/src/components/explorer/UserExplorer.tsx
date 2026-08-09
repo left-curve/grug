@@ -5,6 +5,7 @@ import {
   useExplorerUser,
   useExplorerUserTransactions,
   type AccountWithDetails,
+  type ExplorerTransaction,
   type ExplorerUserData,
 } from "@left-curve/store";
 import { useNavigate } from "@tanstack/react-router";
@@ -14,7 +15,7 @@ import { AssetsTable } from "./AssetsTable";
 import { HeaderExplorer } from "./HeaderExplorer";
 import { TransactionsTable } from "./TransactionsTable";
 
-import type { Address, IndexedTransaction } from "@left-curve/types";
+import type { Address } from "@left-curve/types";
 import type React from "react";
 import type { PropsWithChildren } from "react";
 import { Image } from "~/components/foundation/Image";
@@ -22,7 +23,7 @@ import { Image } from "~/components/foundation/Image";
 type UserExplorerContextType = {
   username: string;
   userData: ExplorerUserData | null;
-  transactions: IndexedTransaction[];
+  transactions: ExplorerTransaction[];
   transactionsPagination: {
     isLoading: boolean;
     goNext: () => void;

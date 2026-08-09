@@ -2,7 +2,7 @@ import { AddressVisualizer, useApp } from "@left-curve/applets-kit";
 import {
   type ExplorerAccount,
   useExplorerAccount,
-  useExplorerTransactionsBySender,
+  useExplorerTransactionsByAddress,
   usePrices,
 } from "@left-curve/store";
 import type { UseQueryResult } from "@tanstack/react-query";
@@ -144,7 +144,7 @@ const Assets: React.FC = () => {
 const Transactions: React.FC = () => {
   const { isLoading, data: account } = useAccountExplorer();
 
-  const { data, pagination, ...transactions } = useExplorerTransactionsBySender(
+  const { data, pagination, ...transactions } = useExplorerTransactionsByAddress(
     account?.address as Address,
     !!account,
   );

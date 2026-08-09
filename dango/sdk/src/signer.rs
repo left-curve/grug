@@ -49,9 +49,12 @@ where
             .account_factory;
 
         Ok(client
-            .query_wasm_smart(account_factory, account_factory::QueryAccountRequest {
-                address: self.address,
-            })
+            .query_wasm_smart(
+                account_factory,
+                account_factory::QueryAccountRequest {
+                    address: self.address,
+                },
+            )
             .await?
             .owner)
     }
@@ -118,11 +121,14 @@ where
         let key_hash = secret.key_hash();
 
         let user_index = client
-            .query_wasm_smart(factory_addr, account_factory::QueryForgotUsernameRequest {
-                key_hash,
-                start_after: None,
-                limit: Some(1),
-            })
+            .query_wasm_smart(
+                factory_addr,
+                account_factory::QueryForgotUsernameRequest {
+                    key_hash,
+                    start_after: None,
+                    limit: Some(1),
+                },
+            )
             .await?
             .first()
             .ok_or_else(|| anyhow!("no user index found for key hash {key_hash}"))?

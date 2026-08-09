@@ -57,9 +57,10 @@ fn retrieve_user_index(
     }
 
     querier
-        .query_wasm_smart(account_factory, account_factory::QueryAccountRequest {
-            address: addr,
-        })
+        .query_wasm_smart(
+            account_factory,
+            account_factory::QueryAccountRequest { address: addr },
+        )
         .ok()
         .map(|account| account.owner)
 }

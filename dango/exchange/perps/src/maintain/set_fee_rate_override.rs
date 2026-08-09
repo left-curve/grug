@@ -103,13 +103,16 @@ mod tests {
     /// invariant reduces to the override-level arithmetic alone.
     fn save_param(storage: &mut dyn Storage) {
         PARAM
-            .save(storage, &Param {
-                taker_fee_rates: RateSchedule {
-                    base: Dimensionless::ONE,
+            .save(
+                storage,
+                &Param {
+                    taker_fee_rates: RateSchedule {
+                        base: Dimensionless::ONE,
+                        ..Default::default()
+                    },
                     ..Default::default()
                 },
-                ..Default::default()
-            })
+            )
             .unwrap();
     }
 
@@ -267,13 +270,16 @@ mod tests {
         // Use a param whose tier-schedule min taker rate is 1 so the
         // invariant is not tripped by the schedule itself.
         PARAM
-            .save(&mut ctx.storage, &Param {
-                taker_fee_rates: RateSchedule {
-                    base: Dimensionless::ONE,
+            .save(
+                &mut ctx.storage,
+                &Param {
+                    taker_fee_rates: RateSchedule {
+                        base: Dimensionless::ONE,
+                        ..Default::default()
+                    },
                     ..Default::default()
                 },
-                ..Default::default()
-            })
+            )
             .unwrap();
         let rates = (Dimensionless::new_int(-1), Dimensionless::ONE);
 
@@ -410,13 +416,16 @@ mod tests {
             .with_funds(Coins::default());
         // Schedule: taker 1%, maker 0 → invariant holds against bare schedule.
         PARAM
-            .save(&mut ctx.storage, &Param {
-                taker_fee_rates: RateSchedule {
-                    base: Dimensionless::new_permille(10),
+            .save(
+                &mut ctx.storage,
+                &Param {
+                    taker_fee_rates: RateSchedule {
+                        base: Dimensionless::new_permille(10),
+                        ..Default::default()
+                    },
                     ..Default::default()
                 },
-                ..Default::default()
-            })
+            )
             .unwrap();
 
         // User A carries a -1% maker override — compatible with the schedule.

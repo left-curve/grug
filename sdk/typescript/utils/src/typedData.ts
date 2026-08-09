@@ -2,15 +2,11 @@ import { camelToSnake, recursiveTransform } from "./index.js";
 
 import type {
   ArbitraryTypedData,
-  Coins,
   EIP712Domain,
   EIP712Message,
   Json,
   Message,
-  TxMessageType,
   TypedData,
-  TypedDataParameter,
-  TypedDataProperty,
 } from "@left-curve/types";
 
 /**
@@ -50,12 +46,7 @@ export function composeArbitraryTypedData(parameters: ArbitraryTypedData) {
  * @param typeData The typed data parameters.
  * @returns The composed typed data
  */
-export function composeTxTypedData(
-  message: EIP712Message,
-  domain: EIP712Domain,
-  typeData?: Partial<TypedDataParameter<TxMessageType>>,
-): TypedData<TxMessageType> {
-  const { type = [], extraTypes = {} } = typeData || {};
+export function composeTxTypedData(message: EIP712Message, domain: EIP712Domain): TypedData {
   const { messages, data, gas_limit, sender } = message;
   const { expiry } = data;
 
@@ -70,7 +61,12 @@ export function composeTxTypedData(
         { name: "sender", type: "address" },
         { name: "data", type: "Metadata" },
         { name: "gas_limit", type: "uint32" },
-        { name: "messages", type: "TxMessage[]" },
+        // EIP-712 has no sum type, so the `Message` enum can't be a struct;
+        // each message is bound as its canonical JSON string. The EIP-712
+        // signer (the `eip1193` connector) stringifies the message values just
+        // before signing so they match this declared type and the chain's
+        // reconstruction.
+        { name: "messages", type: "string[]" },
       ],
       Metadata: [
         { name: "user_index", type: "uint32" },
@@ -78,11 +74,13 @@ export function composeTxTypedData(
         { name: "nonce", type: "uint32" },
         ...(data.expiry ? [{ name: "expiry", type: "string" }] : []),
       ],
-      TxMessage: type,
-      ...extraTypes,
     },
     primaryType: "Message",
     domain,
+    // `messages` stays as objects here: this SignDoc is shared with the raw
+    // Secp256k1/Passkey signers, which sign SHA-256 over its canonical JSON
+    // (message content as objects, matching the chain's SignDoc canonical
+    // form). The EIP-712 signer converts them to canonical strings.
     message: {
       sender,
       data: recursiveTransform({ ...data, ...(expiry ? { expiry } : {}) }, camelToSnake) as Json,
@@ -90,15 +88,4 @@ export function composeTxTypedData(
       messages: recursiveTransform(messages, camelToSnake) as Message[],
     },
   };
-}
-
-/**
- * @description Gets the typed data for coins.
- *
- * @param coins The coins to get the typed data for.
- * @returns The typed data properties.
- */
-export function getCoinsTypedData(coins?: Coins): TypedDataProperty[] {
-  if (!coins) return [];
-  return Object.keys(coins).map((coin) => ({ name: coin, type: "string" }));
 }

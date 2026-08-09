@@ -1,10 +1,12 @@
 use {
     crate::Secret,
-    aes_gcm::{AeadCore, Aes256Gcm, Key, KeyInit, aead::Aead},
+    aes_gcm::{
+        Aes256Gcm, Key, KeyInit,
+        aead::{Aead, Generate, Nonce},
+    },
     anyhow::anyhow,
-    dango_primitives::{Binary, ByteArray, JsonDeExt, JsonSerExt},
+    dango_primitives::{Binary, ByteArray, Inner, JsonDeExt, JsonSerExt},
     pbkdf2::pbkdf2_hmac,
-    rand::{Rng, rngs::OsRng},
     sha2::Sha256,
     std::{fs, path::Path},
 };
@@ -48,7 +50,10 @@ impl Keystore {
         let cipher = Aes256Gcm::new(&Key::<Aes256Gcm>::from(password_hash));
 
         cipher
-            .decrypt(keystore.nonce.as_ref().into(), keystore.ciphertext.as_ref())?
+            .decrypt(
+                &keystore.nonce.into_inner().into(),
+                keystore.ciphertext.as_ref(),
+            )?
             .try_into()
             .map_err(|bytes: Vec<u8>| {
                 anyhow!(
@@ -68,8 +73,7 @@ impl Keystore {
         P: AsRef<[u8]>,
     {
         // generate encryption key
-        let mut salt = [0u8; PBKDF2_SALT_LEN];
-        OsRng.fill(&mut salt);
+        let salt = <[u8; PBKDF2_SALT_LEN]>::generate();
         let mut password_hash = [0u8; PBKDF2_KEY_LEN];
         pbkdf2_hmac::<Sha256>(
             password.as_ref(),
@@ -80,7 +84,7 @@ impl Keystore {
 
         // encrypt the private key
         let cipher = Aes256Gcm::new(&Key::<Aes256Gcm>::from(password_hash));
-        let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
+        let nonce = Nonce::<Aes256Gcm>::generate();
         let ciphertext = cipher.encrypt(&nonce, secret.private_key().as_ref())?;
 
         // write keystore to file
@@ -94,5 +98,30 @@ impl Keystore {
         fs::write(filename, keystore_str.as_bytes())?;
 
         Ok(keystore)
+    }
+}
+
+// ----------------------------------- tests -----------------------------------
+
+#[cfg(test)]
+mod tests {
+    use {super::*, crate::Secp256k1};
+
+    #[test]
+    fn keystore_roundtrip() {
+        let path = std::env::temp_dir().join("dango_sdk_keystore_roundtrip_test.json");
+        let _ = fs::remove_file(&path);
+
+        let secret = Secp256k1::new_random();
+        Keystore::write_to_file(&secret, &path, "correct horse battery staple").unwrap();
+
+        // Decrypting with the correct password recovers the private key.
+        let sk = Keystore::from_file(&path, "correct horse battery staple").unwrap();
+        assert_eq!(sk, secret.private_key());
+
+        // Decrypting with an incorrect password fails.
+        assert!(Keystore::from_file(&path, "hunter2").is_err());
+
+        fs::remove_file(&path).unwrap();
     }
 }

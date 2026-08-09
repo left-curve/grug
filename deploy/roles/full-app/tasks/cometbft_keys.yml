@@ -41,6 +41,9 @@
     cometbft show-validator --home {{ cometbft_container_dir }}
   register: cometbft_validator_public_key_result
 
+# The registered result contains the raw private key, so `no_log` is required:
+# without it, a task failure or a `-v` run would print the key into the
+# terminal and the tee'd log under `deploy/logs/`.
 - name: Get validator private key
   command: >
     docker run --rm
@@ -48,19 +51,25 @@
     ghcr.io/left-curve/left-curve/cometbft:{{ cometbft_tag }}
     cat {{ cometbft_container_dir }}/config/priv_validator_key.json
   register: cometbft_priv_validator_key_result
+  no_log: true
 
 - name: Calculate validator address
   shell: >
     echo "{{ (cometbft_validator_public_key_result.stdout | from_json).value }}" | base64 -d | sha256sum | head -c 40 | tr '[:lower:]' '[:upper:]'
   register: validator_address_calc
 
+# `no_log` because the facts include the validator private key, which verbose
+# runs would otherwise print. The public facts set here are still shown by the
+# "Debug keys" task below.
 - name: Set validator facts
   set_fact:
     cometbft_validator_public_key: "{{ (cometbft_validator_public_key_result.stdout | from_json).value }}"
     cometbft_validator_address: "{{ validator_address_calc.stdout }}"
     cometbft_validator_private_key: "{{ (cometbft_priv_validator_key_result.stdout | from_json).priv_key.value }}"
     cometbft_node_id: "{{ cometbft_node_id_result.stdout }}"
+  no_log: true
 
+# Same as the validator key above: the result holds the node's private key.
 - name: Read and parse node_key.json
   command: >
     docker run --rm
@@ -68,10 +77,12 @@
     ghcr.io/left-curve/left-curve/cometbft:{{ cometbft_tag }}
     cat {{ cometbft_container_dir }}/config/node_key.json
   register: cometbft_node_key_result
+  no_log: true
 
 - name: Extract node key value
   set_fact:
     cometbft_node_key: "{{ (cometbft_node_key_result.stdout | from_json).priv_key.value }}"
+  no_log: true
 
 - name: Debug keys
   debug:

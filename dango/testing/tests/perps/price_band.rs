@@ -67,18 +67,20 @@ macro_rules! submit_limit {
             .execute(
                 &mut $accounts.user1,
                 $contracts.perps,
-                &perps::ExecuteMsg::Trade(perps::TraderMsg::SubmitOrder(perps::SubmitOrderRequest {
-                    pair_id: $pair.clone(),
-                    size: Quantity::new_int($size),
-                    kind: OrderKind::Limit {
-                        limit_price: UsdPrice::new_int($price),
-                        time_in_force: $tif,
-                        client_order_id: None,
+                &perps::ExecuteMsg::Trade(perps::TraderMsg::SubmitOrder(
+                    perps::SubmitOrderRequest {
+                        pair_id: $pair.clone(),
+                        size: Quantity::new_int($size),
+                        kind: OrderKind::Limit {
+                            limit_price: UsdPrice::new_int($price),
+                            time_in_force: $tif,
+                            client_order_id: None,
+                        },
+                        reduce_only: false,
+                        tp: None,
+                        sl: None,
                     },
-                    reduce_only: false,
-                    tp: None,
-                    sl: None,
-                })),
+                )),
                 Coins::new(),
             )
             .await
@@ -324,9 +326,12 @@ async fn banding_drift_maker_cancelled_at_match_time() {
 
     // user1's stale ask was cancelled by the match-time check.
     let orders: BTreeMap<OrderId, QueryOrdersByUserResponseItem> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryOrdersByUserRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryOrdersByUserRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed();
     assert!(
         orders.is_empty(),
@@ -337,9 +342,12 @@ async fn banding_drift_maker_cancelled_at_match_time() {
     // was cancelled without filling, so user2's size-2 order is only
     // half-filled.
     let user2_state: UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user2.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user2.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
     let pos = user2_state

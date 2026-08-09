@@ -1,0 +1,149 @@
+# Common labels for all services
+x-common-labels: &common-labels
+  environment: "development"
+  project: "ci-stack"
+
+services:
+  dango:
+    image: ghcr.io/left-curve/left-curve/dango:${DANGO_TAG:-latest}
+    labels:
+      <<: *common-labels
+    depends_on:
+      db:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    ports:
+      - 127.0.0.1:${DANGO_PORT:-8080}:8080
+    volumes:
+      - ./configs/dango/config:/root/.dango/config
+      - dango_data:/root/.dango/data
+      - dango_indexer:/root/.dango/indexer
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_NAME=grug_dev
+      - INDEXER__DATABASE__URL=${INDEXER__DATABASE__URL:-postgres://postgres@db:5432/grug_dev}
+      - INDEXER__CLICKHOUSE__URL=${INDEXER__CLICKHOUSE__URL:-http://clickhouse:8123}
+      - INDEXER__CLICKHOUSE__PASSWORD=${CLICKHOUSE_PASSWORD:-}
+      - PYTH__ACCESS_TOKEN=${PYTH__ACCESS_TOKEN:-}
+    tty: true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8080/up"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  frontend:
+    image: ghcr.io/left-curve/left-curve/dango-frontend:${FRONTEND_TAG:-latest}
+    profiles: ["frontend"]
+    labels:
+      <<: *common-labels
+    ports:
+      - "127.0.0.1:${DANGO_FRONTEND_PORT:-5081}:80"
+    environment:
+      - DANGO_CONFIG_JSON=${DANGO_CONFIG_JSON:-}
+      # Set to "true" to enable JSON access logs
+      - NGINX_JSON_LOGS=${NGINX_JSON_LOGS:-}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  cometbft:
+    image: ghcr.io/left-curve/left-curve/cometbft:${COMETBFT_TAG:-v0.39.3}
+    labels:
+      <<: *common-labels
+    ports:
+      - 127.0.0.1:${COMETBFT_PORT:-26657}:26657
+    volumes:
+      - ./configs/cometbft/config:/root/.cometbft/config
+      - cometbft_data:/root/.cometbft/data
+    tty: true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:26657/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    entrypoint: >
+      sh -c "
+      mkdir -p /root/.cometbft/data &&
+      [ -f /root/.cometbft/data/priv_validator_state.json ] ||
+      printf '{\"height\":\"0\",\"round\":0,\"step\":0}' > /root/.cometbft/data/priv_validator_state.json &&
+      exec cometbft start --proxy_app=tcp://dango:26658
+      "
+
+  faucet:
+    image: ghcr.io/left-curve/bots/faucet:${FAUCET_BOT_TAG:-latest}
+    pull_policy: always
+    depends_on:
+      cometbft:
+        condition: service_healthy
+    labels:
+      <<: *common-labels
+    environment:
+      - HOME=/app
+      - chain_id="dev-6"
+    tty: true
+    ports:
+      - 127.0.0.1:${FAUCET_PORT:-8082}:8082
+    command: >
+      sh -c "
+      faucet --provider-url http://dango:8080 --chain-id $$chain_id
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8082/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  db:
+    image: docker.io/library/postgres:17
+    labels:
+      <<: *common-labels
+    ports:
+      # For security reasons, postgres should only accept connections from localhost.
+      - 127.0.0.1:${POSTGRES_PORT:-5432}:5432
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_HOST_AUTH_METHOD=trust
+      - POSTGRES_DB=grug_dev
+    tty: true
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -p 5432 -U postgres"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+
+  clickhouse:
+    image: docker.io/clickhouse/clickhouse-server:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${CLICKHOUSE_PORT:-8123}:8123" # HTTP interface
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    environment:
+      CLICKHOUSE_DB: grug_dev
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  db_data:
+  dango_data:
+  dango_indexer:
+  cometbft_data:
+  clickhouse_data:

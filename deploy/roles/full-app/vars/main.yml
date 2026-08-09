@@ -6,13 +6,28 @@ dango_image_digest: ""
 faucet_bot_tag: "latest"
 perps_bot_tag: "latest"
 perp_liquidator_tag: "latest"
+withdrawal_approver_tag: "latest"
+# Master switch for the withdrawal-approver. Ships enabled because this
+# change merges LAST, once the guarded-withdrawals gateway (left-curve#2247)
+# is live on-chain AND the bot image exists on GHCR for the pinned tag: with
+# either prerequisite missing, an enabled bot crash-loops and the post-deploy
+# health gate takes the whole stack down with it. Flip to false here to pull
+# the bot from the next deploy — recipes need no per-recipe flag.
+withdrawal_approver_enabled: true
+# Hosts running the withdrawal-approver for this network: static inventory
+# groups, single instance per network, no devnet group on purpose.
+withdrawal_approver_hosts: "{{ groups['withdrawal-approver-' ~ dango_network] | default([]) }}"
+# True on the one host where the bot deploys in this play. Gated on
+# system_wide_directories so preview-style manual runs (which skip
+# stop_previous) can never mint a second guardian instance.
+withdrawal_approver_host_enabled: "{{ withdrawal_approver_enabled | bool and system_wide_directories | bool and inventory_hostname in withdrawal_approver_hosts }}"
 cometbft_node_key: ""
 cometbft_validator_address: ""
 cometbft_validator_public_key: ""
 cometbft_validator_private_key: ""
 dango_host: "dango"
 cometbft_host: "cometbft"
-cometbft_tag: "v0.38.21"
+cometbft_tag: "v0.39.3"
 cometbft_generate_keys: false
 deploy_env: "staging"
 chain_id: "dev-10"
@@ -26,9 +41,6 @@ deploy_includes_postgres: true
 delete_postgres_database_at_merge: false
 deploy_includes_clickhouse: true
 delete_clickhouse_database_at_merge: false
-delete_s3_backup_at_merge: false
-s3_bucket: "dango-{{ chain_id }}"
-s3_path: "dango/indexer/blocks/"
 postgres_database: "dango_{{ timestamp }}"
 clickhouse_database: "dango_{{ timestamp }}"
 deployment_dir: "{{ ansible_facts['env']['HOME'] }}/deployments/{{ deployment_name }}"

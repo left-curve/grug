@@ -73,27 +73,36 @@ async fn roll_price_blends_over_the_schedule() {
 
     // Before the first fixing: 100% current = $100.
     let price = suite
-        .query_wasm_smart(oracle, QueryPriceRequest {
-            denom: denom.clone(),
-        })
+        .query_wasm_smart(
+            oracle,
+            QueryPriceRequest {
+                denom: denom.clone(),
+            },
+        )
         .should_succeed();
     assert_eq!(price.humanized_price, UsdPrice::new_int(100));
 
     // Into the 40% window (~t0+152): 100*0.6 + 200*0.4 = $140.
     suite.increase_time(Duration::from_seconds(150)).await;
     let price = suite
-        .query_wasm_smart(oracle, QueryPriceRequest {
-            denom: denom.clone(),
-        })
+        .query_wasm_smart(
+            oracle,
+            QueryPriceRequest {
+                denom: denom.clone(),
+            },
+        )
         .should_succeed();
     assert_eq!(price.humanized_price, UsdPrice::new_int(140));
 
     // After the last fixing (~t0+252): 100% next = $200.
     suite.increase_time(Duration::from_seconds(100)).await;
     let price = suite
-        .query_wasm_smart(oracle, QueryPriceRequest {
-            denom: denom.clone(),
-        })
+        .query_wasm_smart(
+            oracle,
+            QueryPriceRequest {
+                denom: denom.clone(),
+            },
+        )
         .should_succeed();
     assert_eq!(price.humanized_price, UsdPrice::new_int(200));
 }

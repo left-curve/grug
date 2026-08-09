@@ -48,10 +48,14 @@ pub fn take_vault_snapshot(
         },
     };
 
-    VAULT_SNAPSHOTS.save(storage, key, &VaultSnapshot {
-        equity,
-        share_supply: state.vault_share_supply,
-    })?;
+    VAULT_SNAPSHOTS.save(
+        storage,
+        key,
+        &VaultSnapshot {
+            equity,
+            share_supply: state.vault_share_supply,
+        },
+    )?;
 
     Ok(())
 }
@@ -82,28 +86,38 @@ mod tests {
     /// for BTC so the equity-computation lookup succeeds.
     fn init_storage(storage: &mut dyn Storage, share_supply: u128, position_size: i128) {
         STATE
-            .save(storage, &State {
-                vault_share_supply: Uint128::new(share_supply),
-                ..Default::default()
-            })
+            .save(
+                storage,
+                &State {
+                    vault_share_supply: Uint128::new(share_supply),
+                    ..Default::default()
+                },
+            )
             .unwrap();
 
         let mut positions = BTreeMap::new();
         if position_size != 0 {
-            positions.insert(btc_pair_id(), Position {
-                size: Quantity::new_int(position_size),
-                entry_price: UsdPrice::ZERO,
-                entry_funding_per_unit: FundingPerUnit::ZERO,
-                conditional_order_above: None,
-                conditional_order_below: None,
-            });
+            positions.insert(
+                btc_pair_id(),
+                Position {
+                    size: Quantity::new_int(position_size),
+                    entry_price: UsdPrice::ZERO,
+                    entry_funding_per_unit: FundingPerUnit::ZERO,
+                    conditional_order_above: None,
+                    conditional_order_below: None,
+                },
+            );
         }
 
         USER_STATES
-            .save(storage, CONTRACT, &UserState {
-                positions,
-                ..Default::default()
-            })
+            .save(
+                storage,
+                CONTRACT,
+                &UserState {
+                    positions,
+                    ..Default::default()
+                },
+            )
             .unwrap();
 
         PAIR_STATES
@@ -171,11 +185,14 @@ mod tests {
             .keys(&storage, None, None, Order::Ascending)
             .collect::<Result<_, _>>()
             .unwrap();
-        assert_eq!(keys, vec![
-            Timestamp::from_seconds(0),
-            Timestamp::from_seconds(ONE_DAY),
-            Timestamp::from_seconds(2 * ONE_DAY),
-        ]);
+        assert_eq!(
+            keys,
+            vec![
+                Timestamp::from_seconds(0),
+                Timestamp::from_seconds(ONE_DAY),
+                Timestamp::from_seconds(2 * ONE_DAY),
+            ]
+        );
     }
 
     #[test]

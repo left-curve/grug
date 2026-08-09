@@ -8,7 +8,6 @@ use {
     },
     dango_primitives::{Addr, Hash256, HashExt, HexBinary, HexByteArray, Inner, Shared},
     k256::ecdsa::SigningKey,
-    rand::Rng,
     std::collections::{BTreeSet, HashMap},
 };
 
@@ -50,7 +49,7 @@ impl Nonce {
     /// Get the next nonce.
     pub fn next_nonce(&mut self) -> u32 {
         match self {
-            Self::Random => rand::thread_rng().r#gen(),
+            Self::Random => rand::random(),
             Self::Sequential(nonce) => {
                 *nonce += 1;
                 *nonce

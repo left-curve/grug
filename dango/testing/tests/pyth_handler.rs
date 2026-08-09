@@ -23,7 +23,7 @@ async fn handler() {
     let empty_oracle = suite
         .instantiate(
             &mut accounts.owner,
-            codes.oracle.to_bytes().hash256(),
+            codes.oracle.to_bytes().sha2_256(),
             &InstantiateMsg {
                 price_sources: btree_map! {},
                 trusted_signers: btree_map! {},

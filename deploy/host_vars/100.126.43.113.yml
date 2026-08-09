@@ -1,0 +1,26 @@
+---
+tailscale_ip: "100.126.43.113"
+hostname: "hetzner7"
+wireguard_ip: "10.99.0.12"
+reboot_time: "15:30"
+dango_networks: []
+cloudflare_lb_enabled: false
+
+# Archive indexer instance — `just deploy-archive mainnet` (roles/archive).
+# live_host_override resolves the live_url hostname to the source node's
+# wireguard IP inside the container (compose extra_hosts): traffic reaches the
+# node's traefik :80 directly over the VPN, bypassing Cloudflare and its rate
+# limits. 10.99.0.10 = hetzner3 (FSN1, same campus as this host — picked over
+# hetzner1/HEL1 for latency, and it clocked the fastest /block/full/range
+# among the mainnet nodes; hetzner6 is unusable as a source: no blocks below
+# ~23.2M). On node migration point it at another mainnet full-app host with
+# full history (its tailscale IP works too).
+archive_instances:
+  - name: mainnet
+    live_url: "http://api-mainnet.dango.zone"
+    live_host_override: "10.99.0.10"
+    metrics_host_port: 9192
+    httpd_host_port: 9082
+    cloudflare:
+      enabled: true
+      load_balancer: true

@@ -7,13 +7,13 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  COMETBFT_GIT_TAG: v0.38.21
+  COMETBFT_GIT_TAG: v0.39.3
 
 on:
   workflow_dispatch:
     inputs:
       cometbft_tag:
-        description: "Existing cometbft tag to sign (e.g. v0.38.21)"
+        description: "Existing cometbft tag to sign (e.g. v0.39.3)"
         required: false
       cometbft_digest:
         description: "Optional digest override (sha256:...) if you already know it"

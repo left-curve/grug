@@ -1,0 +1,10 @@
+---
+block_cleanup_dir: "{{ deploy_home }}/block-cleanup"
+block_cleanup_image: "ghcr.io/left-curve/bots/block-cleanup"
+block_cleanup_tag: "latest"
+# Log what would be deleted without touching the disk.
+block_cleanup_dry_run: false
+# Host path to the node's `blocks/` directory, keyed by network. Leave a
+# network unset to auto-detect the active full-app deployment's blocks dir at
+# deploy time (recommended). Set it explicitly to pin a fixed path.
+block_cleanup_blocks_dir: {}

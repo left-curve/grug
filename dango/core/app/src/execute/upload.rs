@@ -18,7 +18,7 @@ pub fn do_upload(
     msg: MsgUpload,
     #[allow(unused_variables)] trace_opt: TraceOption,
 ) -> EventResult<EvtUpload> {
-    let code_hash = msg.code.hash256();
+    let code_hash = msg.code.sha2_256();
 
     let evt = EvtUpload {
         sender: uploader,
@@ -69,12 +69,17 @@ fn _do_upload(
         return Err(AppError::code_exists(code_hash));
     }
 
-    CODES.save_with_gas(storage, gas_tracker, code_hash, &Code {
-        code: msg.code,
-        status: CodeStatus::Orphaned {
-            since: block.timestamp,
+    CODES.save_with_gas(
+        storage,
+        gas_tracker,
+        code_hash,
+        &Code {
+            code: msg.code,
+            status: CodeStatus::Orphaned {
+                since: block.timestamp,
+            },
         },
-    })?;
+    )?;
 
     Ok(())
 }

@@ -27,6 +27,33 @@ where
         )
 }
 
+/// Doc-only stub carrying the OpenAPI path item for `POST /graphql` — never
+/// mounted; the real route is the generic [`graphql_route`] resource, which
+/// `#[utoipa::path]` cannot annotate.
+#[utoipa::path(
+    post,
+    path = "/graphql",
+    tag = "graphql",
+    summary = "GraphQL endpoint (deprecated)",
+    description = "**Deprecated — scheduled for removal.** Prefer the REST \
+                   routes and `GET /ws`. Accepts a standard GraphQL-over-HTTP \
+                   request or a batch of them; the same resource also serves \
+                   legacy `graphql-ws` subscriptions on a GET upgrade \
+                   (undocumented). No schema is documented here.",
+    request_body(
+        content = serde_json::Value,
+        description = "A GraphQL request (`{\"query\": \"...\", \"variables\": {...}}`) \
+                       or a batch of them",
+        content_type = "application/json",
+    ),
+    responses(
+        (status = 200, description = "GraphQL response envelope (errors ride the envelope, \
+                                      not the status)"),
+    ),
+)]
+#[deprecated = "the GraphQL API is deprecated and will be removed"]
+pub fn graphql_doc() {}
+
 #[cfg_attr(feature = "tracing", tracing::instrument(skip_all))]
 pub async fn graphql_index<Q, M, S>(
     schema: web::Data<Schema<Q, M, S>>,

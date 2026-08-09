@@ -111,10 +111,13 @@ fn query_accounts(
         .map(|res| {
             let (addr, user_index, user) = res?;
             let (&index, _) = user.accounts.iter().find(|(_, a)| **a == addr).unwrap();
-            Ok((addr, Account {
-                index,
-                owner: user_index,
-            }))
+            Ok((
+                addr,
+                Account {
+                    index,
+                    owner: user_index,
+                },
+            ))
         })
         .collect()
 }

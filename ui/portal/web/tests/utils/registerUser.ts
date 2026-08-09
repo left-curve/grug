@@ -15,10 +15,33 @@ const registrationLabels = {
 };
 
 export async function dismissActivateAccountModal(page: Page, timeout = 2_000): Promise<void> {
-  const heading = page.getByRole("heading", { name: registrationLabels.activateAccount });
+  const modalText = {
+    button: registrationLabels.doThisLater,
+    heading: registrationLabels.activateAccount,
+  };
 
-  const isVisible = await heading
-    .waitFor({ state: "visible", timeout })
+  const isVisible = await page
+    .waitForFunction(
+      (labels) => {
+        const normalizeText = (value: string | null) => value?.replace(/\s+/g, " ").trim() ?? "";
+        const isVisible = (element: Element) => {
+          const style = window.getComputedStyle(element);
+          const rect = element.getBoundingClientRect();
+          return (
+            style.visibility !== "hidden" &&
+            style.display !== "none" &&
+            rect.width > 0 &&
+            rect.height > 0
+          );
+        };
+
+        return Array.from(document.querySelectorAll("h1,h2,h3,h4,h5,h6")).some(
+          (element) => isVisible(element) && normalizeText(element.textContent) === labels.heading,
+        );
+      },
+      modalText,
+      { timeout },
+    )
     .then(() => true)
     .catch(() => false);
 
@@ -26,10 +49,57 @@ export async function dismissActivateAccountModal(page: Page, timeout = 2_000): 
     return;
   }
 
-  const laterButton = page.getByRole("button", { name: registrationLabels.doThisLater });
-  await laterButton.waitFor({ state: "visible", timeout: 10_000 });
-  await laterButton.dispatchEvent("click");
-  await heading.waitFor({ state: "hidden", timeout: 10_000 });
+  await page.waitForFunction(
+    (labels) => {
+      const normalizeText = (value: string | null) => value?.replace(/\s+/g, " ").trim() ?? "";
+      const isVisible = (element: Element) => {
+        const style = window.getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        return (
+          style.visibility !== "hidden" &&
+          style.display !== "none" &&
+          rect.width > 0 &&
+          rect.height > 0
+        );
+      };
+
+      const hasHeading = Array.from(document.querySelectorAll("h1,h2,h3,h4,h5,h6")).some(
+        (element) => isVisible(element) && normalizeText(element.textContent) === labels.heading,
+      );
+      if (!hasHeading) return true;
+
+      const button = Array.from(document.querySelectorAll("button")).find(
+        (element) => isVisible(element) && normalizeText(element.textContent) === labels.button,
+      );
+
+      if (!button) return false;
+      button.click();
+      return true;
+    },
+    modalText,
+    { timeout: 10_000 },
+  );
+  await page.waitForFunction(
+    (labels) => {
+      const normalizeText = (value: string | null) => value?.replace(/\s+/g, " ").trim() ?? "";
+      const isVisible = (element: Element) => {
+        const style = window.getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        return (
+          style.visibility !== "hidden" &&
+          style.display !== "none" &&
+          rect.width > 0 &&
+          rect.height > 0
+        );
+      };
+
+      return !Array.from(document.querySelectorAll("h1,h2,h3,h4,h5,h6")).some(
+        (element) => isVisible(element) && normalizeText(element.textContent) === labels.heading,
+      );
+    },
+    modalText,
+    { timeout: 10_000 },
+  );
 }
 
 /**

@@ -1,0 +1,101 @@
+---
+# Redeploy only the withdrawal-approver inside the CURRENT deployment:
+# re-render config.json and the secret .env (key rotation), bump the image
+# tag, and recreate just that container — without minting a new deployment
+# or touching dango/cometbft. Modeled on redeploy-perp-liquidator.yml.
+#
+# The current deployment's compose file must already contain the service
+# (i.e. it was deployed with withdrawal_approver_enabled on); otherwise the
+# compose recreate fails loudly with "no such service" — a full network
+# deploy is needed to add the service in that case.
+- hosts: full-app
+  remote_user: "{{ deploy_user }}"
+  gather_facts: yes
+  vars_files:
+    - roles/full-app/vars/main.yml
+    - roles/full-app/defaults/main.yml
+  pre_tasks:
+    - name: Get deploy user info
+      getent:
+        database: passwd
+        key: "{{ deploy_user }}"
+    - name: Set deploy_home fact
+      set_fact:
+        deploy_home: "{{ ansible_facts.getent_passwd[deploy_user][4] }}"
+  tasks:
+    - name: Skip hosts that do not run the withdrawal-approver
+      meta: end_host
+      when: inventory_hostname not in withdrawal_approver_hosts
+
+    - name: Check withdrawal-approver private key format
+      set_fact:
+        withdrawal_approver_key_ok: "{{ (withdrawal_approver_private_key | default('')) is match('^[0-9a-f]{64}$') }}"
+      no_log: true
+
+    - name: Validate withdrawal-approver deploy inputs
+      assert:
+        that:
+          - withdrawal_approver_key_ok | bool
+          - withdrawal_approver_tag != 'latest'
+        fail_msg: >-
+          withdrawal-approver preflight failed: withdrawal_approver_private_key
+          must be exactly 64 lowercase hex chars with no 0x prefix, and
+          withdrawal_approver_tag must be pinned (got
+          '{{ withdrawal_approver_tag }}').
+        quiet: true
+
+    - name: Read current deploy
+      include_role:
+        name: full-app
+        tasks_from: read_current_deploy.yml
+
+    - name: Set deployment facts
+      set_fact:
+        deployment_name: "{{ current_deployment }}"
+
+    - name: Create withdrawal-approver config directory
+      file:
+        path: "{{ deployment_dir }}/withdrawal-approver"
+        state: directory
+        mode: '0755'
+
+    - name: Copy withdrawal-approver config
+      copy:
+        src: "roles/full-app/files/withdrawal-approver/{{ dango_network }}/config.json"
+        dest: "{{ deployment_dir }}/withdrawal-approver/config.json"
+        mode: '0644'
+
+    # diff/no_log off: the rendered content is the guardian private key.
+    - name: Template withdrawal-approver .env
+      template:
+        src: roles/full-app/templates/withdrawal-approver.env.j2
+        dest: "{{ deployment_dir }}/withdrawal-approver/.env"
+        mode: '0600'
+      diff: false
+      no_log: true
+
+    - name: Update WITHDRAWAL_APPROVER_TAG in main .env
+      lineinfile:
+        path: "{{ deployment_dir }}/.env"
+        regexp: '^WITHDRAWAL_APPROVER_TAG='
+        line: "WITHDRAWAL_APPROVER_TAG={{ withdrawal_approver_tag }}"
+
+    - name: Login to GHCR
+      community.docker.docker_login:
+        registry: ghcr.io
+        username: "{{ ghcr_user }}"
+        password: "{{ ghcr_token }}"
+
+    # dependencies: false is essential: the service depends_on dango
+    # (service_healthy) and a bot-only redeploy must not restart the node
+    # (see redeploy-perp-liquidator.yml / #1785).
+    - name: Redeploy withdrawal-approver service
+      community.docker.docker_compose_v2:
+        project_name: "{{ current_deployment }}"
+        project_src: "{{ deployment_dir }}"
+        services:
+          - withdrawal-approver
+        pull: always
+        state: present
+        recreate: always
+        dependencies: false

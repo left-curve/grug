@@ -22,18 +22,15 @@ wasmer             = { workspace = true, features = ["singlepass"] }
 wasmer-middlewares = { workspace = true }
 
 [dev-dependencies]
-criterion      = { workspace = true }
-dango-app      = { workspace = true, features = ["tracing"] }
-dango-crypto   = { workspace = true }
-dango-identity = { workspace = true }
-dango-math     = { workspace = true }
-dango-tester   = { workspace = true, features = ["library"] }
-ed25519-dalek  = { workspace = true, features = ["batch", "digest"] }
-k256           = { workspace = true }
-p256           = { workspace = true }
-rand           = { workspace = true }
-test-case      = { workspace = true }
-tokio          = { workspace = true }
+criterion    = { workspace = true }
+dango-app    = { workspace = true, features = ["tracing"] }
+dango-crypto = { workspace = true }
+dango-math   = { workspace = true }
+dango-tester = { workspace = true, features = ["library"] }
+k256         = { workspace = true }
+p256         = { workspace = true }
+test-case    = { workspace = true }
+tokio        = { workspace = true }
 
 [[bench]]
 harness = false

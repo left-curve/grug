@@ -283,7 +283,7 @@ where
             .app
             .do_prepare_proposal(raw_txs, usize::MAX)
             .into_iter()
-            .map(|raw_tx| (raw_tx.deserialize_json().unwrap(), raw_tx.hash256()))
+            .map(|raw_tx| (raw_tx.deserialize_json().unwrap(), raw_tx.sha2_256()))
             .collect::<Vec<_>>();
 
         let block = Block {
@@ -535,7 +535,7 @@ where
         B: Into<Binary>,
     {
         let code = code.into();
-        let code_hash = code.hash256();
+        let code_hash = code.sha2_256();
 
         let outcome = self
             .send_message_with_gas(signer, gas_limit, Message::upload(code))
@@ -662,7 +662,7 @@ where
         StdError: From<C::Error>,
     {
         let code = code.into();
-        let code_hash = code.hash256();
+        let code_hash = code.sha2_256();
         let salt = salt.into();
         let address = Addr::derive(signer.address(), code_hash, &salt);
 

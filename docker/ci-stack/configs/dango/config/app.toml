@@ -1,0 +1,215 @@
+# This is a TOML config file.
+# For more information, see https://github.com/toml-lang/toml
+
+# Logging verbosity: error|warn|info|debug|trace.
+log_level = "info"
+
+# Logging format: text|json.
+log_format = "text"
+
+################################################################################
+###                            Grug Configuration                            ###
+################################################################################
+
+[grug]
+
+# Capacity of the wasm module cache; zero means to not use a cache.
+wasm_cache_capacity = 1000
+
+# Gas limit when serving query requests.
+query_gas_limit = 100000000
+
+# Range of database keys that will be loaded into memory for better performance.
+# Lower bound is inclusive, upper bound is exclusive.
+priority_range = [
+  "7761736d", # = b"wasm"
+  "7761736e", # = increment_last_byte(b"wasm")
+]
+
+################################################################################
+###                          Indexer Configuration                           ###
+################################################################################
+
+[indexer]
+
+# Whether to store block respnonses.
+keep_blocks = true
+
+[indexer.database]
+
+# URL to the SQL database to be used by the indexer.
+url = "postgres://postgres@db:5432/grug_dev"
+
+# How many connections to keep in the connection pool.
+max_connections = 100
+
+[indexer.clickhouse]
+
+# URL to the Clickhouse database to be used by the indexer.
+url = "http://clickhouse:8123"
+
+user = "default"
+
+password = ""
+
+database = "grug_dev"
+
+[httpd]
+
+# Whether to enable the HTTP server.
+enabled = true
+
+# IP address to listen on. `0.0.0.0` means all interfaces.
+ip = "0.0.0.0"
+
+# Port to listen on.
+port = 8080
+
+# Allowed origin for CORS.
+#
+# Wildcards are not supported here. To allow all origins, simply comment out
+# this line.
+#cors_allowed_origin = "*"
+
+# This will be exposed
+static_files_path = ""
+
+# Number of actix worker threads.
+workers = 12
+
+# Maximum number of concurrent connections per worker.
+max_connections = 10000
+
+# Maximum number of pending connections in the OS listen queue.
+backlog = 2048
+
+# Keep-alive timeout in seconds. Idle connections are closed after this period.
+keep_alive_secs = 5
+
+# Maximum time in seconds to wait for the client to send a complete request.
+client_request_timeout_secs = 5
+
+# Maximum time in seconds to wait for the client to disconnect gracefully.
+client_disconnect_timeout_secs = 1
+
+# Maximum number of blocking threads per worker for synchronous operations.
+worker_max_blocking_threads = 2
+
+# Maximum number of GraphQL subscriptions allowed per WebSocket connection.
+max_subscriptions_per_connection = 30
+
+# Maximum total number of GraphQL subscriptions across all connections.
+max_subscriptions_global = 15000
+
+# Per-request execution timeout for non-subscription GraphQL operations.
+# Subscriptions (WebSocket) are long-lived and unaffected by this.
+graphql_request_timeout_secs = 30
+
+# Maximum HTTP request body size in bytes for GraphQL operations.
+# Requests larger than this are rejected before parsing.
+graphql_max_body_bytes = 131072
+
+[metrics_httpd]
+
+# Whether to enable the HTTP server.
+enabled = true
+
+# IP address to listen on. `0.0.0.0` means all interfaces.
+ip = "0.0.0.0"
+
+# Port to listen on.
+port = 9191
+
+################################################################################
+###                         Tendermint Configuration                         ###
+################################################################################
+
+[tendermint]
+
+# Tendermint RPC listening address.
+rpc_addr = "http://cometbft:26657"
+
+# Tendermint ABCI listening address.
+abci_addr = "0.0.0.0:26658"
+
+# Number of most-recent blocks CometBFT keeps the full data (block parts) for.
+# Below this height, block parts are pruned at each commit; lightweight block
+# headers are still retained within the evidence window (genesis params:
+# max_age_num_blocks = 100000, max_age_duration = 48h) so equivocation evidence
+# stays verifiable. This therefore governs the peer block-sync catch-up window,
+# not the evidence retention. 0 retains all blocks.
+#
+# Caveat: CometBFT only prunes logically here; on v0.38 (goleveldb, no forced
+# `compact`) the freed disk space is reclaimed lazily by background compaction,
+# so usage drops gradually rather than immediately. Full history is persisted
+# independently by the indexer. 100000 ~= 10h of blocks at our ~350ms block time.
+retain_recent_blocks = 100000
+
+################################################################################
+###                        Transaction Configuration                         ###
+################################################################################
+
+[transactions]
+
+# Chain identifier.
+chain_id = "dango-1"
+
+# Scaling factor to apply to simulated gas consumption.
+gas_adjustment = 1.4
+
+################################################################################
+###                          Sentry Configuration                            ###
+################################################################################
+
+[sentry]
+
+# Whether to enable Sentry.
+enabled = false
+
+# Enable the logs feature
+enable_logs = false
+
+# DSN to use for Sentry.
+dsn = "https://your-dsn-here"
+
+# Environment to use for Sentry.
+environment = "development"
+
+# Sample rate for Sentry.
+sample_rate = 1.0
+
+# Traces sample rate for Sentry.
+traces_sample_rate = 1.0
+
+################################################################################
+###                         Telemetry Configuration                         ###
+################################################################################
+
+[trace]
+
+# Whether to enable OpenTelemetry exporter.
+enabled = false
+
+# OTLP/gRPC collector endpoint (Tempo default gRPC port is 4317).
+endpoint = "http://tempo:4317"
+
+# Protocol used to export traces: "otlp_grpc" or "otlp_http".
+protocol = "otlp_grpc"
+
+################################################################################
+###                            Pyth Configuration                            ###
+################################################################################
+
+[pyth]
+
+# Pyth Lazer endpoints. This is a Vec<String>.
+# If the list is empty, Pyth Lazer oracle is disabled.
+endpoints = [
+  "wss://pyth-lazer-0.dourolabs.app/v1/stream",
+  "wss://pyth-lazer-1.dourolabs.app/v1/stream",
+  "wss://pyth-lazer-2.dourolabs.app/v1/stream",
+]
+
+# Pyth Lazer access token.
+# If the string is empty, Pyth Lazer oracle is disabled.
+access_token = ""

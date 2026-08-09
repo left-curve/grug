@@ -2,12 +2,8 @@ use {
     crate::{config::Config, home_directory::HomeDirectory},
     clap::{Parser, Subcommand},
     dango_config_parser::parse_config,
-    dango_indexer_cache::{Cache, IndexerPath, cache_file::CacheFile},
+    dango_indexer_cache::{IndexerPath, cache_file::CacheFile},
     metrics_exporter_prometheus::PrometheusBuilder,
-    std::{
-        sync::{Arc, Mutex},
-        time::{Duration, Instant},
-    },
     tokio::task::JoinSet,
 };
 
@@ -42,13 +38,6 @@ enum SubCmd {
 
     /// Start the metrics HTTP server
     MetricsHttpd,
-
-    /// Sync the indexer block cache to S3
-    S3Sync {
-        /// Wallclock ceiling for the whole sync, in seconds.
-        #[arg(long, default_value_t = 480)]
-        timeout_secs: u64,
-    },
 }
 
 impl IndexerCmd {
@@ -151,74 +140,6 @@ impl IndexerCmd {
                     metrics_handler,
                 )
                 .await?;
-            },
-            SubCmd::S3Sync { timeout_secs } => {
-                let cfg: Config = parse_config(app_dir.config_file())?;
-
-                let mut indexer_cache = Cache::new_with_dir(app_dir.indexer_dir());
-                indexer_cache.context.s3 = cfg.indexer.s3.clone();
-
-                // Read the last synced height from disk
-                let last_synced_height =
-                    Cache::read_last_s3_block_height(&indexer_cache.context)?.unwrap_or(0);
-
-                let start = Instant::now();
-
-                tracing::info!(last_synced_height, timeout_secs, "Starting S3 sync");
-
-                // Wrap the sync in a wallclock timeout. Without this a single
-                // unreachable bucket lets a `*/10` cron stack invocations on
-                // top of each other forever — the prod incident on
-                // 2026-05-03 saw 30+ accumulated processes after 7h. The
-                // `JoinSet` in `sync_to_s3` ensures hitting the deadline
-                // actually cancels the spawned upload tasks rather than
-                // leaking them on the runtime.
-                let new_height = match tokio::time::timeout(
-                    Duration::from_secs(timeout_secs),
-                    Cache::sync_to_s3(
-                        &indexer_cache.context,
-                        indexer_cache.s3_bitmap.clone(),
-                        last_synced_height,
-                    ),
-                )
-                .await
-                {
-                    Ok(Ok(h)) => h,
-                    Ok(Err(e)) => return Err(e.into()),
-                    Err(_elapsed) => {
-                        tracing::error!(timeout_secs, "S3 sync exceeded deadline; aborting");
-                        anyhow::bail!("s3 sync timed out after {timeout_secs}s");
-                    },
-                };
-
-                // Only store the new height if sync succeeded and made progress
-                if let Some(height) = new_height {
-                    Cache::store_last_s3_block_height(&indexer_cache.context, height)?;
-                }
-
-                tracing::info!(
-                    elapsed = start.elapsed().as_secs_f32(),
-                    last_synced_height,
-                    new_height = ?new_height,
-                    "Finished syncing to S3"
-                );
-
-                // The sync will definitely take a few seconds, I reload the s3_bitmap from disk which could have be modified
-                // in the meantime, merge both and rewrite it.
-                // What can happen:
-                // - We write the bitmap at the same time as the dango process, therefor missing the changes from here
-                // - We write the bitmap at the same time as the dango process, therefor missing the change from dango process
-                // Both are fine.
-
-                let on_disk_s3_bitmap = Cache::s3_bitmap(&indexer_cache.context.indexer_path);
-
-                let s3_bitmap = indexer_cache.s3_bitmap.lock().map_err(|err| {
-                    dango_indexer_cache::error::IndexerError::mutex_poisoned(err.to_string())
-                })?;
-
-                let merged = &on_disk_s3_bitmap | &*s3_bitmap;
-
-                Cache::store_bitmap(&indexer_cache.context, Arc::new(Mutex::new(merged)))?;
             },
         }
 

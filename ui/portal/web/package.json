@@ -24,7 +24,7 @@
     "@monaco-editor/react": "^4.7.0",
     "@sentry/react": "^9.10.1",
     "@sentry/webpack-plugin": "^3.2.4",
-    "@swapper-finance/deposit-sdk": "0.2.14",
+    "@swapper-finance/deposit-sdk": "0.2.15",
     "@tanstack/react-query": "catalog:",
     "@tanstack/react-router": "catalog:",
     "@tanstack/react-table": "^8.21.2",

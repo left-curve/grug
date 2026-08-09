@@ -91,9 +91,12 @@ async fn conditional_order_tp_triggers_on_price_rise() {
         .should_succeed();
 
     let state: UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
 
@@ -122,9 +125,12 @@ async fn conditional_order_tp_triggers_on_price_rise() {
 
     // Step 5: Verify conditional order exists on the position.
     let state: UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
     let pos = state
@@ -166,9 +172,12 @@ async fn conditional_order_tp_triggers_on_price_rise() {
 
     // Step 9: Verify trader state — position closed.
     let state: UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
 
@@ -310,9 +319,12 @@ async fn conditional_order_sl_triggers_on_price_drop() {
 
     // Step 5: Verify trader state — position closed, PnL = 5*($1,800-$2,000) = -$1,000.
     let state: UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
 
@@ -567,9 +579,12 @@ async fn conditional_orders_follow_price_time_priority() {
     // -------------------------------------------------------------------------
 
     let state_user1: UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
 
@@ -584,9 +599,12 @@ async fn conditional_orders_follow_price_time_priority() {
     );
 
     let state_user3: UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user3.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user3.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
 
@@ -756,9 +774,12 @@ async fn conditional_order_failure_does_not_block_others() {
 
     // Verify positions: User1 = 5 long, User3 = 5 short.
     let state_user1: UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
     assert_eq!(
@@ -768,9 +789,12 @@ async fn conditional_order_failure_does_not_block_others() {
     );
 
     let state_user3: UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user3.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user3.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
     assert_eq!(
@@ -866,9 +890,12 @@ async fn conditional_order_failure_does_not_block_others() {
 
     // User1: position unchanged (sell failed), conditional order cancelled (not stuck).
     let state_user1: UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
 
@@ -880,9 +907,12 @@ async fn conditional_order_failure_does_not_block_others() {
 
     // User3: position closed (short covered), conditional order consumed.
     let state_user3: UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user3.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user3.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
 
@@ -1021,9 +1051,12 @@ async fn conditional_order_self_trade_failure_preserves_user_state() {
 
     // Snapshot User1's state: should have 1 resting bid, reserved_margin > 0.
     let state_before: UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
     assert_eq!(
@@ -1066,9 +1099,12 @@ async fn conditional_order_self_trade_failure_preserves_user_state() {
     // --- Post-trigger assertions ---
 
     let state_after: UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
 
@@ -1104,9 +1140,12 @@ async fn conditional_order_self_trade_failure_preserves_user_state() {
 
     // User1's resting bid must still be on the book.
     let orders: std::collections::BTreeMap<OrderId, QueryOrdersByUserResponseItem> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryOrdersByUserRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryOrdersByUserRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed();
     assert_eq!(
         orders.len(),
@@ -1138,9 +1177,12 @@ async fn conditional_order_self_trade_failure_preserves_user_state() {
     // After the fill, User1's resting bid should be gone and
     // open_order_count == 0.
     let state_final: UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
     assert_eq!(
@@ -1222,9 +1264,12 @@ async fn child_order_market_with_tp_triggers() {
 
     // Verify TP is on the position.
     let state: UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
 
@@ -1262,9 +1307,12 @@ async fn child_order_market_with_tp_triggers() {
 
     // Verify position is closed.
     let state: UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
 
@@ -1346,9 +1394,12 @@ async fn child_order_market_with_sl_triggers() {
 
     // Verify SL is on the position.
     let state: UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
 
@@ -1384,9 +1435,12 @@ async fn child_order_market_with_sl_triggers() {
     suite.increase_time(Duration::from_minutes(2)).await;
 
     let state: UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
 
@@ -1511,9 +1565,12 @@ async fn child_order_ignored_when_position_closed() {
 
     // Position should be closed, no conditional orders.
     let state: UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
 
@@ -1629,9 +1686,12 @@ async fn child_order_overwrites_existing() {
         .should_succeed();
 
     let state: UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
 
@@ -1751,9 +1811,12 @@ async fn conditional_order_overwrite_same_direction() {
         .should_succeed();
 
     let state: UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
 
@@ -1855,9 +1918,12 @@ async fn conditional_order_size_exceeds_position_allowed() {
 
     // Verify it was placed.
     let state: UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
 
@@ -2031,9 +2097,12 @@ async fn conditional_order_cancelled_when_slippage_cap_tightened() {
     // Position is still open (TP was not executed; order was cancelled
     // for cap tightening).
     let state: UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
 

@@ -1,0 +1,54 @@
+---
+# Drops only the Postgres projection database (cursors + activity tables). The
+# RocksDB block store under <instance_dir>/data is deliberately left in place —
+# blocks are re-fetchable cache, and keeping them lets the projection rebuild
+# without a full re-backfill. To wipe everything, also delete that data dir.
+- name: "{{ instance.name }} - Derive instance facts"
+  set_fact:
+    archive_instance_dir: "{{ archive_dir }}/{{ instance.name }}"
+    archive_db_name: "archive_{{ instance.name | replace('-', '_') }}"
+    archive_db_user: "archive_{{ instance.name | replace('-', '_') }}"
+
+- name: "{{ instance.name }} - Validate required variables"
+  assert:
+    that:
+      - postgres_user is defined
+      - postgres_password is defined
+    fail_msg: "drop-db requires postgres_user and postgres_password"
+
+- name: "{{ instance.name }} - Stop stack"
+  community.docker.docker_compose_v2:
+    project_src: "{{ archive_instance_dir }}"
+    state: stopped
+    pull: never
+
+- name: "{{ instance.name }} - Drop postgres database"
+  community.postgresql.postgresql_db:
+    name: "{{ archive_db_name }}"
+    login_user: "{{ postgres_user }}"
+    login_password: "{{ postgres_password }}"
+    login_host: "{{ postgres_external_host }}"
+    login_port: "{{ postgres_port }}"
+    state: absent
+
+- name: "{{ instance.name }} - Recreate empty postgres database"
+  community.postgresql.postgresql_db:
+    name: "{{ archive_db_name }}"
+    owner: "{{ archive_db_user }}"
+    login_user: "{{ postgres_user }}"
+    login_password: "{{ postgres_password }}"
+    login_host: "{{ postgres_external_host }}"
+    login_port: "{{ postgres_port }}"
+    state: present
+
+- name: "{{ instance.name }} - Grant privileges on database"
+  community.postgresql.postgresql_privs:
+    type: database
+    privs: ALL
+    roles: "{{ archive_db_user }}"
+    login_db: "{{ archive_db_name }}"
+    login_user: "{{ postgres_user }}"
+    login_password: "{{ postgres_password }}"
+    login_host: "{{ postgres_external_host }}"
+    login_port: "{{ postgres_port }}"
+    state: present

@@ -34,21 +34,24 @@ async fn batch_transfer() {
 
     // Owner makes a multi-send to users 1, 2, and the non-existent recipient.
     let events = suite
-        .batch_transfer(&mut accounts.owner, btree_map! {
-            accounts.user1.address() => coins! {
-                dango::DENOM.clone() => 100,
+        .batch_transfer(
+            &mut accounts.owner,
+            btree_map! {
+                accounts.user1.address() => coins! {
+                    dango::DENOM.clone() => 100,
+                },
+                accounts.user2.address() => coins! {
+                    dango::DENOM.clone() => 200,
+                    usdc::DENOM.clone() => 300,
+                },
+                dead1 => coins! {
+                    dango::DENOM.clone() => 400,
+                },
+                dead2 => coins! {
+                    usdc::DENOM.clone() => 500,
+                },
             },
-            accounts.user2.address() => coins! {
-                dango::DENOM.clone() => 200,
-                usdc::DENOM.clone() => 300,
-            },
-            dead1 => coins! {
-                dango::DENOM.clone() => 400,
-            },
-            dead2 => coins! {
-                usdc::DENOM.clone() => 500,
-            },
-        })
+        )
         .await
         .should_succeed()
         .events;
@@ -66,37 +69,40 @@ async fn batch_transfer() {
             .map(|e| e.event.data.deserialize_json::<Sent>().unwrap())
             .collect::<Vec<_>>();
 
-        assert!(vectors_have_same_elements(sends, vec![
-            Sent {
-                user: accounts.owner.address(),
-                to: accounts.user1.address(),
-                coins: coins! {
-                    dango::DENOM.clone() => 100,
+        assert!(vectors_have_same_elements(
+            sends,
+            vec![
+                Sent {
+                    user: accounts.owner.address(),
+                    to: accounts.user1.address(),
+                    coins: coins! {
+                        dango::DENOM.clone() => 100,
+                    },
                 },
-            },
-            Sent {
-                user: accounts.owner.address(),
-                to: accounts.user2.address(),
-                coins: coins! {
-                    dango::DENOM.clone() => 200,
-                    usdc::DENOM.clone() => 300,
+                Sent {
+                    user: accounts.owner.address(),
+                    to: accounts.user2.address(),
+                    coins: coins! {
+                        dango::DENOM.clone() => 200,
+                        usdc::DENOM.clone() => 300,
+                    },
                 },
-            },
-            Sent {
-                user: accounts.owner.address(),
-                to: contracts.bank, // The orphaned transfer goes to the bank.
-                coins: coins! {
-                    dango::DENOM.clone() => 400,
+                Sent {
+                    user: accounts.owner.address(),
+                    to: contracts.bank, // The orphaned transfer goes to the bank.
+                    coins: coins! {
+                        dango::DENOM.clone() => 400,
+                    },
                 },
-            },
-            Sent {
-                user: accounts.owner.address(),
-                to: contracts.bank, // The orphaned transfer goes to the bank.
-                coins: coins! {
-                    usdc::DENOM.clone() => 500,
+                Sent {
+                    user: accounts.owner.address(),
+                    to: contracts.bank, // The orphaned transfer goes to the bank.
+                    coins: coins! {
+                        usdc::DENOM.clone() => 500,
+                    },
                 },
-            },
-        ]));
+            ]
+        ));
     }
 
     // `received` events:
@@ -111,37 +117,40 @@ async fn batch_transfer() {
             .map(|e| e.event.data.deserialize_json::<Received>().unwrap())
             .collect::<Vec<_>>();
 
-        assert!(vectors_have_same_elements(receives, vec![
-            Received {
-                user: accounts.user1.address(),
-                from: accounts.owner.address(),
-                coins: coins! {
-                    dango::DENOM.clone() => 100,
+        assert!(vectors_have_same_elements(
+            receives,
+            vec![
+                Received {
+                    user: accounts.user1.address(),
+                    from: accounts.owner.address(),
+                    coins: coins! {
+                        dango::DENOM.clone() => 100,
+                    },
                 },
-            },
-            Received {
-                user: accounts.user2.address(),
-                from: accounts.owner.address(),
-                coins: coins! {
-                    dango::DENOM.clone() => 200,
-                    usdc::DENOM.clone() => 300,
+                Received {
+                    user: accounts.user2.address(),
+                    from: accounts.owner.address(),
+                    coins: coins! {
+                        dango::DENOM.clone() => 200,
+                        usdc::DENOM.clone() => 300,
+                    },
                 },
-            },
-            Received {
-                user: contracts.bank, // The orphaned transfer goes to the bank.
-                from: accounts.owner.address(),
-                coins: coins! {
-                    dango::DENOM.clone() => 400,
+                Received {
+                    user: contracts.bank, // The orphaned transfer goes to the bank.
+                    from: accounts.owner.address(),
+                    coins: coins! {
+                        dango::DENOM.clone() => 400,
+                    },
                 },
-            },
-            Received {
-                user: contracts.bank, // The orphaned transfer goes to the bank.
-                from: accounts.owner.address(),
-                coins: coins! {
-                    usdc::DENOM.clone() => 500,
+                Received {
+                    user: contracts.bank, // The orphaned transfer goes to the bank.
+                    from: accounts.owner.address(),
+                    coins: coins! {
+                        usdc::DENOM.clone() => 500,
+                    },
                 },
-            },
-        ]));
+            ]
+        ));
     }
 
     // `transfer_orphaned` events:
@@ -155,46 +164,61 @@ async fn batch_transfer() {
             .map(|e| e.event.data.deserialize_json::<TransferOrphaned>().unwrap())
             .collect::<Vec<_>>();
 
-        assert!(vectors_have_same_elements(orphans, vec![
-            TransferOrphaned {
-                from: accounts.owner.address(),
-                to: dead1,
-                coins: coins! {
-                    dango::DENOM.clone() => 400,
+        assert!(vectors_have_same_elements(
+            orphans,
+            vec![
+                TransferOrphaned {
+                    from: accounts.owner.address(),
+                    to: dead1,
+                    coins: coins! {
+                        dango::DENOM.clone() => 400,
+                    },
                 },
-            },
-            TransferOrphaned {
-                from: accounts.owner.address(),
-                to: dead2,
-                coins: coins! {
-                    usdc::DENOM.clone() => 500,
+                TransferOrphaned {
+                    from: accounts.owner.address(),
+                    to: dead2,
+                    coins: coins! {
+                        usdc::DENOM.clone() => 500,
+                    },
                 },
-            },
-        ]));
+            ]
+        ));
     }
 
     // Check the balance changes.
     {
-        suite.balances().should_change(&accounts.owner, btree_map! {
-            dango::DENOM.clone() => BalanceChange::Decreased(700),
-            usdc::DENOM.clone() => BalanceChange::Decreased(800),
-        });
+        suite.balances().should_change(
+            &accounts.owner,
+            btree_map! {
+                dango::DENOM.clone() => BalanceChange::Decreased(700),
+                usdc::DENOM.clone() => BalanceChange::Decreased(800),
+            },
+        );
 
-        suite.balances().should_change(&accounts.user1, btree_map! {
-            dango::DENOM.clone() => BalanceChange::Increased(100),
-        });
+        suite.balances().should_change(
+            &accounts.user1,
+            btree_map! {
+                dango::DENOM.clone() => BalanceChange::Increased(100),
+            },
+        );
 
-        suite.balances().should_change(&accounts.user2, btree_map! {
-            dango::DENOM.clone() => BalanceChange::Increased(200),
-            usdc::DENOM.clone() => BalanceChange::Increased(300),
-        });
+        suite.balances().should_change(
+            &accounts.user2,
+            btree_map! {
+                dango::DENOM.clone() => BalanceChange::Increased(200),
+                usdc::DENOM.clone() => BalanceChange::Increased(300),
+            },
+        );
 
         // The token that are supposed to go to the non-existing accounts should
         // have been withheld in the bank contract as orphaned transfers.
-        suite.balances().should_change(&contracts.bank, btree_map! {
-            dango::DENOM.clone() => BalanceChange::Increased(400),
-            usdc::DENOM.clone() => BalanceChange::Increased(500),
-        });
+        suite.balances().should_change(
+            &contracts.bank,
+            btree_map! {
+                dango::DENOM.clone() => BalanceChange::Increased(400),
+                usdc::DENOM.clone() => BalanceChange::Increased(500),
+            },
+        );
 
         // The non-existing accounts should have no balance.
         suite.balances().should_change(&dead1, btree_map! {});
@@ -204,10 +228,13 @@ async fn batch_transfer() {
     // The orphaned transfers should have been recorded.
     {
         suite
-            .query_wasm_smart(contracts.bank, QueryOrphanedTransfersRequest {
-                start_after: None,
-                limit: None,
-            })
+            .query_wasm_smart(
+                contracts.bank,
+                QueryOrphanedTransfersRequest {
+                    start_after: None,
+                    limit: None,
+                },
+            )
             .should_succeed_and_equal(vec![
                 OrphanedTransferResponseItem {
                     sender: accounts.owner.address(),
@@ -222,32 +249,41 @@ async fn batch_transfer() {
             ]);
 
         suite
-            .query_wasm_smart(contracts.bank, QueryOrphanedTransfersBySenderRequest {
-                sender: accounts.owner.address(),
-                start_after: None,
-                limit: None,
-            })
+            .query_wasm_smart(
+                contracts.bank,
+                QueryOrphanedTransfersBySenderRequest {
+                    sender: accounts.owner.address(),
+                    start_after: None,
+                    limit: None,
+                },
+            )
             .should_succeed_and_equal(btree_map! {
                 dead1 => coins! { dango::DENOM.clone() => 400 },
                 dead2 => coins! { usdc::DENOM.clone() => 500 },
             });
 
         suite
-            .query_wasm_smart(contracts.bank, QueryOrphanedTransfersByRecipientRequest {
-                recipient: dead1,
-                start_after: None,
-                limit: None,
-            })
+            .query_wasm_smart(
+                contracts.bank,
+                QueryOrphanedTransfersByRecipientRequest {
+                    recipient: dead1,
+                    start_after: None,
+                    limit: None,
+                },
+            )
             .should_succeed_and_equal(btree_map! {
                 accounts.owner.address() => coins! { dango::DENOM.clone() => 400 },
             });
 
         suite
-            .query_wasm_smart(contracts.bank, QueryOrphanedTransfersByRecipientRequest {
-                recipient: dead2,
-                start_after: None,
-                limit: None,
-            })
+            .query_wasm_smart(
+                contracts.bank,
+                QueryOrphanedTransfersByRecipientRequest {
+                    recipient: dead2,
+                    start_after: None,
+                    limit: None,
+                },
+            )
             .should_succeed_and_equal(btree_map! {
                 accounts.owner.address() => coins! { usdc::DENOM.clone() => 500 },
             });
@@ -375,9 +411,12 @@ async fn set_metadata_can_only_be_called_by_non_namespace_owner() {
 
     // Assert metadata is set correctly
     suite
-        .query_wasm_smart(contracts.bank, bank::QueryMetadataRequest {
-            denom: Denom::new_unchecked(["testing", "test"]),
-        })
+        .query_wasm_smart(
+            contracts.bank,
+            bank::QueryMetadataRequest {
+                denom: Denom::new_unchecked(["testing", "test"]),
+            },
+        )
         .should_succeed_and_equal(bank::Metadata {
             name: LengthBounded::new_unchecked("Very testy token".to_string()),
             symbol: LengthBounded::new_unchecked("TESTY".to_string()),
@@ -392,9 +431,12 @@ async fn set_namespace_owner_works() {
 
     // Query namespace owner of testing. Should fail because it's not set.
     suite
-        .query_wasm_smart(contracts.bank, bank::QueryNamespaceOwnerRequest {
-            namespace: Part::new_unchecked("testing"),
-        })
+        .query_wasm_smart(
+            contracts.bank,
+            bank::QueryNamespaceOwnerRequest {
+                namespace: Part::new_unchecked("testing"),
+            },
+        )
         .should_fail_with_error(
             "msg: data not found! type: dango_primitives::encoded_bytes::EncodedBytes",
         );
@@ -415,9 +457,12 @@ async fn set_namespace_owner_works() {
 
     // Query namespace owner of testing. Should succeed.
     suite
-        .query_wasm_smart(contracts.bank, bank::QueryNamespaceOwnerRequest {
-            namespace: Part::new_unchecked("testing"),
-        })
+        .query_wasm_smart(
+            contracts.bank,
+            bank::QueryNamespaceOwnerRequest {
+                namespace: Part::new_unchecked("testing"),
+            },
+        )
         .should_succeed_and_equal(accounts.user1.address());
 }
 
@@ -427,20 +472,26 @@ fn query_namespace_owners_works() {
 
     // Query namespace owners. Should succeed.
     suite
-        .query_wasm_smart(contracts.bank, bank::QueryNamespaceOwnersRequest {
-            start_after: None,
-            limit: None,
-        })
+        .query_wasm_smart(
+            contracts.bank,
+            bank::QueryNamespaceOwnersRequest {
+                start_after: None,
+                limit: None,
+            },
+        )
         .should_succeed_and_equal(btree_map! {
             Part::new_unchecked("bridge") => contracts.gateway,
         });
 
     // Query namespace owners with limit. Should succeed.
     suite
-        .query_wasm_smart(contracts.bank, bank::QueryNamespaceOwnersRequest {
-            start_after: None,
-            limit: Some(1),
-        })
+        .query_wasm_smart(
+            contracts.bank,
+            bank::QueryNamespaceOwnersRequest {
+                start_after: None,
+                limit: Some(1),
+            },
+        )
         .should_succeed_and_equal(btree_map! {
             Part::new_unchecked("bridge") => contracts.gateway,
         });
@@ -451,10 +502,13 @@ fn query_metadatas_works() {
     let (suite, _, _, contracts, _) = setup_test_naive(Default::default());
 
     suite
-        .query_wasm_smart(contracts.bank, bank::QueryMetadatasRequest {
-            start_after: None,
-            limit: None,
-        })
+        .query_wasm_smart(
+            contracts.bank,
+            bank::QueryMetadatasRequest {
+                start_after: None,
+                limit: None,
+            },
+        )
         .should_succeed_and(|metadatas| {
             metadatas.keys().collect::<BTreeSet<_>>()
                 == BTreeSet::from([
@@ -466,10 +520,13 @@ fn query_metadatas_works() {
 
     // Start after eth
     suite
-        .query_wasm_smart(contracts.bank, bank::QueryMetadatasRequest {
-            start_after: Some(Denom::new_unchecked(["bridge", "eth"])),
-            limit: None,
-        })
+        .query_wasm_smart(
+            contracts.bank,
+            bank::QueryMetadatasRequest {
+                start_after: Some(Denom::new_unchecked(["bridge", "eth"])),
+                limit: None,
+            },
+        )
         .should_succeed_and(|metadatas| {
             metadatas.keys().collect::<BTreeSet<_>>()
                 == BTreeSet::from([
@@ -480,10 +537,13 @@ fn query_metadatas_works() {
 
     // Limit 2
     suite
-        .query_wasm_smart(contracts.bank, bank::QueryMetadatasRequest {
-            start_after: None,
-            limit: Some(2),
-        })
+        .query_wasm_smart(
+            contracts.bank,
+            bank::QueryMetadatasRequest {
+                start_after: None,
+                limit: Some(2),
+            },
+        )
         .should_succeed_and(|metadatas| {
             metadatas.keys().collect::<BTreeSet<_>>()
                 == BTreeSet::from([

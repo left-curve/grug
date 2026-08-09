@@ -1,0 +1,26 @@
+[package]
+authors       = { workspace = true }
+categories    = { workspace = true }
+documentation = { workspace = true }
+edition       = { workspace = true }
+license       = { workspace = true }
+name          = "dango-archive-types"
+repository    = { workspace = true }
+rust-version  = { workspace = true }
+version       = { workspace = true }
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+# Derives `utoipa::ToSchema` on the wire types, for the crates that serve them
+# over HTTP and document them via OpenAPI (the httpd and the projections).
+# Clients (e.g. dango-sdk) leave it off so they never pull utoipa.
+utoipa = ["dep:utoipa"]
+
+[dependencies]
+anyhow           = { workspace = true }
+dango-primitives = { workspace = true }
+serde            = { workspace = true, features = ["derive"] }
+serde_json       = { workspace = true }
+utoipa           = { workspace = true, optional = true }

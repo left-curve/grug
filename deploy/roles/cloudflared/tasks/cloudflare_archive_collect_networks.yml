@@ -1,0 +1,11 @@
+---
+- name: Collect archive Cloudflare LB networks for host
+  become: false
+  delegate_to: localhost
+  set_fact:
+    archive_cf_lb_networks: "{{ archive_cf_lb_networks + [archive_instance.name] }}"
+  loop: "{{ hostvars[archive_host].archive_lb_instances | default([]) }}"
+  loop_control:
+    loop_var: archive_instance
+    label: "{{ archive_instance.name }}"
+  when: archive_instance.name not in archive_cf_lb_networks

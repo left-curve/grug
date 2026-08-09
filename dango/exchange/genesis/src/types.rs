@@ -60,7 +60,7 @@ where
         .into_iter()
         .map(|code| {
             let binary: Binary = code.clone().into();
-            binary.hash256()
+            binary.sha2_256()
         })
         .collect()
     }
@@ -116,6 +116,9 @@ pub struct GatewayOption {
     pub rate_limits: BTreeMap<Denom, RateLimit>,
     pub rate_limit_refresh_period: Duration,
     pub withdrawal_fees: Vec<WithdrawalFee>,
+    /// The whitelisted address that responds to withdrawal requests. If
+    /// unset, only the chain owner can respond.
+    pub guardian: Option<Addr>,
 }
 
 pub struct HyperlaneOption {

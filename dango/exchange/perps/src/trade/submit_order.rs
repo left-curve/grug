@@ -12,7 +12,7 @@ use {
         query::query_volume,
         referral::{FeeCommissionsOutcome, apply_fee_commissions},
         state::{FEE_RATE_OVERRIDES, PAIR_PARAMS, PAIR_STATES, PARAM, STATE, USER_STATES},
-        trade::resize_reduce_only_orders,
+        trade::{ensure_trading_enabled, resize_reduce_only_orders},
     },
     anyhow::{bail, ensure},
     dango_math::{MathResult, Number, NumberConst},
@@ -42,6 +42,8 @@ pub fn submit_order(
     tp: Option<ChildOrder>,
     sl: Option<ChildOrder>,
 ) -> anyhow::Result<Response> {
+    ensure_trading_enabled(&PARAM.load(ctx.storage)?)?;
+
     let mut events = EventBuilder::new();
 
     _submit_order(
@@ -385,6 +387,12 @@ pub(crate) fn compute_submit_order_outcome(
     let mut pair_state = pair_state.clone();
     let mut taker_state = taker_state.clone();
 
+    // `oracle_price` is the mark (`index_price`): used for fills, fees, and
+    // minimum-order-size. The order price band instead references the last
+    // external oracle price, which does not drift during closed sessions, so
+    // resting orders cannot walk the band away from the true price.
+    let reference_price = pair_state.oracle_price;
+
     // -------------- Step 0. Validate prices and slippage --------------------
 
     match &kind {
@@ -398,7 +406,7 @@ pub(crate) fn compute_submit_order_outcome(
             // `limit_price` is rejected here too.
             check_price_band(
                 *limit_price,
-                oracle_price,
+                reference_price,
                 pair_param.max_limit_price_deviation,
             )?;
         },
@@ -584,7 +592,7 @@ pub(crate) fn compute_submit_order_outcome(
         None, // no forced maker fee; respect per-user overrides and tier schedule
         &BTreeMap::new(),
         target_price,
-        oracle_price,
+        reference_price,
         pair_param.max_limit_price_deviation,
         fillable_size,
         next_order_id,
@@ -806,6 +814,13 @@ pub fn match_order(
         }
     };
 
+    // Running remainder of the taker's order, decremented on each fill below
+    // so every taker-side `OrderFilled` can report the order's post-fill size.
+    // Mirrors `walk_book`'s own `remaining_size` decrement using the same
+    // per-fill sizes, so the two stay exactly in sync. Captured here before
+    // the `remaining_size` binding is shadowed by the walk's leftover.
+    let mut taker_remaining_size = remaining_size;
+
     let WalkBookOutcome {
         steps,
         remaining_size,
@@ -896,6 +911,14 @@ pub fn match_order(
             }) => {
                 let maker_fill_size = taker_fill_size.checked_neg()?;
 
+                // Post-fill order remainders reported on the two `OrderFilled`
+                // events below. Decrement the taker's running remainder (the
+                // same trajectory `walk_book` computed); the maker's signed
+                // remainder is its pre-fill size less what it just filled, and
+                // is zero on a full fill.
+                taker_remaining_size.checked_sub_assign(taker_fill_size)?;
+                let maker_remaining_size = maker_order.size.checked_sub(maker_fill_size)?;
+
                 // ---------------- Allocate a shared fill id ------------------
                 //
                 // Both `OrderFilled` events below carry this `fill_id`, so
@@ -922,6 +945,7 @@ pub fn match_order(
                         taker_client_order_id,
                         fill_id,
                         false,
+                        taker_remaining_size,
                     )),
                 )?;
 
@@ -982,7 +1006,14 @@ pub fn match_order(
                     maker_fill_size,
                     fill_price,
                     maker_fee_rate,
-                    Some((events, maker_order_id, maker_client_order_id, fill_id, true)),
+                    Some((
+                        events,
+                        maker_order_id,
+                        maker_client_order_id,
+                        fill_id,
+                        true,
+                        maker_remaining_size,
+                    )),
                 )?;
 
                 volumes
@@ -1196,6 +1227,9 @@ pub fn settle_fill(
         Option<ClientOrderId>,
         FillId,
         bool,
+        // The order's remaining unfilled size after this fill, forwarded to
+        // `OrderFilled.remaining_order_size`.
+        Quantity,
     )>,
 ) -> StdResult<FillSettlement> {
     let (closing, opening) = {
@@ -1220,7 +1254,18 @@ pub fn settle_fill(
 
     let volume = compute_notional(fill_size, fill_price)?;
 
-    if let Some((events, order_id, client_order_id, fill_id, is_maker)) = events {
+    if let Some((events, order_id, client_order_id, fill_id, is_maker, remaining_order_size)) =
+        events
+    {
+        // `execute_fill` just mutated the position; read its resulting size.
+        // An absent entry means the fill closed the position entirely, which
+        // `unwrap_or_default` reports as zero.
+        let remaining_position_size = user_state
+            .positions
+            .get(pair_id)
+            .map(|p| p.size)
+            .unwrap_or_default();
+
         events.push(OrderFilled {
             order_id,
             pair_id: pair_id.clone(),
@@ -1235,6 +1280,8 @@ pub fn settle_fill(
             client_order_id,
             fill_id: Some(fill_id),
             is_maker: Some(is_maker),
+            remaining_order_size: Some(remaining_order_size),
+            remaining_position_size: Some(remaining_position_size),
         })?;
     }
 
@@ -1422,10 +1469,13 @@ pub fn settle_pnls(
                 },
                 FeeBreakdown::ZERO,
             ),
-            (false, true) => (FeeBreakdown::ZERO, FeeBreakdown {
-                protocol_fee,
-                vault_fee,
-            }),
+            (false, true) => (
+                FeeBreakdown::ZERO,
+                FeeBreakdown {
+                    protocol_fee,
+                    vault_fee,
+                },
+            ),
             (false, false) => (FeeBreakdown::ZERO, FeeBreakdown::ZERO),
         };
 
@@ -1745,10 +1795,15 @@ mod tests {
             .save(storage, &pair_id(), &test_pair_param())
             .unwrap();
         PAIR_STATES
-            .save(storage, &pair_id(), &PairState {
-                index_price: UsdPrice::new_percent(5_000_000), // $50,000
-                ..Default::default()
-            })
+            .save(
+                storage,
+                &pair_id(),
+                &PairState {
+                    index_price: UsdPrice::new_percent(5_000_000), // $50,000
+                    oracle_price: UsdPrice::new_percent(5_000_000), // $50,000
+                    ..Default::default()
+                },
+            )
             .unwrap();
         NEXT_ORDER_ID.save(storage, &Uint64::new(1)).unwrap();
         NEXT_FILL_ID.save(storage, &FillId::ONE).unwrap();
@@ -2279,13 +2334,16 @@ mod tests {
             margin: LARGE_COLLATERAL,
             ..Default::default()
         };
-        taker_state.positions.insert(pair_id(), Position {
-            size: Quantity::new_int(5),
-            entry_price: UsdPrice::new_int(50_000),
-            entry_funding_per_unit: FundingPerUnit::ZERO,
-            conditional_order_above: None,
-            conditional_order_below: None,
-        });
+        taker_state.positions.insert(
+            pair_id(),
+            Position {
+                size: Quantity::new_int(5),
+                entry_price: UsdPrice::new_int(50_000),
+                entry_funding_per_unit: FundingPerUnit::ZERO,
+                conditional_order_above: None,
+                conditional_order_below: None,
+            },
+        );
 
         let SubmitOrderOutcome {
             pair_state: _,
@@ -2964,12 +3022,16 @@ mod tests {
         };
         ASKS.save(&mut ctx.storage, key, &ask).unwrap();
         USER_STATES
-            .save(&mut ctx.storage, MAKER_A, &UserState {
-                margin: LARGE_COLLATERAL,
-                open_order_count: 1,
-                reserved_margin: ask.reserved_margin,
-                ..Default::default()
-            })
+            .save(
+                &mut ctx.storage,
+                MAKER_A,
+                &UserState {
+                    margin: LARGE_COLLATERAL,
+                    open_order_count: 1,
+                    reserved_margin: ask.reserved_margin,
+                    ..Default::default()
+                },
+            )
             .unwrap();
 
         let param = test_param();
@@ -3120,12 +3182,16 @@ mod tests {
         };
         ASKS.save(&mut ctx.storage, key, &ask).unwrap();
         USER_STATES
-            .save(&mut ctx.storage, MAKER_A, &UserState {
-                margin: LARGE_COLLATERAL,
-                open_order_count: 1,
-                reserved_margin: ask.reserved_margin,
-                ..Default::default()
-            })
+            .save(
+                &mut ctx.storage,
+                MAKER_A,
+                &UserState {
+                    margin: LARGE_COLLATERAL,
+                    open_order_count: 1,
+                    reserved_margin: ask.reserved_margin,
+                    ..Default::default()
+                },
+            )
             .unwrap();
 
         // Partial fill consuming half the order.
@@ -3531,10 +3597,13 @@ mod tests {
     fn settle_pnls_empty() {
         let taker = TAKER;
         let mut taker_state = UserState::default();
-        let mut maker_states = BTreeMap::from([(CONTRACT, UserState {
-            margin: UsdValue::new_int(500),
-            ..Default::default()
-        })]);
+        let mut maker_states = BTreeMap::from([(
+            CONTRACT,
+            UserState {
+                margin: UsdValue::new_int(500),
+                ..Default::default()
+            },
+        )]);
         let mut state = State::default();
 
         // No fills — nothing to settle. Vault margin should be unchanged.
@@ -3589,10 +3658,13 @@ mod tests {
     fn settle_pnls_vault_pnl_adjusts_margin() {
         let taker = TAKER;
         let mut taker_state = UserState::default();
-        let mut maker_states = BTreeMap::from([(CONTRACT, UserState {
-            margin: UsdValue::new_int(1_000),
-            ..Default::default()
-        })]);
+        let mut maker_states = BTreeMap::from([(
+            CONTRACT,
+            UserState {
+                margin: UsdValue::new_int(1_000),
+                ..Default::default()
+            },
+        )]);
         let mut state = State::default();
 
         // Vault is the maker on this fill and realises +$500 PnL.
@@ -3617,10 +3689,13 @@ mod tests {
     fn settle_pnls_vault_loss_creates_bad_debt() {
         let taker = TAKER;
         let mut taker_state = UserState::default();
-        let mut maker_states = BTreeMap::from([(CONTRACT, UserState {
-            margin: UsdValue::new_int(100),
-            ..Default::default()
-        })]);
+        let mut maker_states = BTreeMap::from([(
+            CONTRACT,
+            UserState {
+                margin: UsdValue::new_int(100),
+                ..Default::default()
+            },
+        )]);
         let mut state = State::default();
 
         // Vault is the maker and realises −$500 PnL.
@@ -3645,10 +3720,13 @@ mod tests {
     fn settle_pnls_vault_profit_recovers_negative_margin() {
         let taker = TAKER;
         let mut taker_state = UserState::default();
-        let mut maker_states = BTreeMap::from([(CONTRACT, UserState {
-            margin: UsdValue::new_int(-300),
-            ..Default::default()
-        })]);
+        let mut maker_states = BTreeMap::from([(
+            CONTRACT,
+            UserState {
+                margin: UsdValue::new_int(-300),
+                ..Default::default()
+            },
+        )]);
         let mut state = State::default();
 
         // Vault maker with +$500 PnL on this fill.
@@ -3674,10 +3752,13 @@ mod tests {
     fn settle_pnls_vault_fees_skipped() {
         let taker = TAKER;
         let mut taker_state = UserState::default();
-        let mut maker_states = BTreeMap::from([(CONTRACT, UserState {
-            margin: UsdValue::new_int(1_000),
-            ..Default::default()
-        })]);
+        let mut maker_states = BTreeMap::from([(
+            CONTRACT,
+            UserState {
+                margin: UsdValue::new_int(1_000),
+                ..Default::default()
+            },
+        )]);
         let mut state = State::default();
 
         // Vault is the maker with no PnL and no fee — the upstream
@@ -4048,7 +4129,14 @@ mod tests {
             .save(&mut ctx.storage, &pair_id(), &test_pair_param())
             .unwrap();
         PAIR_STATES
-            .save(&mut ctx.storage, &pair_id(), &PairState::default())
+            .save(
+                &mut ctx.storage,
+                &pair_id(),
+                &PairState {
+                    oracle_price: UsdPrice::new_int(50_000),
+                    ..Default::default()
+                },
+            )
             .unwrap();
         NEXT_ORDER_ID
             .save(&mut ctx.storage, &Uint64::new(1))
@@ -4155,7 +4243,14 @@ mod tests {
             .save(&mut ctx.storage, &pair_id(), &test_pair_param())
             .unwrap();
         PAIR_STATES
-            .save(&mut ctx.storage, &pair_id(), &PairState::default())
+            .save(
+                &mut ctx.storage,
+                &pair_id(),
+                &PairState {
+                    oracle_price: UsdPrice::new_int(50_000),
+                    ..Default::default()
+                },
+            )
             .unwrap();
         NEXT_ORDER_ID
             .save(&mut ctx.storage, &Uint64::new(1))
@@ -4318,7 +4413,14 @@ mod tests {
             .save(&mut ctx.storage, &pair_id(), &test_pair_param())
             .unwrap();
         PAIR_STATES
-            .save(&mut ctx.storage, &pair_id(), &PairState::default())
+            .save(
+                &mut ctx.storage,
+                &pair_id(),
+                &PairState {
+                    oracle_price: UsdPrice::new_int(50_000),
+                    ..Default::default()
+                },
+            )
             .unwrap();
         NEXT_ORDER_ID
             .save(&mut ctx.storage, &Uint64::new(1))
@@ -4765,13 +4867,16 @@ mod tests {
             margin: LARGE_COLLATERAL,
             ..Default::default()
         };
-        taker_state.positions.insert(pair_id(), Position {
-            size: Quantity::new_int(5),
-            entry_price: UsdPrice::new_int(50_000),
-            entry_funding_per_unit: FundingPerUnit::ZERO,
-            conditional_order_above: None,
-            conditional_order_below: None,
-        });
+        taker_state.positions.insert(
+            pair_id(),
+            Position {
+                size: Quantity::new_int(5),
+                entry_price: UsdPrice::new_int(50_000),
+                entry_funding_per_unit: FundingPerUnit::ZERO,
+                conditional_order_above: None,
+                conditional_order_below: None,
+            },
+        );
 
         let SubmitOrderOutcome {
             pair_state: _,
@@ -4981,7 +5086,12 @@ mod tests {
 
         let param = test_param();
         let pair_param = test_pair_param();
-        let pair_state = PAIR_STATES.load(&ctx.storage, &pair_id()).unwrap();
+        // Model an oracle that has moved to $30k; stale makers from when it was
+        // higher now fall outside the band around it.
+        let pair_state = PairState {
+            oracle_price: UsdPrice::new_int(30_000),
+            ..PAIR_STATES.load(&ctx.storage, &pair_id()).unwrap()
+        };
         let taker_state = UserState {
             margin: LARGE_COLLATERAL,
             ..Default::default()
@@ -5131,10 +5241,14 @@ mod tests {
         // Vault (CONTRACT) is the maker. Give it enough margin to take
         // the other side of the taker's buy.
         USER_STATES
-            .save(&mut ctx.storage, CONTRACT, &UserState {
-                margin: LARGE_COLLATERAL,
-                ..Default::default()
-            })
+            .save(
+                &mut ctx.storage,
+                CONTRACT,
+                &UserState {
+                    margin: LARGE_COLLATERAL,
+                    ..Default::default()
+                },
+            )
             .unwrap();
         // Vault ask at $50,000 — would be out-of-band at oracle=$30k.
         place_ask(&mut ctx.storage, CONTRACT, 50_000, 5, 100);
@@ -5228,7 +5342,12 @@ mod tests {
 
         let param = test_param();
         let pair_param = test_pair_param();
-        let pair_state = PAIR_STATES.load(&ctx.storage, &pair_id()).unwrap();
+        // Model an oracle that has moved to $30k; stale makers from when it was
+        // higher now fall outside the band around it.
+        let pair_state = PairState {
+            oracle_price: UsdPrice::new_int(30_000),
+            ..PAIR_STATES.load(&ctx.storage, &pair_id()).unwrap()
+        };
         let taker_state = UserState {
             margin: LARGE_COLLATERAL,
             ..Default::default()
@@ -5500,13 +5619,16 @@ mod tests {
             margin: UsdValue::new_int(1_000),
             ..Default::default()
         };
-        vault_state.positions.insert(pair_id(), Position {
-            size: Quantity::new_int(-10),
-            entry_price: UsdPrice::new_int(50_000),
-            entry_funding_per_unit: FundingPerUnit::ZERO,
-            conditional_order_above: None,
-            conditional_order_below: None,
-        });
+        vault_state.positions.insert(
+            pair_id(),
+            Position {
+                size: Quantity::new_int(-10),
+                entry_price: UsdPrice::new_int(50_000),
+                entry_funding_per_unit: FundingPerUnit::ZERO,
+                conditional_order_above: None,
+                conditional_order_below: None,
+            },
+        );
         USER_STATES
             .save(&mut ctx.storage, CONTRACT, &vault_state)
             .unwrap();
@@ -5752,7 +5874,10 @@ mod tests {
             &State::default(),
             &pair_id(),
             &test_pair_param(),
-            &PairState::default(),
+            &PairState {
+                oracle_price: UsdPrice::new_int(50_000),
+                ..Default::default()
+            },
             &ts,
             UsdPrice::new_int(50_000),
             Quantity::new_int(10),
@@ -5803,7 +5928,10 @@ mod tests {
             &State::default(),
             &pair_id(),
             &test_pair_param(),
-            &PairState::default(),
+            &PairState {
+                oracle_price: UsdPrice::new_int(50_000),
+                ..Default::default()
+            },
             &ts,
             UsdPrice::new_int(50_000),
             Quantity::new_int(-10),
@@ -5842,13 +5970,16 @@ mod tests {
 
         // Give taker an existing long position.
         let mut ts = taker_state(&ctx.storage);
-        ts.positions.insert(pair_id(), Position {
-            size: Quantity::new_int(10),
-            entry_price: UsdPrice::new_int(50_000),
-            entry_funding_per_unit: FundingPerUnit::ZERO,
-            conditional_order_above: None,
-            conditional_order_below: None,
-        });
+        ts.positions.insert(
+            pair_id(),
+            Position {
+                size: Quantity::new_int(10),
+                entry_price: UsdPrice::new_int(50_000),
+                entry_funding_per_unit: FundingPerUnit::ZERO,
+                conditional_order_above: None,
+                conditional_order_below: None,
+            },
+        );
         USER_STATES.save(&mut ctx.storage, TAKER, &ts).unwrap();
 
         // Place bid to absorb the sell.
@@ -5857,6 +5988,7 @@ mod tests {
         // Sell 10 (closes the long). TP/SL should be dropped.
         let pair_state = PairState {
             long_oi: Quantity::new_int(10),
+            oracle_price: UsdPrice::new_int(50_000),
             ..Default::default()
         };
 
@@ -5918,7 +6050,10 @@ mod tests {
             &State::default(),
             &pair_id(),
             &test_pair_param(),
-            &PairState::default(),
+            &PairState {
+                oracle_price: UsdPrice::new_int(50_000),
+                ..Default::default()
+            },
             &ts,
             UsdPrice::new_int(50_000),
             Quantity::new_int(10),
@@ -5967,7 +6102,10 @@ mod tests {
             &State::default(),
             &pair_id(),
             &test_pair_param(),
-            &PairState::default(),
+            &PairState {
+                oracle_price: UsdPrice::new_int(50_000),
+                ..Default::default()
+            },
             &ts,
             UsdPrice::new_int(50_000),
             Quantity::new_int(10),
@@ -6008,13 +6146,16 @@ mod tests {
 
         // Give taker an existing long with no conditional orders.
         let mut ts = taker_state(&ctx.storage);
-        ts.positions.insert(pair_id(), Position {
-            size: Quantity::new_int(5),
-            entry_price: UsdPrice::new_int(50_000),
-            entry_funding_per_unit: FundingPerUnit::ZERO,
-            conditional_order_above: None,
-            conditional_order_below: None,
-        });
+        ts.positions.insert(
+            pair_id(),
+            Position {
+                size: Quantity::new_int(5),
+                entry_price: UsdPrice::new_int(50_000),
+                entry_funding_per_unit: FundingPerUnit::ZERO,
+                conditional_order_above: None,
+                conditional_order_below: None,
+            },
+        );
         USER_STATES.save(&mut ctx.storage, TAKER, &ts).unwrap();
 
         // Place a buy limit at 49_000 — no asks below that so nothing fills.
@@ -6033,7 +6174,10 @@ mod tests {
             &State::default(),
             &pair_id(),
             &test_pair_param(),
-            &PairState::default(),
+            &PairState {
+                oracle_price: UsdPrice::new_int(50_000),
+                ..Default::default()
+            },
             &ts,
             UsdPrice::new_int(50_000),
             Quantity::new_int(10),
@@ -6111,7 +6255,10 @@ mod tests {
             &State::default(),
             &pair_id(),
             &test_pair_param(),
-            &PairState::default(),
+            &PairState {
+                oracle_price: UsdPrice::new_int(50_000),
+                ..Default::default()
+            },
             &taker_state(&ctx.storage),
             UsdPrice::new_int(50_000),
             Quantity::new_int(10),
@@ -6166,7 +6313,10 @@ mod tests {
             &State::default(),
             &pair_id(),
             &test_pair_param(),
-            &PairState::default(),
+            &PairState {
+                oracle_price: UsdPrice::new_int(50_000),
+                ..Default::default()
+            },
             &ts,
             UsdPrice::new_int(50_000),
             Quantity::new_int(10),
@@ -6198,23 +6348,26 @@ mod tests {
 
         // Give taker a long position with existing TP/SL.
         let mut ts = taker_state(&ctx.storage);
-        ts.positions.insert(pair_id(), Position {
-            size: Quantity::new_int(5),
-            entry_price: UsdPrice::new_int(50_000),
-            entry_funding_per_unit: FundingPerUnit::ZERO,
-            conditional_order_above: Some(ConditionalOrder {
-                order_id: Uint64::new(99),
-                size: None,
-                trigger_price: UsdPrice::new_int(60_000),
-                max_slippage: Dimensionless::new_percent(1),
-            }),
-            conditional_order_below: Some(ConditionalOrder {
-                order_id: Uint64::new(98),
-                size: None,
-                trigger_price: UsdPrice::new_int(40_000),
-                max_slippage: Dimensionless::new_percent(2),
-            }),
-        });
+        ts.positions.insert(
+            pair_id(),
+            Position {
+                size: Quantity::new_int(5),
+                entry_price: UsdPrice::new_int(50_000),
+                entry_funding_per_unit: FundingPerUnit::ZERO,
+                conditional_order_above: Some(ConditionalOrder {
+                    order_id: Uint64::new(99),
+                    size: None,
+                    trigger_price: UsdPrice::new_int(60_000),
+                    max_slippage: Dimensionless::new_percent(1),
+                }),
+                conditional_order_below: Some(ConditionalOrder {
+                    order_id: Uint64::new(98),
+                    size: None,
+                    trigger_price: UsdPrice::new_int(40_000),
+                    max_slippage: Dimensionless::new_percent(2),
+                }),
+            },
+        );
         USER_STATES.save(&mut ctx.storage, TAKER, &ts).unwrap();
 
         // Buy more with different TP/SL.
@@ -6235,6 +6388,7 @@ mod tests {
             &test_pair_param(),
             &PairState {
                 long_oi: Quantity::new_int(5),
+                oracle_price: UsdPrice::new_int(50_000),
                 ..Default::default()
             },
             &ts,
@@ -6282,13 +6436,16 @@ mod tests {
             margin: LARGE_COLLATERAL,
             positions: {
                 let mut p = BTreeMap::new();
-                p.insert(pair_id(), Position {
-                    size: Quantity::new_int(-10),
-                    entry_price: UsdPrice::new_int(50_000),
-                    entry_funding_per_unit: FundingPerUnit::ZERO,
-                    conditional_order_above: None,
-                    conditional_order_below: None,
-                });
+                p.insert(
+                    pair_id(),
+                    Position {
+                        size: Quantity::new_int(-10),
+                        entry_price: UsdPrice::new_int(50_000),
+                        entry_funding_per_unit: FundingPerUnit::ZERO,
+                        conditional_order_above: None,
+                        conditional_order_below: None,
+                    },
+                );
                 p
             },
             ..Default::default()
@@ -6314,6 +6471,7 @@ mod tests {
             &test_pair_param(),
             &PairState {
                 short_oi: Quantity::new_int(10),
+                oracle_price: UsdPrice::new_int(50_000),
                 ..Default::default()
             },
             &ts,
@@ -6356,13 +6514,16 @@ mod tests {
             reserved_margin: UsdValue::new_int(12_500),
             positions: {
                 let mut p = BTreeMap::new();
-                p.insert(pair_id(), Position {
-                    size: Quantity::new_int(-10),
-                    entry_price: UsdPrice::new_int(50_000),
-                    entry_funding_per_unit: FundingPerUnit::ZERO,
-                    conditional_order_above: None,
-                    conditional_order_below: None,
-                });
+                p.insert(
+                    pair_id(),
+                    Position {
+                        size: Quantity::new_int(-10),
+                        entry_price: UsdPrice::new_int(50_000),
+                        entry_funding_per_unit: FundingPerUnit::ZERO,
+                        conditional_order_above: None,
+                        conditional_order_below: None,
+                    },
+                );
                 p
             },
             ..Default::default()
@@ -6405,6 +6566,7 @@ mod tests {
             &test_pair_param(),
             &PairState {
                 short_oi: Quantity::new_int(10),
+                oracle_price: UsdPrice::new_int(50_000),
                 ..Default::default()
             },
             &ts,
@@ -6468,7 +6630,10 @@ mod tests {
             &State::default(),
             &pair_id(),
             &test_pair_param(),
-            &PairState::default(),
+            &PairState {
+                oracle_price: UsdPrice::new_int(48_000),
+                ..Default::default()
+            },
             &ts,
             UsdPrice::new_int(48_000),
             Quantity::new_int(10),
@@ -7208,12 +7373,16 @@ mod tests {
         )
         .unwrap();
         USER_STATES
-            .save(&mut ctx.storage, MAKER_A, &UserState {
-                margin: LARGE_COLLATERAL,
-                open_order_count: 1,
-                reserved_margin: UsdValue::new_int(25_000),
-                ..Default::default()
-            })
+            .save(
+                &mut ctx.storage,
+                MAKER_A,
+                &UserState {
+                    margin: LARGE_COLLATERAL,
+                    open_order_count: 1,
+                    reserved_margin: UsdValue::new_int(25_000),
+                    ..Default::default()
+                },
+            )
             .unwrap();
 
         let param = test_param();
@@ -7300,12 +7469,16 @@ mod tests {
         ASKS.save(&mut ctx.storage, maker_key, &maker_order)
             .unwrap();
         USER_STATES
-            .save(&mut ctx.storage, MAKER_A, &UserState {
-                margin: LARGE_COLLATERAL,
-                open_order_count: 1,
-                reserved_margin: UsdValue::new_int(25_000),
-                ..Default::default()
-            })
+            .save(
+                &mut ctx.storage,
+                MAKER_A,
+                &UserState {
+                    margin: LARGE_COLLATERAL,
+                    open_order_count: 1,
+                    reserved_margin: UsdValue::new_int(25_000),
+                    ..Default::default()
+                },
+            )
             .unwrap();
 
         // Sanity: the alias is reachable before the fill.

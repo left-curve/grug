@@ -94,30 +94,38 @@ macro_rules! query_smoke_test {
     };
 }
 
-query_smoke_test!(test_query_app, QueryApp, query_app::Variables {
-    request: json!({"config":{}}),
-    height: None,
-});
+query_smoke_test!(
+    test_query_app,
+    QueryApp,
+    query_app::Variables {
+        request: json!({"config":{}}),
+        height: None,
+    }
+);
 
-query_smoke_test!(test_simulate, Simulate, simulate::Variables {
-    tx: json!({
-        "data": {
-            "chain_id": "dev-1",
-            "nonce": 1,
-            "username": "owner"
-        },
-        "msgs": [
-            {
-                "transfer": {
-                    "0x01bba610cbbfe9df0c99b8862f3ad41b2f646553": {
-                        "hyp/all/btc": "100"
+query_smoke_test!(
+    test_simulate,
+    Simulate,
+    simulate::Variables {
+        tx: json!({
+            "data": {
+                "chain_id": "dev-1",
+                "nonce": 1,
+                "username": "owner"
+            },
+            "msgs": [
+                {
+                    "transfer": {
+                        "0x01bba610cbbfe9df0c99b8862f3ad41b2f646553": {
+                            "hyp/all/btc": "100"
+                        }
                     }
                 }
-            }
-        ],
-        "sender": "0x33361de42571d6aa20c37daa6da4b5ab67bfaad9"
-    }),
-});
+            ],
+            "sender": "0x33361de42571d6aa20c37daa6da4b5ab67bfaad9"
+        }),
+    }
+);
 
 // -----------------------------------------------------------------------------
 // Subscription smoke tests

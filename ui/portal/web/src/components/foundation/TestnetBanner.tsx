@@ -1,17 +1,17 @@
-import { IconClose, Marquee, twMerge } from "@left-curve/applets-kit";
+import { IconClose, Marquee, Modals, twMerge, useApp } from "@left-curve/applets-kit";
 
 import type React from "react";
 
 import { useState } from "react";
 
 import { motion } from "framer-motion";
+import { m } from "@left-curve/foundation/paraglide/messages.js";
 
 export const TestnetBanner: React.FC = () => {
-  const [testBannerVisibility, setTestBannerVisibility] = useState(true);
+  const [isVisible, setIsVisible] = useState(true);
+  const showModal = useApp((state) => state.showModal);
 
-  const text = window.dango?.banner;
-
-  if (!testBannerVisibility || !text) return null;
+  if (!isVisible) return null;
   const isLandingPage = location.pathname === "/";
 
   return (
@@ -23,20 +23,28 @@ export const TestnetBanner: React.FC = () => {
         isLandingPage && "relative z-50",
       )}
     >
-      <Marquee
-        className="w-full bg-[#F7CF74] h-fit p-0 uppercase gap-10"
-        item={
-          <div className="flex gap-10 items-center text-primitives-gray-light-700 diatype-sm-heavy ml-10">
-            <span>{text}</span>
-            <span>•</span>
-          </div>
-        }
-        speed={50}
-      />
       <button
         type="button"
+        aria-label={m["announcement.title"]()}
+        className="h-full w-full cursor-pointer"
+        onClick={() => showModal(Modals.WindingDown)}
+      >
+        <Marquee
+          className="w-full bg-[#F7CF74] h-fit p-0 uppercase gap-10"
+          item={
+            <div className="flex gap-10 items-center text-primitives-gray-light-700 diatype-sm-heavy ml-10">
+              <span>{m["announcement.title"]()}</span>
+              <span>•</span>
+            </div>
+          }
+          speed={50}
+        />
+      </button>
+      <button
+        type="button"
+        aria-label={m["common.dismiss"]()}
         className="absolute right-3 top-[7px] h-6 w-6 z-10 rounded-full bg-primitives-red-light-50 border border-primitives-gray-light-100 flex items-center justify-center"
-        onClick={() => setTestBannerVisibility(false)}
+        onClick={() => setIsVisible(false)}
       >
         <IconClose className="text-primitives-red-light-500 w-5 h-5" />
       </button>

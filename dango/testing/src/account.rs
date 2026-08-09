@@ -15,7 +15,7 @@ use {
         auth::{Credential, Key, Metadata, Nonce, SignDoc, Signature, StandardCredential},
         signer::SequencedSigner,
     },
-    k256::{ecdsa::SigningKey, elliptic_curve::rand_core::OsRng},
+    k256::{ecdsa::SigningKey, elliptic_curve::Generate},
     sha2::Sha256,
     std::{array, collections::BTreeMap},
 };
@@ -86,10 +86,10 @@ where
 
 impl TestAccount<Undefined<UserIndex>, Undefined<Addr>> {
     pub fn new_key_pair() -> (SigningKey, Key) {
-        let sk = SigningKey::random(&mut OsRng);
+        let sk = SigningKey::generate();
         let pk = sk
             .verifying_key()
-            .to_encoded_point(true)
+            .to_sec1_point(true)
             .to_bytes()
             .to_vec()
             .try_into()
@@ -99,7 +99,7 @@ impl TestAccount<Undefined<UserIndex>, Undefined<Addr>> {
     }
 
     pub fn new_random() -> Self {
-        let sk = SigningKey::random(&mut OsRng);
+        let sk = SigningKey::generate();
 
         Self::new(sk)
     }
@@ -113,13 +113,13 @@ impl TestAccount<Undefined<UserIndex>, Undefined<Addr>> {
     pub fn new(sk: SigningKey) -> Self {
         let pk = sk
             .verifying_key()
-            .to_encoded_point(true)
+            .to_sec1_point(true)
             .to_bytes()
             .to_vec()
             .try_into()
             .unwrap();
         let key = Key::Secp256k1(pk);
-        let key_hash = pk.hash256();
+        let key_hash = pk.sha2_256();
 
         Self {
             user_index: Undefined::new(),
@@ -153,9 +153,12 @@ impl TestAccount<Undefined<UserIndex>, Defined<Addr>> {
     ) -> TestAccount<Defined<UserIndex>, Defined<Addr>> {
         let account_factory = querier.query_account_factory().unwrap();
         let user_index = querier
-            .query_wasm_smart(account_factory, account_factory::QueryAccountRequest {
-                address: self.address.into_inner(),
-            })
+            .query_wasm_smart(
+                account_factory,
+                account_factory::QueryAccountRequest {
+                    address: self.address.into_inner(),
+                },
+            )
             .unwrap()
             .owner;
 

@@ -176,9 +176,12 @@ async fn adl_bug_absurd_book_price() {
 
     // Verify positions.
     let state: UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
 
@@ -186,9 +189,12 @@ async fn adl_bug_absurd_book_price() {
     assert_eq!(state.positions[&pair].size, Quantity::new_int(-5));
 
     let state: UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user3.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user3.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
 
@@ -309,9 +315,12 @@ async fn adl_bug_absurd_book_price() {
 
     // user1 (liquidated): should have no positions and ~$0 margin.
     let user1_state: Option<UserState> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed();
 
     assert!(
@@ -328,9 +337,12 @@ async fn adl_bug_absurd_book_price() {
     //   PnL = 5 × ($2,208 − $2,000) = +$1,040
     //   margin = $10,000 + $1,040 = $11,040
     let user3_state: UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user3.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user3.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
 
@@ -357,9 +369,12 @@ async fn adl_bug_absurd_book_price() {
     // After the fix: the bankruptcy price ($2,208) is used as target_price,
     // so the $100,000 ask is never matched. user2 should have no position.
     let user2_state: UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user2.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user2.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
 

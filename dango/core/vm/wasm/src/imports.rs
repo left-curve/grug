@@ -1,7 +1,7 @@
 use {
     crate::{Environment, Iterator, VmError, VmResult, read_from_memory, write_to_memory},
     dango_app::GAS_COSTS,
-    dango_primitives::{Addr, BorshDeExt, BorshSerExt, Query, Record, Storage, decode_sections},
+    dango_primitives::{Addr, BorshDeExt, BorshSerExt, Query, Record, Storage},
     tracing::info,
     wasmer::FunctionEnvMut,
 };
@@ -316,54 +316,6 @@ pub fn secp256k1_pubkey_recover(
     Ok(((error_code as u64) << 32) | (ptr as u64))
 }
 
-pub fn ed25519_verify(
-    mut fe: FunctionEnvMut<Environment>,
-    msg_hash_ptr: u32,
-    sig_ptr: u32,
-    pk_ptr: u32,
-) -> VmResult<u32> {
-    let (env, mut store) = fe.data_and_store_mut();
-
-    let msg_hash = read_from_memory(env, &store, msg_hash_ptr)?;
-    let sig = read_from_memory(env, &store, sig_ptr)?;
-    let pk = read_from_memory(env, &store, pk_ptr)?;
-
-    env.consume_external_gas(&mut store, GAS_COSTS.ed25519_verify, "ed25519_verify")?;
-
-    match dango_crypto::ed25519_verify(&msg_hash, &sig, &pk) {
-        Ok(()) => Ok(0),
-        Err(err) => Ok(err.into_error_code()),
-    }
-}
-
-pub fn ed25519_batch_verify(
-    mut fe: FunctionEnvMut<Environment>,
-    prehash_msgs_ptr: u32,
-    sigs_ptr: u32,
-    pks_ptr: u32,
-) -> VmResult<u32> {
-    let (env, mut store) = fe.data_and_store_mut();
-
-    let prehash_msgs = read_from_memory(env, &store, prehash_msgs_ptr)?;
-    let sigs = read_from_memory(env, &store, sigs_ptr)?;
-    let pks = read_from_memory(env, &store, pks_ptr)?;
-
-    let prehash_msgs = decode_sections(&prehash_msgs);
-    let sigs = decode_sections(&sigs);
-    let pks = decode_sections(&pks);
-
-    env.consume_external_gas(
-        &mut store,
-        GAS_COSTS.ed25519_batch_verify.cost(prehash_msgs.len()),
-        "ed25519_batch_verify",
-    )?;
-
-    match dango_crypto::ed25519_batch_verify(&prehash_msgs, &sigs, &pks) {
-        Ok(()) => Ok(0),
-        Err(err) => Ok(err.into_error_code()),
-    }
-}
-
 macro_rules! impl_hash_method {
     ($hasher:ident, $name:literal) => {
         pub fn $hasher(mut fe: FunctionEnvMut<Environment>, data_ptr: u32) -> VmResult<u32> {
@@ -380,15 +332,7 @@ macro_rules! impl_hash_method {
 }
 
 impl_hash_method!(sha2_256, "sha2_256");
-impl_hash_method!(sha2_512, "sha2_512");
-impl_hash_method!(sha2_512_truncated, "sha2_512_truncated");
-impl_hash_method!(sha3_256, "sha3_256");
-impl_hash_method!(sha3_512, "sha3_512");
-impl_hash_method!(sha3_512_truncated, "sha3_512_truncated");
 impl_hash_method!(keccak256, "keccak256");
-impl_hash_method!(blake2s_256, "blake2s_256");
-impl_hash_method!(blake2b_512, "blake2b_512");
-impl_hash_method!(blake3, "blake3");
 
 /// Pack a KV pair into a single byte array in the following format:
 ///
@@ -415,12 +359,10 @@ mod tests {
             db_scan, db_write, debug, read_from_memory, write_to_memory,
         },
         dango_app::{APP_CONFIG, GAS_COSTS, GasTracker, QuerierProviderImpl, StorageProvider},
-        dango_identity::{Identity256, Identity512},
         dango_primitives::{
             Addr, BlockInfo, BorshDeExt, BorshSerExt, GenericResult, Hash256, MockStorage, Order,
-            Query, QueryResponse, ResultExt, Shared, Storage, Timestamp, encode_sections, json,
+            Query, QueryResponse, ResultExt, Shared, Storage, Timestamp, json,
         },
-        rand::rngs::OsRng,
         std::{fmt::Debug, sync::Arc},
         test_case::test_case,
         wasmer::{
@@ -498,18 +440,8 @@ mod tests {
                     "secp256k1_verify"         => Function::new_typed(&mut store, |_: u32, _: u32, _: u32|       -> u32 { 0 }),
                     "secp256r1_verify"         => Function::new_typed(&mut store, |_: u32, _: u32, _: u32|       -> u32 { 0 }),
                     "secp256k1_pubkey_recover" => Function::new_typed(&mut store, |_: u32, _: u32, _: u8, _: u8| -> u64 { 0 }),
-                    "ed25519_verify"           => Function::new_typed(&mut store, |_: u32, _: u32, _: u32|       -> u32 { 0 }),
-                    "ed25519_batch_verify"     => Function::new_typed(&mut store, |_: u32, _: u32, _: u32|       -> u32 { 0 }),
                     "sha2_256"                 => Function::new_typed(&mut store, |_: u32|                       -> u32 { 0 }),
-                    "sha2_512"                 => Function::new_typed(&mut store, |_: u32|                       -> u32 { 0 }),
-                    "sha2_512_truncated"       => Function::new_typed(&mut store, |_: u32|                       -> u32 { 0 }),
-                    "sha3_256"                 => Function::new_typed(&mut store, |_: u32|                       -> u32 { 0 }),
-                    "sha3_512"                 => Function::new_typed(&mut store, |_: u32|                       -> u32 { 0 }),
-                    "sha3_512_truncated"       => Function::new_typed(&mut store, |_: u32|                       -> u32 { 0 }),
                     "keccak256"                => Function::new_typed(&mut store, |_: u32|                       -> u32 { 0 }),
-                    "blake2s_256"              => Function::new_typed(&mut store, |_: u32|                       -> u32 { 0 }),
-                    "blake2b_512"              => Function::new_typed(&mut store, |_: u32|                       -> u32 { 0 }),
-                    "blake3"                   => Function::new_typed(&mut store, |_: u32|                       -> u32 { 0 }),
                     "debug"                    => Function::new_typed(&mut store, |_: u32, _: u32|                      {   }),
                     "query_chain"              => Function::new_typed(&mut store, |_: u32,|                      -> u32 { 0 }),
                 },
@@ -907,50 +839,40 @@ mod tests {
     }
 
     fn generate_secp256r1_verify_request() -> VerifyTest {
-        use p256::ecdsa::{Signature, SigningKey, VerifyingKey, signature::DigestSigner};
+        use p256::{
+            ecdsa::{Signature, SigningKey, VerifyingKey, signature::hazmat::PrehashSigner},
+            elliptic_curve::Generate,
+        };
 
-        let sk = SigningKey::random(&mut OsRng);
+        let sk = SigningKey::generate();
         let vk = VerifyingKey::from(&sk);
-        let msg_hash = Identity256::from(dango_crypto::sha2_256(MSG));
-        let sig: Signature = sk.sign_digest(msg_hash.clone());
+        let msg_hash = dango_crypto::sha2_256(MSG);
+        let sig: Signature = sk.sign_prehash(&msg_hash).unwrap();
 
         VerifyTest {
             pk: vk.to_sec1_bytes().to_vec(),
             sig: sig.to_bytes().to_vec(),
-            msg_hash: msg_hash.into_bytes().into(),
+            msg_hash: msg_hash.into(),
             wrong_msg: dango_crypto::sha2_256(WRONG_MSG).to_vec(),
         }
     }
 
     fn generate_secp256k1_verify_request() -> VerifyTest {
-        use k256::ecdsa::{Signature, SigningKey, VerifyingKey, signature::DigestSigner};
+        use k256::{
+            ecdsa::{Signature, SigningKey, VerifyingKey, signature::hazmat::PrehashSigner},
+            elliptic_curve::Generate,
+        };
 
-        let sk = SigningKey::random(&mut OsRng);
+        let sk = SigningKey::generate();
         let vk = VerifyingKey::from(&sk);
-        let msg_hash = Identity256::from(dango_crypto::sha2_256(MSG));
-        let sig: Signature = sk.sign_digest(msg_hash.clone());
+        let msg_hash = dango_crypto::sha2_256(MSG);
+        let sig: Signature = sk.sign_prehash(&msg_hash).unwrap();
 
         VerifyTest {
             pk: vk.to_sec1_bytes().to_vec(),
             sig: sig.to_bytes().to_vec(),
-            msg_hash: msg_hash.into_bytes().into(),
+            msg_hash: msg_hash.into(),
             wrong_msg: dango_crypto::sha2_256(WRONG_MSG).to_vec(),
-        }
-    }
-
-    fn generate_ed25519_verify_request() -> VerifyTest {
-        use ed25519_dalek::{DigestSigner, SigningKey, VerifyingKey};
-
-        let sk = SigningKey::generate(&mut OsRng);
-        let vk = VerifyingKey::from(&sk);
-        let msg_hash = Identity512::from(dango_crypto::sha2_512(MSG));
-        let sig = sk.sign_digest(msg_hash.clone());
-
-        VerifyTest {
-            pk: vk.to_bytes().to_vec(),
-            sig: sig.to_bytes().to_vec(),
-            msg_hash: msg_hash.into_bytes().into(),
-            wrong_msg: dango_crypto::sha2_512(WRONG_MSG).to_vec(),
         }
     }
 
@@ -963,11 +885,6 @@ mod tests {
         crate::secp256r1_verify,
         generate_secp256r1_verify_request;
         "secp256kr_verify"
-    )]
-    #[test_case(
-        crate::ed25519_verify,
-        generate_ed25519_verify_request;
-        "ed25519_verify"
     )]
     fn verify_works<V, G>(verify: V, generate: G)
     where
@@ -1008,17 +925,20 @@ mod tests {
         let mut suite = setup_test();
 
         let (pk, sig, msg_hash, recovery_id, compressed) = {
-            use k256::ecdsa::{SigningKey, VerifyingKey};
+            use k256::{
+                ecdsa::{SigningKey, VerifyingKey},
+                elliptic_curve::Generate,
+            };
 
-            let sk = SigningKey::random(&mut OsRng);
+            let sk = SigningKey::generate();
             let vk = VerifyingKey::from(&sk);
-            let msg_hash = Identity256::from(dango_crypto::sha2_256(MSG));
-            let (sig, recovery_id) = sk.sign_digest_recoverable(msg_hash.clone()).unwrap();
+            let msg_hash = dango_crypto::sha2_256(MSG);
+            let (sig, recovery_id) = sk.sign_prehash_recoverable(&msg_hash);
 
             (
                 vk.to_sec1_bytes().to_vec(),
                 sig.to_vec(),
-                msg_hash.into_bytes().to_vec(),
+                msg_hash.to_vec(),
                 recovery_id.to_byte(),
                 1,
             )
@@ -1067,73 +987,6 @@ mod tests {
         }
     }
 
-    // ------------------------- ed25519_batch_verify --------------------------
-    #[test]
-    fn ed25519_batch_verify_works() {
-        let mut suite = setup_test();
-
-        fn ed25519_sign(msg: &str) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
-            use ed25519_dalek::{Signer, SigningKey, VerifyingKey};
-
-            let sk = SigningKey::generate(&mut OsRng);
-            let vk = VerifyingKey::from(&sk);
-            let sig = sk.sign(msg.as_bytes());
-
-            (
-                msg.as_bytes().to_vec(),
-                sig.to_bytes().into(),
-                vk.to_bytes().into(),
-            )
-        }
-
-        let (msg_hash1, sig1, pk1) = ed25519_sign("msg1");
-        let (msg_hash2, sig2, pk2) = ed25519_sign("msg2");
-        let (msg_hash3, sig3, pk3) = ed25519_sign("msg3");
-
-        let prehash_msgs = [
-            msg_hash1.as_slice(),
-            msg_hash2.as_slice(),
-            msg_hash3.as_slice(),
-        ];
-
-        let sigs = [sig1.as_slice(), sig2.as_slice(), sig3.as_slice()];
-        let pks = [pk1.as_slice(), pk2.as_slice(), pk3.as_slice()];
-
-        // Ok
-        {
-            let prehash_msgs = encode_sections(&prehash_msgs).unwrap();
-            let sigs = encode_sections(&sigs).unwrap();
-            let pks = encode_sections(&pks).unwrap();
-
-            let ptr_prehash_msgs = suite.write(&prehash_msgs).unwrap();
-            let ptr_sigs = suite.write(&sigs).unwrap();
-            let ptr_pks = suite.write(&pks).unwrap();
-
-            let result =
-                crate::ed25519_batch_verify(suite.fe_mut(), ptr_prehash_msgs, ptr_sigs, ptr_pks)
-                    .unwrap();
-
-            assert_eq!(result, 0);
-        }
-
-        // Fail
-        {
-            let prehash_msgs = encode_sections(&[msg_hash1.as_slice()]).unwrap();
-            let sigs = encode_sections(&sigs).unwrap();
-            let pks = encode_sections(&pks).unwrap();
-
-            let ptr_prehash_msgs = suite.write(&prehash_msgs).unwrap();
-            let ptr_sigs = suite.write(&sigs).unwrap();
-            let ptr_pks = suite.write(&pks).unwrap();
-
-            let result =
-                crate::ed25519_batch_verify(suite.fe_mut(), ptr_prehash_msgs, ptr_sigs, ptr_pks)
-                    .unwrap();
-
-            assert_eq!(result, 3);
-        }
-    }
-
     // --------------------------------- Hash ----------------------------------
 
     #[test_case(
@@ -1142,49 +995,9 @@ mod tests {
         "sha2_256"
     )]
     #[test_case(
-        crate::sha2_512,
-        dango_crypto::sha2_512;
-        "sha2_512"
-    )]
-    #[test_case(
-        crate::sha2_512_truncated,
-        dango_crypto::sha2_512_truncated;
-        "sha2_512_truncated"
-    )]
-    #[test_case(
-        crate::sha3_256,
-        dango_crypto::sha3_256;
-        "sha3_256"
-    )]
-    #[test_case(
-        crate::sha3_512,
-        dango_crypto::sha3_512;
-        "sha3_512"
-    )]
-    #[test_case(
-        crate::sha3_512_truncated,
-        dango_crypto::sha3_512_truncated;
-        "sha3_512_truncated"
-    )]
-    #[test_case(
         crate::keccak256,
         dango_crypto::keccak256;
         "keccak256"
-    )]
-    #[test_case(
-        crate::blake2s_256,
-        dango_crypto::blake2s_256;
-        "blake2s_256"
-    )]
-    #[test_case(
-        crate::blake2b_512,
-        dango_crypto::blake2b_512;
-        "blake2b_512"
-    )]
-    #[test_case(
-        crate::blake3,
-        dango_crypto::blake3;
-        "blake3"
     )]
     fn hash_works<H, G, const S: usize>(hash: H, generate: G)
     where

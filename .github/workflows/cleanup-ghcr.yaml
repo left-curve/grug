@@ -36,7 +36,7 @@ jobs:
           echo "Cutoff date: $(date -d "-${DAYS} days")"
           echo "====================================="
 
-          IMAGES=("left-curve%2Fdango" "left-curve%2Fdango-frontend")
+          IMAGES=("left-curve%2Fdango" "left-curve%2Fdango-frontend" "left-curve%2Farchive")
           TOTAL_PROCESSED=0
           TOTAL_DELETED=0
           TOTAL_SKIPPED=0

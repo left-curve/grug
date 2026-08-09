@@ -71,13 +71,9 @@ ui/portal/app/android
 !pyth/client/testdata/
 .playwright-mcp
 
-# LocalDango
-localdango/**/configs/cometbft/config/addrbook.json
-localdango/**/configs/cometbft/config/write-file-atomic-*
-localdango/**/configs/backups
-localdango/**/data
-localdango/**/indexer
-localdango/**/logs
+# CI stack (cometbft writes into the mounted config dir at runtime)
+docker/ci-stack/configs/cometbft/config/addrbook.json
+docker/ci-stack/configs/cometbft/config/write-file-atomic-*
 
 # Ansible deploy logs (captured by `just deploy-*`, `just restart-*`, etc.)
 deploy/logs/

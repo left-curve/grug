@@ -3,7 +3,7 @@ use {
         state::PARAM,
         trade::{
             _cancel_all_orders, _cancel_one_order, _cancel_one_order_by_client_order_id,
-            _submit_order,
+            _submit_order, ensure_trading_enabled,
         },
     },
     anyhow::ensure,
@@ -27,6 +27,10 @@ pub fn batch_update_orders(
     reqs: NonEmpty<Vec<SubmitOrCancelOrderRequest>>,
 ) -> anyhow::Result<Response> {
     let param = PARAM.load(ctx.storage)?;
+
+    // Gate the whole batch rather than only its submit actions: a batch that
+    // mixes cancels with submits must fail as a unit, not partially apply.
+    ensure_trading_enabled(&param)?;
 
     // Enforce the governance-tunable upper bound on batch size.
     ensure!(

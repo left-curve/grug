@@ -90,9 +90,12 @@ async fn batch_submit_then_cancel() {
         .should_succeed();
 
     let orders: BTreeMap<OrderId, QueryOrdersByUserResponseItem> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryOrdersByUserRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryOrdersByUserRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed();
     assert_eq!(orders.len(), 1, "only the ask should remain on the book");
     let (_, ask) = orders.iter().next().unwrap();
@@ -131,9 +134,12 @@ async fn batch_atomic_replace() {
     }
 
     let old_orders: BTreeMap<OrderId, QueryOrdersByUserResponseItem> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryOrdersByUserRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryOrdersByUserRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed();
     assert_eq!(old_orders.len(), 3);
     let old_ids: Vec<OrderId> = old_orders.keys().copied().collect();
@@ -158,9 +164,12 @@ async fn batch_atomic_replace() {
         .should_succeed();
 
     let new_orders: BTreeMap<OrderId, QueryOrdersByUserResponseItem> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryOrdersByUserRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryOrdersByUserRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed();
     assert_eq!(new_orders.len(), 3, "book should hold the 3 new bids");
     for id in old_ids {
@@ -227,9 +236,12 @@ async fn batch_reuse_client_order_id() {
         .should_succeed();
 
     let orders: BTreeMap<OrderId, QueryOrdersByUserResponseItem> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryOrdersByUserRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryOrdersByUserRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed();
     assert_eq!(orders.len(), 1);
     let (_, order) = orders.iter().next().unwrap();
@@ -255,15 +267,21 @@ async fn batch_atomicity_on_submit_failure() {
         .should_succeed();
 
     let state_before: perps::UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
     let orders_before: BTreeMap<OrderId, QueryOrdersByUserResponseItem> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryOrdersByUserRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryOrdersByUserRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed();
 
     // Two submits with the same client_order_id. The first is accepted by the
@@ -286,15 +304,21 @@ async fn batch_atomicity_on_submit_failure() {
         .should_fail();
 
     let state_after: perps::UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
     let orders_after: BTreeMap<OrderId, QueryOrdersByUserResponseItem> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryOrdersByUserRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryOrdersByUserRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed();
 
     assert_eq!(state_before, state_after, "UserState must be unchanged");
@@ -320,15 +344,21 @@ async fn batch_atomicity_on_cancel_failure() {
         .should_succeed();
 
     let state_before: perps::UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
     let orders_before: BTreeMap<OrderId, QueryOrdersByUserResponseItem> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryOrdersByUserRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryOrdersByUserRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed();
 
     suite
@@ -350,15 +380,21 @@ async fn batch_atomicity_on_cancel_failure() {
         .should_fail_with_error("order not found");
 
     let state_after: perps::UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
     let orders_after: BTreeMap<OrderId, QueryOrdersByUserResponseItem> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryOrdersByUserRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryOrdersByUserRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed();
 
     assert_eq!(state_before, state_after);
@@ -409,26 +445,38 @@ async fn batch_fill_reverts_on_later_failure() {
     // would leak taker mutations (position, reserved_margin, unrested bids)
     // past the rollback.
     let user1_state_before: perps::UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
     let user1_orders_before: BTreeMap<OrderId, QueryOrdersByUserResponseItem> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryOrdersByUserRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryOrdersByUserRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed();
     let user2_state_before: perps::UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user2.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user2.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
     let user2_orders_before: BTreeMap<OrderId, QueryOrdersByUserResponseItem> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryOrdersByUserRequest {
-            user: accounts.user2.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryOrdersByUserRequest {
+                user: accounts.user2.address(),
+            },
+        )
         .should_succeed();
 
     // user2 submits a batch: market buy (crosses user1's ask) followed by a
@@ -465,26 +513,38 @@ async fn batch_fill_reverts_on_later_failure() {
     // a bid resting mid-batch under cid=99) are rolled back along with the
     // rest of the batch.
     let user1_state_after: perps::UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
     let user1_orders_after: BTreeMap<OrderId, QueryOrdersByUserResponseItem> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryOrdersByUserRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryOrdersByUserRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed();
     let user2_state_after: perps::UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user2.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user2.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
     let user2_orders_after: BTreeMap<OrderId, QueryOrdersByUserResponseItem> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryOrdersByUserRequest {
-            user: accounts.user2.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryOrdersByUserRequest {
+                user: accounts.user2.address(),
+            },
+        )
         .should_succeed();
 
     assert_eq!(
@@ -540,9 +600,12 @@ async fn batch_single_action() {
         .should_succeed();
 
     let orders: BTreeMap<OrderId, QueryOrdersByUserResponseItem> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryOrdersByUserRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryOrdersByUserRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed();
     assert_eq!(orders.len(), 1);
 }
@@ -585,9 +648,12 @@ async fn batch_size_cap_enforced() {
         .should_succeed();
 
     let state_before: perps::UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
 
@@ -611,9 +677,12 @@ async fn batch_size_cap_enforced() {
         .should_fail_with_error("`max_action_batch_size` (3), found: 4");
 
     let state_after: perps::UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
     assert_eq!(state_before, state_after);
@@ -652,20 +721,23 @@ async fn batch_across_two_pairs() {
 
     // Register oracle prices for both pairs (plus USDC for settlement).
     suite
-        .seed_oracle_prices(&mut accounts.owner, btree_map! {
-            usdc::DENOM.clone() => OracleTestEntry {
-                pyth_id: 1,
-                humanized_price: UsdPrice::new_int(1),
+        .seed_oracle_prices(
+            &mut accounts.owner,
+            btree_map! {
+                usdc::DENOM.clone() => OracleTestEntry {
+                    pyth_id: 1,
+                    humanized_price: UsdPrice::new_int(1),
+                },
+                eth_pair.clone() => OracleTestEntry {
+                    pyth_id: 2,
+                    humanized_price: UsdPrice::new_int(2_000),
+                },
+                btc_pair.clone() => OracleTestEntry {
+                    pyth_id: 3,
+                    humanized_price: UsdPrice::new_int(60_000),
+                },
             },
-            eth_pair.clone() => OracleTestEntry {
-                pyth_id: 2,
-                humanized_price: UsdPrice::new_int(2_000),
-            },
-            btc_pair.clone() => OracleTestEntry {
-                pyth_id: 3,
-                humanized_price: UsdPrice::new_int(60_000),
-            },
-        })
+        )
         .await;
 
     // Add the BTC pair (the ETH pair is already configured at genesis;
@@ -742,9 +814,12 @@ async fn batch_across_two_pairs() {
     // Only the BTC bid remains; the ETH bid was cancelled by its
     // just-written cid.
     let orders: BTreeMap<OrderId, QueryOrdersByUserResponseItem> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryOrdersByUserRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryOrdersByUserRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed();
     assert_eq!(orders.len(), 1, "only the BTC bid should remain");
     let (_, order) = orders.iter().next().unwrap();
@@ -827,9 +902,12 @@ async fn batch_stp_fires_for_self_match() {
 
     // Post-batch: only the rested ask remains.
     let orders: BTreeMap<OrderId, QueryOrdersByUserResponseItem> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryOrdersByUserRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryOrdersByUserRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed();
     assert_eq!(orders.len(), 1, "only the rested ask should remain");
     let (_, order) = orders.iter().next().unwrap();
@@ -872,21 +950,30 @@ async fn batch_cancel_fails_for_filled_order() {
         .should_succeed();
 
     let user1_state_before: perps::UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
     let user2_state_before: perps::UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user2.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user2.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
     let user2_orders_before: BTreeMap<OrderId, QueryOrdersByUserResponseItem> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryOrdersByUserRequest {
-            user: accounts.user2.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryOrdersByUserRequest {
+                user: accounts.user2.address(),
+            },
+        )
         .should_succeed();
 
     let cid = 99u64;
@@ -927,21 +1014,30 @@ async fn batch_cancel_fails_for_filled_order() {
     // Full rollback: maker's resting ask and both users' states are
     // byte-identical to the snapshot.
     let user1_state_after: perps::UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
     let user2_state_after: perps::UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user2.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user2.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
     let user2_orders_after: BTreeMap<OrderId, QueryOrdersByUserResponseItem> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryOrdersByUserRequest {
-            user: accounts.user2.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryOrdersByUserRequest {
+                user: accounts.user2.address(),
+            },
+        )
         .should_succeed();
 
     assert_eq!(user1_state_before, user1_state_after);
@@ -1016,16 +1112,22 @@ async fn batch_referral_commissions_rollback() {
     // Snapshot cumulative referral data for both referrer and referee
     // before the failing batch.
     let user1_data_before: UserReferralData = suite
-        .query_wasm_smart(contracts.perps, perps::QueryReferralDataRequest {
-            user: 1,
-            since: None,
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryReferralDataRequest {
+                user: 1,
+                since: None,
+            },
+        )
         .should_succeed();
     let user2_data_before: UserReferralData = suite
-        .query_wasm_smart(contracts.perps, perps::QueryReferralDataRequest {
-            user: 2,
-            since: None,
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryReferralDataRequest {
+                user: 2,
+                since: None,
+            },
+        )
         .should_succeed();
 
     let cid = 7u64;
@@ -1062,16 +1164,22 @@ async fn batch_referral_commissions_rollback() {
         .should_fail();
 
     let user1_data_after: UserReferralData = suite
-        .query_wasm_smart(contracts.perps, perps::QueryReferralDataRequest {
-            user: 1,
-            since: None,
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryReferralDataRequest {
+                user: 1,
+                since: None,
+            },
+        )
         .should_succeed();
     let user2_data_after: UserReferralData = suite
-        .query_wasm_smart(contracts.perps, perps::QueryReferralDataRequest {
-            user: 2,
-            since: None,
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryReferralDataRequest {
+                user: 2,
+                since: None,
+            },
+        )
         .should_succeed();
 
     assert_eq!(
@@ -1082,4 +1190,54 @@ async fn batch_referral_commissions_rollback() {
         user2_data_before, user2_data_after,
         "referee's cumulative referral data must be unchanged after batch rollback"
     );
+}
+
+/// The `orders_by_user` query is deliberately unpaginated: a user's resting
+/// orders are bounded by `Param::max_open_orders`, and the query returns all
+/// of them, however many there are.
+#[tokio::test]
+async fn orders_by_user_returns_all_orders() {
+    let (mut suite, mut accounts, _, contracts, _) = setup_test_naive(TestOption::default());
+    register_oracle_prices(&mut suite, &mut accounts, 2_000).await;
+
+    suite
+        .execute(
+            &mut accounts.user1,
+            contracts.perps,
+            &perps::ExecuteMsg::Trade(perps::TraderMsg::Deposit { to: None }),
+            Coins::one(usdc::DENOM.clone(), Uint128::new(10_000_000_000)).unwrap(),
+        )
+        .await
+        .should_succeed();
+
+    // 35 resting bids — more than `DEFAULT_PAGE_LIMIT` (30), the fallback
+    // most enumerative queries would truncate at — submitted in batches of
+    // `max_action_batch_size` (5), at distinct prices within the price band.
+    for batch in 0..7i128 {
+        let submits = (0..5i128)
+            .map(|i| SubmitOrCancelOrderRequest::Submit(limit_bid(1_200 + batch * 5 + i, 1, None)))
+            .collect::<Vec<_>>();
+
+        suite
+            .execute(
+                &mut accounts.user1,
+                contracts.perps,
+                &perps::ExecuteMsg::Trade(perps::TraderMsg::BatchUpdateOrders(
+                    NonEmpty::new(submits).unwrap(),
+                )),
+                Coins::new(),
+            )
+            .await
+            .should_succeed();
+    }
+
+    let all: BTreeMap<OrderId, QueryOrdersByUserResponseItem> = suite
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryOrdersByUserRequest {
+                user: accounts.user1.address(),
+            },
+        )
+        .should_succeed();
+    assert_eq!(all.len(), 35);
 }

@@ -5,7 +5,7 @@ use {
         APP_CONFIG, AppError, AppResult, CONFIG, EventResult, NEXT_CRONJOBS, TraceOption,
         schedule_cronjob,
     },
-    dango_primitives::{Addr, BlockInfo, EvtConfigure, MsgConfigure, Storage},
+    dango_primitives::{Addr, BlockInfo, Config, EvtConfigure, JsonDeExt, MsgConfigure, Storage},
 };
 
 pub fn do_configure(
@@ -51,6 +51,11 @@ fn _do_configure(
     }
 
     if let Some(new_cfg) = msg.new_cfg {
+        // `MsgConfigure.new_cfg` is a raw JSON value rather than a typed
+        // `Config`, so that historical blocks containing config updates keep
+        // deserializing across `Config` schema changes. Parse it here instead.
+        let new_cfg: Config = new_cfg.deserialize_json()?;
+
         // If the list of cronjobs has been changed, we have to delete the
         // existing scheduled ones and reschedule.
         if new_cfg.cronjobs != cfg.cronjobs {

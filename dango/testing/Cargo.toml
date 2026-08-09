@@ -28,7 +28,6 @@ dango-db-memory             = { workspace = true }
 dango-eth-utils             = { workspace = true }
 dango-genesis               = { workspace = true }
 dango-hyperlane-types       = { workspace = true }
-dango-identity              = { workspace = true }
 dango-indexer-cache         = { workspace = true, features = ["http-request-details", "metrics", "tracing"] }
 dango-indexer-clickhouse    = { workspace = true, features = ["metrics", "testing", "tracing"] }
 dango-indexer-graphql-types = { workspace = true }
@@ -79,7 +78,6 @@ dango-storage               = { workspace = true }
 dango-tester                = { workspace = true, features = ["library"] }
 dango-vm-hybrid             = { workspace = true }
 dango-vm-wasm               = { workspace = true }
-ed25519-dalek               = { workspace = true, features = ["batch", "digest"] }
 graphql_client              = { workspace = true }
 hex                         = { workspace = true }
 itertools                   = { workspace = true }

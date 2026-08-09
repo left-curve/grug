@@ -48,7 +48,7 @@
       {{ (cf_load_balancers.json.result
           | selectattr('name', 'equalto', excl_lb_name)
           | map(attribute='id')
-          | list | first) | default('') }}
+          | list | first) | default(None) }}
   uri:
     url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare_zone_id }}/load_balancers/{{ excl_lb_id }}"
     method: DELETE
@@ -58,7 +58,9 @@
   loop_control:
     loop_var: item
     label: "{{ item.1 }}-{{ item.0.key }}"
-  when: excl_lb_id | length > 0
+  when:
+    - excl_lb_id is string
+    - excl_lb_id | length > 0
   run_once: true
   become: false
   delegate_to: localhost
@@ -70,7 +72,7 @@
       {{ (cf_pools.json.result
           | selectattr('name', 'equalto', excl_pool_name)
           | map(attribute='id')
-          | list | first) | default('') }}
+          | list | first) | default(None) }}
   uri:
     url: "https://api.cloudflare.com/client/v4/accounts/{{ cloudflare_account_id }}/load_balancers/pools/{{ excl_pool_id }}"
     method: DELETE
@@ -80,7 +82,9 @@
   loop_control:
     loop_var: item
     label: "pool-{{ item.1 }}-{{ item.0.key }}"
-  when: excl_pool_id | length > 0
+  when:
+    - excl_pool_id is string
+    - excl_pool_id | length > 0
   run_once: true
   become: false
   delegate_to: localhost

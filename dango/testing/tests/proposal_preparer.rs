@@ -42,10 +42,13 @@ async fn proposal_pyth() {
 
         // Retrieve all PythIds from the oracle.
         let mut pyth_ids = suite
-            .query_wasm_smart(contracts.oracle, QueryPriceSourcesRequest {
-                start_after: None,
-                limit: None,
-            })
+            .query_wasm_smart(
+                contracts.oracle,
+                QueryPriceSourcesRequest {
+                    start_after: None,
+                    limit: None,
+                },
+            )
             .should_succeed()
             .into_values()
             .flat_map(|config| config.feeds())
@@ -101,9 +104,12 @@ async fn proposal_pyth() {
 
     // Retrieve the prices and sequences.
     let prices1 = suite
-        .query_wasm_smart(oracle, QueryPriceRequest {
-            denom: perp_btc::DENOM.clone(),
-        })
+        .query_wasm_smart(
+            oracle,
+            QueryPriceRequest {
+                denom: perp_btc::DENOM.clone(),
+            },
+        )
         .should_succeed();
 
     // Await some time and assert that the timestamps are updated.
@@ -112,9 +118,12 @@ async fn proposal_pyth() {
     suite.make_empty_block().await;
 
     let prices2 = suite
-        .query_wasm_smart(oracle, QueryPriceRequest {
-            denom: perp_btc::DENOM.clone(),
-        })
+        .query_wasm_smart(
+            oracle,
+            QueryPriceRequest {
+                denom: perp_btc::DENOM.clone(),
+            },
+        )
         .should_succeed();
 
     // Assert that the prices have been updated.
@@ -133,17 +142,23 @@ async fn proposal_pyth() {
 
         // Verify the denom does not exist in the oracle.
         suite
-            .query_wasm_smart(contracts.oracle, QueryPriceRequest {
-                denom: test_denom.clone(),
-            })
+            .query_wasm_smart(
+                contracts.oracle,
+                QueryPriceRequest {
+                    denom: test_denom.clone(),
+                },
+            )
             .should_fail_with_error("data not found");
 
         // Verify the NOT_USED_ID is not in the oracle.
         suite
-            .query_wasm_smart(contracts.oracle, QueryPriceSourcesRequest {
-                start_after: None,
-                limit: Some(u32::MAX),
-            })
+            .query_wasm_smart(
+                contracts.oracle,
+                QueryPriceSourcesRequest {
+                    start_after: None,
+                    limit: Some(u32::MAX),
+                },
+            )
             .should_succeed()
             .values()
             .flat_map(|config| config.feeds())
@@ -194,9 +209,12 @@ async fn assert_price_exists<P>(
             tx.should_succeed();
         }
 
-        if let Ok(p) = suite.query_wasm_smart(oracle, QueryPriceRequest {
-            denom: denom.clone(),
-        }) {
+        if let Ok(p) = suite.query_wasm_smart(
+            oracle,
+            QueryPriceRequest {
+                denom: denom.clone(),
+            },
+        ) {
             price = Some(p);
             break;
         }

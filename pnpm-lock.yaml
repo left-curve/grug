@@ -598,8 +598,8 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(encoding@0.1.13)(webpack@5.98.0(@swc/core@1.7.26(@swc/helpers@0.5.17))(esbuild@0.27.7))
       '@swapper-finance/deposit-sdk':
-        specifier: 0.2.14
-        version: 0.2.14
+        specifier: 0.2.15
+        version: 0.2.15
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.59.0(react@19.1.0)
@@ -5257,8 +5257,8 @@ packages:
     peerDependencies:
       '@svgr/core': '*'
 
-  '@swapper-finance/deposit-sdk@0.2.14':
-    resolution: {integrity: sha512-rD3+W0kGBahV8LEcQfNASamTL9sfUQkRSn7CEWuC87ZXqY1+w1I79bHfCYHBeN0KcWmojsgVo1MGabvYafhWrQ==}
+  '@swapper-finance/deposit-sdk@0.2.15':
+    resolution: {integrity: sha512-icP2O++wUs9/m8m48st0w5uM4UEQ3XThgNw/QpfjEmczTH9yWEJg7Ttd5QXlbJP/qqlv4JJdvSHhuE31ExwIhA==}
     engines: {node: '>=14.0.0'}
 
   '@swc/core-darwin-arm64@1.7.26':
@@ -17014,7 +17014,7 @@ snapshots:
     transitivePeerDependencies:
       - typescript
 
-  '@swapper-finance/deposit-sdk@0.2.14': {}
+  '@swapper-finance/deposit-sdk@0.2.15': {}
 
   '@swc/core-darwin-arm64@1.7.26':
     optional: true

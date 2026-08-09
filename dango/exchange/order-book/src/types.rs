@@ -179,6 +179,25 @@ pub struct QueryOrderResponse {
     pub client_order_id: Option<ClientOrderId>,
 }
 
+/// Response type of the order-by-client-order-ID query.
+///
+/// Includes the system-assigned `order_id`, which the caller — knowing only
+/// the client order ID — is typically after. The query inputs (`user`,
+/// `client_order_id`) are not echoed back, consistent with the other order
+/// query responses.
+#[dango_primitives::derive(Serde)]
+pub struct QueryOrderByClientOrderIdResponse {
+    pub order_id: OrderId,
+    pub pair_id: PairId,
+    pub size: Quantity,
+    pub limit_price: UsdPrice,
+    pub reduce_only: bool,
+    pub reserved_margin: UsdValue,
+    pub created_at: Timestamp,
+    pub tp: Option<ChildOrder>,
+    pub sl: Option<ChildOrder>,
+}
+
 #[dango_primitives::derive(Serde)]
 pub struct QueryOrdersByUserResponseItem {
     pub pair_id: PairId,

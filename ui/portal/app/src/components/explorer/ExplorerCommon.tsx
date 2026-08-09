@@ -1,7 +1,7 @@
 import { m } from "@left-curve/foundation/paraglide/messages.js";
 import { formatUnits } from "@left-curve/utils";
 import { useApp } from "@left-curve/foundation";
-import { useConfig, usePrices } from "@left-curve/store";
+import { getExplorerTransactionKey, useConfig, usePrices } from "@left-curve/store";
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, View } from "react-native";
 import { AddressVisualizer } from "~/components/foundation/AddressVisualizer";
@@ -15,7 +15,18 @@ import {
 } from "~/components/foundation";
 
 import type { Address, Coins, IndexedTransaction } from "@left-curve/types";
+import type { ExplorerTransactionRole } from "@left-curve/store";
 import type React from "react";
+
+type ExplorerTransactionRow = IndexedTransaction & {
+  involvement?: ExplorerTransactionRole[];
+};
+
+function getRoleLabel(role: ExplorerTransactionRole): string {
+  return role === "sender"
+    ? m["explorer.txs.roles.sender"]()
+    : m["explorer.txs.roles.participant"]();
+}
 
 export const ExplorerScreen: React.FC<React.PropsWithChildren> = ({ children }) => {
   return (
@@ -150,7 +161,7 @@ export const ExplorerAssetsList: React.FC<{ balances: Coins }> = ({ balances }) 
 };
 
 type TransactionsListProps = {
-  transactions: IndexedTransaction[];
+  transactions: ExplorerTransactionRow[];
   onOpenTx: (hash: string) => void;
   onOpenBlock: (height: number) => void;
   onOpenAddress: (url: string) => void;
@@ -175,14 +186,21 @@ export const ExplorerTransactionsList: React.FC<TransactionsListProps> = ({
   return (
     <ExplorerSectionCard title={m["explorer.txs.title"]()}>
       {transactions.map((tx) => (
-        <View key={tx.hash} className="rounded-md border border-outline-secondary-gray p-3 gap-2">
+        <View
+          key={getExplorerTransactionKey(tx)}
+          className="rounded-md border border-outline-secondary-gray p-3 gap-2"
+        >
           <ExplorerKeyValueRow label="Hash">
-            <Pressable className="flex-row items-center gap-1" onPress={() => onOpenTx(tx.hash)}>
-              <GlobalText className="diatype-sm-bold text-ink-secondary-blue">
-                {tx.hash.slice(0, 18)}...
-              </GlobalText>
-              <IconLink className="w-4 h-4 text-ink-secondary-blue" />
-            </Pressable>
+            {tx.hash ? (
+              <Pressable className="flex-row items-center gap-1" onPress={() => onOpenTx(tx.hash)}>
+                <GlobalText className="diatype-sm-bold text-ink-secondary-blue">
+                  {tx.hash.slice(0, 18)}...
+                </GlobalText>
+                <IconLink className="w-4 h-4 text-ink-secondary-blue" />
+              </Pressable>
+            ) : (
+              <GlobalText>—</GlobalText>
+            )}
           </ExplorerKeyValueRow>
 
           <ExplorerKeyValueRow label={m["explorer.txs.block"]()}>
@@ -198,13 +216,29 @@ export const ExplorerTransactionsList: React.FC<TransactionsListProps> = ({
           </ExplorerKeyValueRow>
 
           <ExplorerKeyValueRow label={m["explorer.txs.sender"]()}>
-            <AddressVisualizer
-              withIcon
-              address={tx.sender as Address}
-              classNames={{ text: "diatype-sm-bold" }}
-              onClick={onOpenAddress}
-            />
+            {tx.sender ? (
+              <AddressVisualizer
+                withIcon
+                address={tx.sender as Address}
+                classNames={{ text: "diatype-sm-bold" }}
+                onClick={onOpenAddress}
+              />
+            ) : (
+              <GlobalText>—</GlobalText>
+            )}
           </ExplorerKeyValueRow>
+
+          {tx.involvement ? (
+            <ExplorerKeyValueRow label={m["explorer.txs.role"]()} valueClassName="flex-row gap-1">
+              {tx.involvement.map((role) => (
+                <Badge
+                  key={role}
+                  color={role === "sender" ? "blue" : "rice"}
+                  text={getRoleLabel(role)}
+                />
+              ))}
+            </ExplorerKeyValueRow>
+          ) : null}
 
           <ExplorerKeyValueRow label={m["explorer.txs.result"]({ result: "" })}>
             <Badge

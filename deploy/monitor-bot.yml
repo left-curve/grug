@@ -1,0 +1,27 @@
+---
+- hosts: monitor-bot
+  become: true
+  become_user: "{{ deploy_user }}"
+  remote_user: deploy
+  collections:
+    - community.docker
+  pre_tasks:
+    # The bridge-collateral checks' EVM RPC URLs live in the hyperlane vault
+    # (`relayer.<chain>_rpc_url`), consumed by the role's env template. ovh3
+    # is not in the [hyperlane] group, so the vault is loaded explicitly —
+    # same mechanism as tasks/load-debian-root-secrets.yml.
+    - name: Load hyperlane secrets
+      community.sops.load_vars:
+        file: group_vars/hyperlane/vault.sops.json
+        return_method: facts-only
+      no_log: true
+      become: false
+    - name: Get deploy user info
+      getent:
+        database: passwd
+        key: "{{ deploy_user }}"
+    - name: Set deploy_home fact
+      set_fact:
+        deploy_home: "{{ ansible_facts.getent_passwd[deploy_user][4] }}"
+  roles:
+    - monitor-bot

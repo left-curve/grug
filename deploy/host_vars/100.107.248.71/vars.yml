@@ -2,7 +2,6 @@
 tailscale_ip: 100.107.248.71
 hostname: ovh2
 wireguard_ip: "10.99.0.2"
-s3_enabled: false
 reboot_time: "09:30"
 dango_networks:
   - devnet

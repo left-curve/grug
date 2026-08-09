@@ -153,6 +153,7 @@ where
                 .collect(),
             rate_limits: opt.gateway.rate_limits,
             withdrawal_fees: opt.gateway.withdrawal_fees,
+            guardian: opt.gateway.guardian,
         },
         "dango/gateway",
         "dango/gateway",
@@ -167,9 +168,12 @@ where
         .zip(&addresses)
         .filter_map(|(user, address)| {
             if user.dango_balance.is_non_zero() {
-                Some((*address, coins! {
-                    dango::DENOM.clone() => user.dango_balance,
-                }))
+                Some((
+                    *address,
+                    coins! {
+                        dango::DENOM.clone() => user.dango_balance,
+                    },
+                ))
             } else {
                 None
             }
@@ -288,7 +292,7 @@ where
     B: Into<Binary>,
 {
     let code = code.into();
-    let code_hash = code.hash256();
+    let code_hash = code.sha2_256();
 
     msgs.push(Message::upload(code));
 

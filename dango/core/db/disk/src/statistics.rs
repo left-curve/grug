@@ -18,64 +18,88 @@ use {
 pub const ROCKSDB_STATISTICS: [(&str, &[(&PropName, &str)]); 10] = [
     // ============= BYTES =============
     // Memtable (RAM)
-    ("rocksdb_memtable_bytes", &[
-        (CUR_SIZE_ACTIVE_MEM_TABLE, "cur_size_active"),
-        (CUR_SIZE_ALL_MEM_TABLES, "cur_size_all"),
-        (SIZE_ALL_MEM_TABLES, "size_all"),
-    ]),
+    (
+        "rocksdb_memtable_bytes",
+        &[
+            (CUR_SIZE_ACTIVE_MEM_TABLE, "cur_size_active"),
+            (CUR_SIZE_ALL_MEM_TABLES, "cur_size_all"),
+            (SIZE_ALL_MEM_TABLES, "size_all"),
+        ],
+    ),
     // SST / on-disk space
-    ("rocksdb_sst_bytes", &[
-        (LIVE_SST_FILES_SIZE, "live_sst_files_size"),
-        (TOTAL_SST_FILES_SIZE, "total_sst_files_size"),
-        (ESTIMATE_LIVE_DATA_SIZE, "estimate_live_data_size"),
-    ]),
+    (
+        "rocksdb_sst_bytes",
+        &[
+            (LIVE_SST_FILES_SIZE, "live_sst_files_size"),
+            (TOTAL_SST_FILES_SIZE, "total_sst_files_size"),
+            (ESTIMATE_LIVE_DATA_SIZE, "estimate_live_data_size"),
+        ],
+    ),
     // Compaction backlog (bytes to rewrite)
-    ("rocksdb_compaction_bytes", &[(
-        ESTIMATE_PENDING_COMPACTION_BYTES,
-        "estimate_pending_compaction",
-    )]),
+    (
+        "rocksdb_compaction_bytes",
+        &[(
+            ESTIMATE_PENDING_COMPACTION_BYTES,
+            "estimate_pending_compaction",
+        )],
+    ),
     // Block cache usage
-    ("rocksdb_block_cache_bytes", &[
-        (BLOCK_CACHE_CAPACITY, "capacity"),
-        (BLOCK_CACHE_USAGE, "usage"),
-        (BLOCK_CACHE_PINNED_USAGE, "pinned_usage"),
-    ]),
+    (
+        "rocksdb_block_cache_bytes",
+        &[
+            (BLOCK_CACHE_CAPACITY, "capacity"),
+            (BLOCK_CACHE_USAGE, "usage"),
+            (BLOCK_CACHE_PINNED_USAGE, "pinned_usage"),
+        ],
+    ),
     // ============= COUNTS =============
     // Memtable entries & deletes
-    ("rocksdb_memtable_count", &[
-        (NUM_ENTRIES_ACTIVE_MEM_TABLE, "entries_active"),
-        (NUM_ENTRIES_IMM_MEM_TABLES, "entries_imm"),
-        (NUM_DELETES_ACTIVE_MEM_TABLE, "deletes_active"),
-        (NUM_DELETES_IMM_MEM_TABLES, "deletes_imm"),
-    ]),
+    (
+        "rocksdb_memtable_count",
+        &[
+            (NUM_ENTRIES_ACTIVE_MEM_TABLE, "entries_active"),
+            (NUM_ENTRIES_IMM_MEM_TABLES, "entries_imm"),
+            (NUM_DELETES_ACTIVE_MEM_TABLE, "deletes_active"),
+            (NUM_DELETES_IMM_MEM_TABLES, "deletes_imm"),
+        ],
+    ),
     // Memtable state (immutables, flushes, etc.)
-    ("rocksdb_memtable_state_count", &[
-        (NUM_IMMUTABLE_MEM_TABLE, "immutable"),
-        (NUM_IMMUTABLE_MEM_TABLE_FLUSHED, "immutable_flushed"),
-        (NUM_RUNNING_FLUSHES, "running_flushes"),
-    ]),
+    (
+        "rocksdb_memtable_state_count",
+        &[
+            (NUM_IMMUTABLE_MEM_TABLE, "immutable"),
+            (NUM_IMMUTABLE_MEM_TABLE_FLUSHED, "immutable_flushed"),
+            (NUM_RUNNING_FLUSHES, "running_flushes"),
+        ],
+    ),
     // Active compactions
-    ("rocksdb_compaction_count", &[(
-        NUM_RUNNING_COMPACTIONS,
-        "running_compactions",
-    )]),
+    (
+        "rocksdb_compaction_count",
+        &[(NUM_RUNNING_COMPACTIONS, "running_compactions")],
+    ),
     // LSM structure info
-    ("rocksdb_lsm_count", &[
-        (NUM_LIVE_VERSIONS, "live_versions"),
-        (CURRENT_SUPER_VERSION_NUMBER, "super_version_number"),
-    ]),
+    (
+        "rocksdb_lsm_count",
+        &[
+            (NUM_LIVE_VERSIONS, "live_versions"),
+            (CURRENT_SUPER_VERSION_NUMBER, "super_version_number"),
+        ],
+    ),
     // Background errors
-    ("rocksdb_errors_count", &[(
-        BACKGROUND_ERRORS,
-        "background_errors",
-    )]),
+    (
+        "rocksdb_errors_count",
+        &[(BACKGROUND_ERRORS, "background_errors")],
+    ),
     // ============= FLAGS (0/1) =============
-    ("rocksdb_flags", &[
-        (COMPACTION_PENDING, "compaction_pending"),
-        (MEM_TABLE_FLUSH_PENDING, "memtable_flush_pending"),
-        (IS_WRITE_STOPPED, "is_write_stopped"),
-        (IS_FILE_DELETIONS_ENABLED, "is_file_deletions_enabled"),
-    ]),
+    (
+        "rocksdb_flags",
+        &[
+            (COMPACTION_PENDING, "compaction_pending"),
+            (MEM_TABLE_FLUSH_PENDING, "memtable_flush_pending"),
+            (IS_WRITE_STOPPED, "is_write_stopped"),
+            (IS_FILE_DELETIONS_ENABLED, "is_file_deletions_enabled"),
+        ],
+    ),
 ];
 
 pub(crate) struct StatisticsWorker {

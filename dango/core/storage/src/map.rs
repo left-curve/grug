@@ -389,11 +389,14 @@ mod test {
                 .collect::<StdResult<Vec<_>>>()
                 .unwrap();
 
-            assert_eq!(res, vec![
-                ((1_u64, "name_1".to_string()), "desc_1".to_string()),
-                ((2_u64, "name_2".to_string()), "desc_2".to_string()),
-                ((2_u64, "name_3".to_string()), "desc_3".to_string()),
-            ]);
+            assert_eq!(
+                res,
+                vec![
+                    ((1_u64, "name_1".to_string()), "desc_1".to_string()),
+                    ((2_u64, "name_2".to_string()), "desc_2".to_string()),
+                    ((2_u64, "name_3".to_string()), "desc_3".to_string()),
+                ]
+            );
         }
 
         // `prefix_range` with a min bound, ascending
@@ -408,11 +411,14 @@ mod test {
                 .collect::<StdResult<Vec<_>>>()
                 .unwrap();
 
-            assert_eq!(res, vec![
-                ((3_u64, "name_4".to_string()), "desc_4".to_string()),
-                ((3_u64, "name_5".to_string()), "desc_5".to_string()),
-                ((4_u64, "name_6".to_string()), "desc_6".to_string()),
-            ]);
+            assert_eq!(
+                res,
+                vec![
+                    ((3_u64, "name_4".to_string()), "desc_4".to_string()),
+                    ((3_u64, "name_5".to_string()), "desc_5".to_string()),
+                    ((4_u64, "name_6".to_string()), "desc_6".to_string()),
+                ]
+            );
         }
 
         // `prefix_range` with a max bound, Descending
@@ -445,13 +451,16 @@ mod test {
                 .collect::<StdResult<Vec<_>>>()
                 .unwrap();
 
-            assert_eq!(res, vec![
-                ((4_u64, "name_6".to_string()), "desc_6".to_string()),
-                ((3_u64, "name_5".to_string()), "desc_5".to_string()),
-                ((3_u64, "name_4".to_string()), "desc_4".to_string()),
-                ((2_u64, "name_3".to_string()), "desc_3".to_string()),
-                ((2_u64, "name_2".to_string()), "desc_2".to_string()),
-            ]);
+            assert_eq!(
+                res,
+                vec![
+                    ((4_u64, "name_6".to_string()), "desc_6".to_string()),
+                    ((3_u64, "name_5".to_string()), "desc_5".to_string()),
+                    ((3_u64, "name_4".to_string()), "desc_4".to_string()),
+                    ((2_u64, "name_3".to_string()), "desc_3".to_string()),
+                    ((2_u64, "name_2".to_string()), "desc_2".to_string()),
+                ]
+            );
         }
 
         // `prefix_range` with both min and max bounds, ascending
@@ -466,12 +475,15 @@ mod test {
                 .collect::<StdResult<Vec<_>>>()
                 .unwrap();
 
-            assert_eq!(res, vec![
-                ((2_u64, "name_2".to_string()), "desc_2".to_string()),
-                ((2_u64, "name_3".to_string()), "desc_3".to_string()),
-                ((3_u64, "name_4".to_string()), "desc_4".to_string()),
-                ((3_u64, "name_5".to_string()), "desc_5".to_string()),
-            ]);
+            assert_eq!(
+                res,
+                vec![
+                    ((2_u64, "name_2".to_string()), "desc_2".to_string()),
+                    ((2_u64, "name_3".to_string()), "desc_3".to_string()),
+                    ((3_u64, "name_4".to_string()), "desc_4".to_string()),
+                    ((3_u64, "name_5".to_string()), "desc_5".to_string()),
+                ]
+            );
         }
     }
 }
@@ -663,10 +675,13 @@ mod cosmwasm_tests {
             .collect();
 
         assert_eq!(2, all.len());
-        assert_eq!(all, vec![
-            (b"jim".to_vec(), data_2_raw.clone()),
-            (b"john".to_vec(), data_1_raw.clone())
-        ]);
+        assert_eq!(
+            all,
+            vec![
+                (b"jim".to_vec(), data_2_raw.clone()),
+                (b"john".to_vec(), data_1_raw.clone())
+            ]
+        );
 
         // let's try to iterate over a range
         let all: Vec<_> = PEOPLE
@@ -678,10 +693,13 @@ mod cosmwasm_tests {
             )
             .collect();
         assert_eq!(2, all.len());
-        assert_eq!(all, vec![
-            (b"jim".to_vec(), data_2_raw),
-            (b"john".to_vec(), data_1_raw.clone())
-        ]);
+        assert_eq!(
+            all,
+            vec![
+                (b"jim".to_vec(), data_2_raw),
+                (b"john".to_vec(), data_1_raw.clone())
+            ]
+        );
 
         // let's try to iterate over a more restrictive range
         let all: Vec<_> = PEOPLE
@@ -724,11 +742,14 @@ mod cosmwasm_tests {
             .range(&storage, None, None, Order::Ascending)
             .collect::<StdResult<Vec<_>>>()
             .unwrap();
-        assert_eq!(all, [
-            (b"ada".to_vec(), data3),
-            (b"jim".to_vec(), data2.clone()),
-            (b"john".to_vec(), data.clone())
-        ]);
+        assert_eq!(
+            all,
+            [
+                (b"ada".to_vec(), data3),
+                (b"jim".to_vec(), data2.clone()),
+                (b"john".to_vec(), data.clone())
+            ]
+        );
 
         // let's try to iterate over a range
         let all = PEOPLE
@@ -740,10 +761,10 @@ mod cosmwasm_tests {
             )
             .collect::<StdResult<Vec<_>>>()
             .unwrap();
-        assert_eq!(all, [
-            (b"jim".to_vec(), data2),
-            (b"john".to_vec(), data.clone())
-        ]);
+        assert_eq!(
+            all,
+            [(b"jim".to_vec(), data2), (b"john".to_vec(), data.clone())]
+        );
 
         // let's try to iterate over a more restrictive range
         let all = PEOPLE
@@ -786,11 +807,14 @@ mod cosmwasm_tests {
             .range(&storage, None, None, Order::Ascending)
             .collect::<StdResult<Vec<_>>>()
             .unwrap();
-        assert_eq!(all, [
-            ("ada".to_string(), data3.clone()),
-            ("jim".to_string(), data2.clone()),
-            ("john".to_string(), data.clone())
-        ]);
+        assert_eq!(
+            all,
+            [
+                ("ada".to_string(), data3.clone()),
+                ("jim".to_string(), data2.clone()),
+                ("john".to_string(), data.clone())
+            ]
+        );
 
         // Manually add a broken key (invalid utf-8)
         storage.write(
@@ -819,23 +843,29 @@ mod cosmwasm_tests {
         let all: Vec<_> = PEOPLE_STR
             .range_raw(&storage, None, None, Order::Ascending)
             .collect();
-        assert_eq!(all, [
-            (b"ada".to_vec(), data3.to_borsh_vec().unwrap()),
-            (b"jim".to_vec(), data2.to_borsh_vec().unwrap()),
-            (b"john".to_vec(), data.to_borsh_vec().unwrap()),
-            (b"\xddim".to_vec(), data2.to_borsh_vec().unwrap()),
-        ]);
+        assert_eq!(
+            all,
+            [
+                (b"ada".to_vec(), data3.to_borsh_vec().unwrap()),
+                (b"jim".to_vec(), data2.to_borsh_vec().unwrap()),
+                (b"john".to_vec(), data.to_borsh_vec().unwrap()),
+                (b"\xddim".to_vec(), data2.to_borsh_vec().unwrap()),
+            ]
+        );
 
         // And the same with keys_raw
         let all: Vec<_> = PEOPLE_STR
             .keys_raw(&storage, None, None, Order::Ascending)
             .collect();
-        assert_eq!(all, [
-            b"ada".to_vec(),
-            b"jim".to_vec(),
-            b"john".to_vec(),
-            b"\xddim".to_vec(),
-        ]);
+        assert_eq!(
+            all,
+            [
+                b"ada".to_vec(),
+                b"jim".to_vec(),
+                b"john".to_vec(),
+                b"\xddim".to_vec(),
+            ]
+        );
     }
 
     #[test]
@@ -966,11 +996,10 @@ mod cosmwasm_tests {
             .collect::<StdResult<Vec<_>>>()
             .unwrap();
         // order is correct
-        assert_eq!(all, [
-            (-1234, data),
-            (-56, data2.clone()),
-            (50, data3.clone())
-        ]);
+        assert_eq!(
+            all,
+            [(-1234, data), (-56, data2.clone()), (50, data3.clone())]
+        );
 
         // let's try to iterate over a range
         let all = SIGNED_ID
@@ -1026,11 +1055,10 @@ mod cosmwasm_tests {
             .collect::<StdResult<Vec<_>>>()
             .unwrap();
         // order is correct
-        assert_eq!(all, [
-            (-1234, data),
-            (-56, data2.clone()),
-            (50, data3.clone())
-        ]);
+        assert_eq!(
+            all,
+            [(-1234, data), (-56, data2.clone()), (50, data3.clone())]
+        );
 
         // let's try to iterate over a range
         let all = SIGNED_ID
@@ -1076,30 +1104,36 @@ mod cosmwasm_tests {
         let all: Vec<_> = ALLOWANCE
             .range_raw(&storage, None, None, Order::Ascending)
             .collect();
-        assert_eq!(all, [
-            (
-                (b"owner".to_vec(), b"spender".to_vec()).joined_key(),
-                1000_u64.to_borsh_vec().unwrap()
-            ),
-            (
-                (b"owner".to_vec(), b"spender2".to_vec()).joined_key(),
-                3000_u64.to_borsh_vec().unwrap()
-            ),
-            (
-                (b"owner2".to_vec(), b"spender".to_vec()).joined_key(),
-                5000_u64.to_borsh_vec().unwrap()
-            ),
-        ]);
+        assert_eq!(
+            all,
+            [
+                (
+                    (b"owner".to_vec(), b"spender".to_vec()).joined_key(),
+                    1000_u64.to_borsh_vec().unwrap()
+                ),
+                (
+                    (b"owner".to_vec(), b"spender2".to_vec()).joined_key(),
+                    3000_u64.to_borsh_vec().unwrap()
+                ),
+                (
+                    (b"owner2".to_vec(), b"spender".to_vec()).joined_key(),
+                    5000_u64.to_borsh_vec().unwrap()
+                ),
+            ]
+        );
 
         // let's try to iterate over a prefix
         let all: Vec<_> = ALLOWANCE
             .prefix(b"owner")
             .range_raw(&storage, None, None, Order::Ascending)
             .collect();
-        assert_eq!(all, [
-            (b"spender".to_vec(), 1000_u64.to_borsh_vec().unwrap()),
-            (b"spender2".to_vec(), 3000_u64.to_borsh_vec().unwrap())
-        ]);
+        assert_eq!(
+            all,
+            [
+                (b"spender".to_vec(), 1000_u64.to_borsh_vec().unwrap()),
+                (b"spender2".to_vec(), 3000_u64.to_borsh_vec().unwrap())
+            ]
+        );
     }
 
     #[test]
@@ -1122,11 +1156,14 @@ mod cosmwasm_tests {
             .range(&storage, None, None, Order::Ascending)
             .collect::<StdResult<Vec<_>>>()
             .unwrap();
-        assert_eq!(all, [
-            ((b"owner".to_vec(), b"spender".to_vec()), 1000),
-            ((b"owner".to_vec(), b"spender2".to_vec()), 3000),
-            ((b"owner2".to_vec(), b"spender".to_vec()), 5000)
-        ]);
+        assert_eq!(
+            all,
+            [
+                ((b"owner".to_vec(), b"spender".to_vec()), 1000),
+                ((b"owner".to_vec(), b"spender2".to_vec()), 3000),
+                ((b"owner2".to_vec(), b"spender".to_vec()), 5000)
+            ]
+        );
 
         // let's try to iterate over a prefix
         let all = ALLOWANCE
@@ -1134,10 +1171,10 @@ mod cosmwasm_tests {
             .range(&storage, None, None, Order::Ascending)
             .collect::<StdResult<Vec<_>>>()
             .unwrap();
-        assert_eq!(all, [
-            (b"spender".to_vec(), 1000),
-            (b"spender2".to_vec(), 3000),
-        ]);
+        assert_eq!(
+            all,
+            [(b"spender".to_vec(), 1000), (b"spender2".to_vec(), 3000),]
+        );
 
         // let's try to iterate over a prefixed restricted inclusive range
         let all = ALLOWANCE
@@ -1150,10 +1187,10 @@ mod cosmwasm_tests {
             )
             .collect::<StdResult<Vec<_>>>()
             .unwrap();
-        assert_eq!(all, [
-            (b"spender".to_vec(), 1000),
-            (b"spender2".to_vec(), 3000),
-        ]);
+        assert_eq!(
+            all,
+            [(b"spender".to_vec(), 1000), (b"spender2".to_vec(), 3000),]
+        );
 
         // let's try to iterate over a prefixed restricted exclusive range
         let all = ALLOWANCE
@@ -1191,44 +1228,50 @@ mod cosmwasm_tests {
         let all: Vec<_> = TRIPLE
             .range_raw(&storage, None, None, Order::Ascending)
             .collect();
-        assert_eq!(all, [
-            (
-                (b"owner".to_vec(), 9u8, b"recipient".to_vec()).joined_key(),
-                1000_u64.to_borsh_vec().unwrap()
-            ),
-            (
-                (b"owner".to_vec(), 9u8, b"recipient2".to_vec()).joined_key(),
-                3000_u64.to_borsh_vec().unwrap()
-            ),
-            (
-                (b"owner".to_vec(), 10u8, b"recipient3".to_vec()).joined_key(),
-                3000_u64.to_borsh_vec().unwrap()
-            ),
-            (
-                (b"owner2".to_vec(), 9u8, b"recipient".to_vec()).joined_key(),
-                5000_u64.to_borsh_vec().unwrap()
-            )
-        ]);
+        assert_eq!(
+            all,
+            [
+                (
+                    (b"owner".to_vec(), 9u8, b"recipient".to_vec()).joined_key(),
+                    1000_u64.to_borsh_vec().unwrap()
+                ),
+                (
+                    (b"owner".to_vec(), 9u8, b"recipient2".to_vec()).joined_key(),
+                    3000_u64.to_borsh_vec().unwrap()
+                ),
+                (
+                    (b"owner".to_vec(), 10u8, b"recipient3".to_vec()).joined_key(),
+                    3000_u64.to_borsh_vec().unwrap()
+                ),
+                (
+                    (b"owner2".to_vec(), 9u8, b"recipient".to_vec()).joined_key(),
+                    5000_u64.to_borsh_vec().unwrap()
+                )
+            ]
+        );
 
         // let's iterate over a prefix
         let all: Vec<_> = TRIPLE
             .prefix(b"owner")
             .range_raw(&storage, None, None, Order::Ascending)
             .collect();
-        assert_eq!(all, [
-            (
-                (9u8, b"recipient".to_vec()).joined_key(),
-                1000_u64.to_borsh_vec().unwrap()
-            ),
-            (
-                (9u8, b"recipient2".to_vec()).joined_key(),
-                3000_u64.to_borsh_vec().unwrap()
-            ),
-            (
-                (10u8, b"recipient3".to_vec()).joined_key(),
-                3000_u64.to_borsh_vec().unwrap()
-            )
-        ]);
+        assert_eq!(
+            all,
+            [
+                (
+                    (9u8, b"recipient".to_vec()).joined_key(),
+                    1000_u64.to_borsh_vec().unwrap()
+                ),
+                (
+                    (9u8, b"recipient2".to_vec()).joined_key(),
+                    3000_u64.to_borsh_vec().unwrap()
+                ),
+                (
+                    (10u8, b"recipient3".to_vec()).joined_key(),
+                    3000_u64.to_borsh_vec().unwrap()
+                )
+            ]
+        );
 
         // let's iterate over a sub prefix
         let all: Vec<_> = TRIPLE
@@ -1237,16 +1280,19 @@ mod cosmwasm_tests {
             .range_raw(&storage, None, None, Order::Ascending)
             .collect();
         // Use range() if you want key deserialization
-        assert_eq!(all, [
-            (
-                (b"recipient".to_vec()).joined_key(),
-                1000_u64.to_borsh_vec().unwrap()
-            ),
-            (
-                (b"recipient2".to_vec()).joined_key(),
-                3000_u64.to_borsh_vec().unwrap()
-            ),
-        ]);
+        assert_eq!(
+            all,
+            [
+                (
+                    (b"recipient".to_vec()).joined_key(),
+                    1000_u64.to_borsh_vec().unwrap()
+                ),
+                (
+                    (b"recipient2".to_vec()).joined_key(),
+                    3000_u64.to_borsh_vec().unwrap()
+                ),
+            ]
+        );
     }
 
     #[test]
@@ -1272,12 +1318,15 @@ mod cosmwasm_tests {
             .range(&storage, None, None, Order::Ascending)
             .collect::<StdResult<Vec<_>>>()
             .unwrap();
-        assert_eq!(all, [
-            ((b"owner".to_vec(), 9, "recipient".to_string()), 1000),
-            ((b"owner".to_vec(), 9, "recipient2".to_string()), 3000),
-            ((b"owner".to_vec(), 10, "recipient3".to_string()), 3000),
-            ((b"owner2".to_vec(), 9, "recipient".to_string()), 5000)
-        ]);
+        assert_eq!(
+            all,
+            [
+                ((b"owner".to_vec(), 9, "recipient".to_string()), 1000),
+                ((b"owner".to_vec(), 9, "recipient2".to_string()), 3000),
+                ((b"owner".to_vec(), 10, "recipient3".to_string()), 3000),
+                ((b"owner2".to_vec(), 9, "recipient".to_string()), 5000)
+            ]
+        );
 
         // let's iterate over a sub_prefix
         let all = TRIPLE
@@ -1285,11 +1334,14 @@ mod cosmwasm_tests {
             .range(&storage, None, None, Order::Ascending)
             .collect::<StdResult<Vec<_>>>()
             .unwrap();
-        assert_eq!(all, [
-            ((9, "recipient".to_string()), 1000),
-            ((9, "recipient2".to_string()), 3000),
-            ((10, "recipient3".to_string()), 3000),
-        ]);
+        assert_eq!(
+            all,
+            [
+                ((9, "recipient".to_string()), 1000),
+                ((9, "recipient2".to_string()), 3000),
+                ((10, "recipient3".to_string()), 3000),
+            ]
+        );
 
         // let's iterate over a prefix
         let all = TRIPLE
@@ -1298,10 +1350,13 @@ mod cosmwasm_tests {
             .range(&storage, None, None, Order::Ascending)
             .collect::<StdResult<Vec<_>>>()
             .unwrap();
-        assert_eq!(all, [
-            ("recipient".to_string(), 1000),
-            ("recipient2".to_string(), 3000),
-        ]);
+        assert_eq!(
+            all,
+            [
+                ("recipient".to_string(), 1000),
+                ("recipient2".to_string(), 3000),
+            ]
+        );
 
         // let's try to iterate over a prefixed restricted inclusive range
         let all = TRIPLE
@@ -1315,10 +1370,13 @@ mod cosmwasm_tests {
             )
             .collect::<StdResult<Vec<_>>>()
             .unwrap();
-        assert_eq!(all, [
-            ("recipient".to_string(), 1000),
-            ("recipient2".to_string(), 3000),
-        ]);
+        assert_eq!(
+            all,
+            [
+                ("recipient".to_string(), 1000),
+                ("recipient2".to_string(), 3000),
+            ]
+        );
 
         // let's try to iterate over a prefixed restricted exclusive range
         let all = TRIPLE
@@ -1504,10 +1562,13 @@ mod cosmwasm_tests {
         let all: Vec<_> = PEOPLE
             .range_raw(&storage, None, None, Order::Ascending)
             .collect();
-        assert_eq!(all, [
-            (b"jim".to_vec(), data2.to_borsh_vec().unwrap()),
-            (b"john".to_vec(), data.to_borsh_vec().unwrap())
-        ]);
+        assert_eq!(
+            all,
+            [
+                (b"jim".to_vec(), data2.to_borsh_vec().unwrap()),
+                (b"john".to_vec(), data.to_borsh_vec().unwrap())
+            ]
+        );
 
         // or just show what is after jim
         let all: Vec<_> = PEOPLE
@@ -1536,10 +1597,13 @@ mod cosmwasm_tests {
             .prefix(b"owner")
             .range_raw(&storage, None, None, Order::Ascending)
             .collect();
-        assert_eq!(all, [
-            (b"spender".to_vec(), 1000_u64.to_borsh_vec().unwrap()),
-            (b"spender2".to_vec(), 3000_u64.to_borsh_vec().unwrap())
-        ]);
+        assert_eq!(
+            all,
+            [
+                (b"spender".to_vec(), 1000_u64.to_borsh_vec().unwrap()),
+                (b"spender2".to_vec(), 3000_u64.to_borsh_vec().unwrap())
+            ]
+        );
 
         // Or ranges between two items (even reverse)
         let all: Vec<_> = ALLOWANCE
@@ -1551,10 +1615,10 @@ mod cosmwasm_tests {
                 Order::Descending,
             )
             .collect();
-        assert_eq!(all, [(
-            b"spender2".to_vec(),
-            3000_u64.to_borsh_vec().unwrap()
-        )]);
+        assert_eq!(
+            all,
+            [(b"spender2".to_vec(), 3000_u64.to_borsh_vec().unwrap())]
+        );
     }
 
     #[test]
@@ -1578,10 +1642,13 @@ mod cosmwasm_tests {
             .prefix(5)
             .range_raw(&storage, None, None, Order::Ascending)
             .collect::<Vec<_>>();
-        assert_eq!(fives, [
-            (vec![7, 8, 9], 789_u64.to_borsh_vec().unwrap()),
-            (vec![9, 8, 7], 987_u64.to_borsh_vec().unwrap())
-        ]);
+        assert_eq!(
+            fives,
+            [
+                (vec![7, 8, 9], 789_u64.to_borsh_vec().unwrap()),
+                (vec![9, 8, 7], 987_u64.to_borsh_vec().unwrap())
+            ]
+        );
 
         // using inclusive bounds both sides
         let include = AGES

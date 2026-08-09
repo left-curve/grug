@@ -477,10 +477,13 @@ mod tests {
         }
         // Ring holds 3,4,5; asking from 2 cannot be served.
         let err = rs.subscribe(Some(2), id).err().unwrap();
-        assert_eq!(err, ResyncRequired {
-            requested_from: 2,
-            ring_floor: 3,
-        });
+        assert_eq!(
+            err,
+            ResyncRequired {
+                requested_from: 2,
+                ring_floor: 3,
+            }
+        );
     }
 
     #[tokio::test]

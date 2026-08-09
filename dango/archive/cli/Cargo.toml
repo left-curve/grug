@@ -1,0 +1,36 @@
+[package]
+authors       = { workspace = true }
+categories    = { workspace = true }
+documentation = { workspace = true }
+edition       = { workspace = true }
+license       = { workspace = true }
+name          = "dango-archive-cli"
+repository    = { workspace = true }
+rust-version  = { workspace = true }
+version       = { workspace = true }
+
+[[bin]]
+name = "archive"
+path = "src/main.rs"
+
+[dependencies]
+anyhow                      = { workspace = true }
+clap                        = { workspace = true, features = ["wrap_help"] }
+dango-archive-app           = { workspace = true, features = ["metrics", "tracing"] }
+dango-archive-block-source  = { workspace = true, features = ["metrics", "tracing"] }
+dango-archive-httpd         = { workspace = true, features = ["metrics", "tracing"] }
+dango-archive-projection    = { workspace = true, features = ["metrics", "tracing"] }
+dango-config-parser         = { workspace = true }
+dango-indexer-cache         = { workspace = true, features = ["metrics", "tracing"] }
+dango-indexer-metrics       = { workspace = true, features = ["tracing"] }
+dango-primitives            = { workspace = true }
+dango-sdk                   = { workspace = true, features = ["tracing"] }
+dango-types                 = { workspace = true }
+home                        = { workspace = true }
+metrics                     = { workspace = true }
+metrics-exporter-prometheus = { workspace = true }
+sea-orm                     = { workspace = true }
+serde                       = { workspace = true, features = ["derive"] }
+tokio                       = { workspace = true }
+tracing                     = { workspace = true }
+tracing-subscriber          = { workspace = true }

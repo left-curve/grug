@@ -226,8 +226,8 @@ mod tests {
         assert!(
             verify_membership_proof(
                 HASH_ROOT,
-                key.as_bytes().hash256(),
-                value.as_bytes().hash256(),
+                key.as_bytes().sha2_256(),
+                value.as_bytes().sha2_256(),
                 &proof,
             )
             .is_ok()
@@ -262,7 +262,7 @@ mod tests {
         "proving o"
     )]
     fn verifying_non_membership(key: &str, proof: NonMembershipProof) {
-        assert!(verify_non_membership_proof(HASH_ROOT, key.as_bytes().hash256(), &proof).is_ok());
+        assert!(verify_non_membership_proof(HASH_ROOT, key.as_bytes().sha2_256(), &proof).is_ok());
     }
 
     // TODO: add fail cases for proofs

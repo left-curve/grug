@@ -88,6 +88,8 @@ scrape_configs:
         - 'hetzner4:9100'
         - 'hetzner5:9100'
         - 'hetzner6:9100'
+        - 'hetzner7:9100'
+        - 'hetzner8:9100'
     relabel_configs:
     - source_labels: [__address__]
       regex: 'node-exporter:9100'
@@ -110,6 +112,8 @@ scrape_configs:
         - 'hetzner4:9101'
         - 'hetzner5:9101'
         - 'hetzner6:9101'
+        - 'hetzner7:9101'
+        - 'hetzner8:9101'
     relabel_configs:
     - source_labels: [__address__]
       regex: 'cadvisor:8080'
@@ -157,6 +161,8 @@ scrape_configs:
       - targets: ['hetzner4:9080']
       - targets: ['hetzner5:9080']
       - targets: ['hetzner6:9080']
+      - targets: ['hetzner7:9080']
+      - targets: ['hetzner8:9080']
     relabel_configs:
     - source_labels: [__address__]
       regex: 'promtail:9080'
@@ -352,6 +358,21 @@ scrape_configs:
           environment: 'production'
           network: 'system'
           dango_network: 'system'
+# Archive hosts (from the [archive] group): their host-level postgres holds
+# the projection tables, so it is labeled with the host's real network — the
+# archive dashboard filters pg_database_size by dango_network. The network is
+# derived from archive_instances (like the 'archive' job below): since #2222
+# these hosts run no dango node and their dango_networks is empty.
+{% for host in groups['archive'] | default([]) %}
+{%   set hn = hostvars[host].hostname | default(host) %}
+{%   set net = hostvars[host].archive_instances | default([]) | map(attribute='name') | first | default('system') %}
+      - targets: ['{{ hn }}:9187']
+        labels:
+          service: 'postgres'
+          environment: 'production'
+          network: '{{ net }}'
+          dango_network: '{{ net }}'
+{% endfor %}
 
   - job_name: 'dango'
     static_configs:
@@ -468,6 +489,32 @@ scrape_configs:
           network: 'mainnet'
           dango_network: 'mainnet'
 
+  - job_name: 'batch-block-backup'
+    static_configs:
+      - targets: ['hetzner2:9320']
+        labels:
+          service: 'batch-block-backup'
+          environment: 'production'
+          network: 'testnet'
+          dango_network: 'testnet'
+      - targets: ['hetzner1:9320']
+        labels:
+          service: 'batch-block-backup'
+          environment: 'production'
+          network: 'mainnet'
+          dango_network: 'mainnet'
+
+  # The monitor bot runs on ovh3 itself (see [monitor-bot] in the inventory);
+  # the target still goes through the wireguard hostname like every other one.
+  - job_name: 'monitor-bot'
+    static_configs:
+      - targets: ['ovh3:9332']
+        labels:
+          service: 'monitor-bot'
+          environment: 'production'
+          network: 'mainnet'
+          dango_network: 'mainnet'
+
   - job_name: 'points-bot'
     static_configs:
       - targets: ['ovh2:9300']
@@ -488,3 +535,20 @@ scrape_configs:
           environment: 'production'
           network: 'mainnet'
           dango_network: 'mainnet'
+
+  # Archive indexer instances — derived from the [archive] group's host_vars
+  # (`archive_instances`), so new instances/hosts are picked up automatically.
+  # Reached over wireguard like every other target (extra_hosts *wg-hosts).
+  - job_name: 'archive'
+    static_configs:
+{% for host in groups['archive'] | default([]) %}
+{%   set hn = hostvars[host].hostname | default(host) %}
+{%   for inst in hostvars[host].archive_instances | default([]) %}
+      - targets: ['{{ hn }}:{{ inst.metrics_host_port }}']
+        labels:
+          service: 'archive'
+          environment: 'production'
+          network: '{{ inst.name }}'
+          dango_network: '{{ inst.name }}'
+{%   endfor %}
+{% endfor %}

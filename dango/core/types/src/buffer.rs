@@ -295,12 +295,18 @@ where
         }
     }
 
+    /// Consume the next pending entry.
+    ///
+    /// Returns `None` both when the entry is a deletion — which yields no item
+    /// and leaves the caller to keep looking — and when there are no pending
+    /// entries left. The caller distinguishes the two by re-inspecting the
+    /// iterators, so both cases are handled by simply continuing the loop.
     fn take_pending(&mut self) -> Option<I> {
         let (key, op) = self.pending.next()?;
 
         match op {
             Op::Insert(value) => Some(I::from_key_value(key, value)),
-            Op::Delete => self.next(),
+            Op::Delete => None,
         }
     }
 }
@@ -314,26 +320,41 @@ where
     type Item = I;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match (self.base.peek(), self.pending.peek()) {
-            (Some(i), Some((pending_key, _))) => {
-                let ordering_raw = i.as_key().cmp(pending_key);
-                let ordering = match self.order {
-                    Order::Ascending => ordering_raw,
-                    Order::Descending => ordering_raw.reverse(),
-                };
+        // Loop rather than recurse on deleted keys. A range over a region where
+        // many contiguous keys have been deleted in the same buffer — a mass
+        // prune, say — would otherwise consume one stack frame per deletion and
+        // overflow the stack.
+        loop {
+            let item = match (self.base.peek(), self.pending.peek()) {
+                (Some(i), Some((pending_key, _))) => {
+                    let ordering_raw = i.as_key().cmp(pending_key);
+                    let ordering = match self.order {
+                        Order::Ascending => ordering_raw,
+                        Order::Descending => ordering_raw.reverse(),
+                    };
 
-                match ordering {
-                    Ordering::Less => self.base.next(),
-                    Ordering::Equal => {
-                        self.base.next();
-                        self.take_pending()
-                    },
-                    Ordering::Greater => self.take_pending(),
-                }
-            },
-            (None, Some(_)) => self.take_pending(),
-            (Some(_), None) => self.base.next(),
-            (None, None) => None,
+                    match ordering {
+                        Ordering::Less => return self.base.next(),
+                        Ordering::Equal => {
+                            // The pending entry shadows the base one, so drop
+                            // the latter whichever way the former resolves.
+                            self.base.next();
+                            self.take_pending()
+                        },
+                        Ordering::Greater => self.take_pending(),
+                    }
+                },
+                (None, Some(_)) => self.take_pending(),
+                (Some(_), None) => return self.base.next(),
+                (None, None) => return None,
+            };
+
+            // A deleted key yields nothing; both iterators have advanced, so
+            // keep going. Every path through the loop consumes at least one
+            // entry, so this terminates.
+            if item.is_some() {
+                return item;
+            }
         }
     }
 }
@@ -415,5 +436,53 @@ mod tests {
 
         merged.reverse();
         assert_eq!(collect_records(&buffer, Order::Descending), merged);
+    }
+
+    /// Iterating across a long run of deleted keys must cost no stack, so that
+    /// wiping a large map and then reading it back stays within the thread's
+    /// stack — worker threads get a couple of megabytes, far less than one
+    /// frame per deleted key would need.
+    ///
+    /// Run on a thread with a deliberately small stack so that a per-deletion
+    /// frame cost fails here rather than only at production scale.
+    #[test]
+    fn iterating_over_many_deletions_is_not_recursive() {
+        const KEYS: u32 = 200_000;
+        const STACK_SIZE: usize = 256 * 1024;
+
+        std::thread::Builder::new()
+            .stack_size(STACK_SIZE)
+            .spawn(|| {
+                let mut base = MockStorage::new();
+
+                for i in 0..KEYS {
+                    base.write(&i.to_be_bytes(), &[1]);
+                }
+
+                let mut buffer = Buffer::new_unnamed(base, None);
+
+                // Delete everything but the final key, so reaching it has to
+                // step over the whole run of tombstones.
+                for i in 0..KEYS - 1 {
+                    buffer.remove(&i.to_be_bytes());
+                }
+
+                let records = collect_records(&buffer, Order::Ascending);
+
+                assert_eq!(records, vec![((KEYS - 1).to_be_bytes().to_vec(), vec![1])]);
+
+                // The same holds in reverse: the tombstones are then walked
+                // before any surviving key is reached.
+                buffer.remove(&(KEYS - 1).to_be_bytes());
+                buffer.write(&[0], &[7]);
+
+                assert_eq!(
+                    collect_records(&buffer, Order::Descending),
+                    vec![(vec![0], vec![7])]
+                );
+            })
+            .unwrap()
+            .join()
+            .unwrap();
     }
 }

@@ -135,7 +135,6 @@ describe("Header shell", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("geoblock banner");
     expect(screen.getByTestId("testnet-banner")).toBeInTheDocument();
     expect(screen.getByTestId("search-menu")).toBeInTheDocument();
-    expect(document.querySelector("#quest-banner")).toBeNull();
     expect(document.querySelector("#trade-buttons")).not.toBeNull();
     expect(screen.getByRole("link", { name: "dango logo" })).toHaveAttribute("href", "/");
   });

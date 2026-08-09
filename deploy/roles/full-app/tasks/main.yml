@@ -17,10 +17,6 @@
 - import_tasks: stop_previous.yml
   when: system_wide_directories
 - import_tasks: deploy_configs.yml
-- import_tasks: create_s3_bucket.yml
-  when: s3_enabled | default(false)
-- import_tasks: s3_sync_cron.yml
-  when: s3_enabled | default(false)
 - import_tasks: verify_signatures.yml
   when: verify_signatures
 # Always resolve digests to fill in any images not verified by cosign
@@ -29,6 +25,7 @@
 - import_tasks: perps_bot.yml
   when: perps_bot_enabled
 - import_tasks: perp_liquidator.yml
+- import_tasks: withdrawal_approver.yml
 - import_tasks: create_databases.yml
 - import_tasks: deploy_standalone.yml
 - import_tasks: update_traefik.yml

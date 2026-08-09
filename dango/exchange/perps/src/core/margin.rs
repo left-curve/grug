@@ -382,13 +382,16 @@ mod tests {
             },
             ..Default::default()
         };
-        let perp_querier = NoCachePerpQuerier::new_mock(Default::default(), hash_map! {
-            perp_eth::DENOM.clone() => PairState {
-                funding_per_unit: FundingPerUnit::new_int(0),
-                index_price: UsdPrice::new_percent(250_000),
-                ..Default::default()
-            }
-        });
+        let perp_querier = NoCachePerpQuerier::new_mock(
+            Default::default(),
+            hash_map! {
+                perp_eth::DENOM.clone() => PairState {
+                    funding_per_unit: FundingPerUnit::new_int(0),
+                    index_price: UsdPrice::new_percent(250_000),
+                    ..Default::default()
+                }
+            },
+        );
 
         assert_eq!(
             compute_user_equity(&perp_querier, &user_state).unwrap(),
@@ -415,13 +418,16 @@ mod tests {
             },
             ..Default::default()
         };
-        let perp_querier = NoCachePerpQuerier::new_mock(Default::default(), hash_map! {
-            perp_eth::DENOM.clone() => PairState {
-                funding_per_unit: FundingPerUnit::new_int(3),
-                index_price: UsdPrice::new_percent(250_000),
-                ..Default::default()
+        let perp_querier = NoCachePerpQuerier::new_mock(
+            Default::default(),
+            hash_map! {
+                perp_eth::DENOM.clone() => PairState {
+                    funding_per_unit: FundingPerUnit::new_int(3),
+                    index_price: UsdPrice::new_percent(250_000),
+                    ..Default::default()
+                },
             },
-        });
+        );
 
         assert_eq!(
             compute_user_equity(&perp_querier, &user_state).unwrap(),
@@ -457,18 +463,21 @@ mod tests {
             },
             ..Default::default()
         };
-        let perp_querier = NoCachePerpQuerier::new_mock(Default::default(), hash_map! {
-            perp_eth::DENOM.clone() => PairState {
-                funding_per_unit: FundingPerUnit::new_int(3),
-                index_price: UsdPrice::new_percent(250_000),
-                ..Default::default()
+        let perp_querier = NoCachePerpQuerier::new_mock(
+            Default::default(),
+            hash_map! {
+                perp_eth::DENOM.clone() => PairState {
+                    funding_per_unit: FundingPerUnit::new_int(3),
+                    index_price: UsdPrice::new_percent(250_000),
+                    ..Default::default()
+                },
+                perp_btc::DENOM.clone() => PairState {
+                    funding_per_unit: FundingPerUnit::new_int(0),
+                    index_price: UsdPrice::new_percent(4_800_000),
+                    ..Default::default()
+                },
             },
-            perp_btc::DENOM.clone() => PairState {
-                funding_per_unit: FundingPerUnit::new_int(0),
-                index_price: UsdPrice::new_percent(4_800_000),
-                ..Default::default()
-            },
-        });
+        );
 
         assert_eq!(
             compute_user_equity(&perp_querier, &user_state).unwrap(),
@@ -494,13 +503,16 @@ mod tests {
             },
             ..Default::default()
         };
-        let perp_querier = NoCachePerpQuerier::new_mock(Default::default(), hash_map! {
-            perp_eth::DENOM.clone() => PairState {
-                funding_per_unit: FundingPerUnit::new_int(0),
-                index_price: UsdPrice::new_percent(150_000),
-                ..Default::default()
+        let perp_querier = NoCachePerpQuerier::new_mock(
+            Default::default(),
+            hash_map! {
+                perp_eth::DENOM.clone() => PairState {
+                    funding_per_unit: FundingPerUnit::new_int(0),
+                    index_price: UsdPrice::new_percent(150_000),
+                    ..Default::default()
+                },
             },
-        });
+        );
 
         assert_eq!(
             compute_user_equity(&perp_querier, &user_state).unwrap(),

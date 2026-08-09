@@ -171,6 +171,13 @@ const modals: Record<(typeof Modals)[keyof typeof Modals], ModalDefinition> = {
       })),
     ),
   },
+  [Modals.WindingDown]: {
+    component: lazyWithRetry(() =>
+      import("./WindingDown").then(({ WindingDown }) => ({
+        default: WindingDown,
+      })),
+    ),
+  },
   [Modals.EditCommissionRate]: {
     component: lazyWithRetry(() =>
       import("./EditCommissionRate").then(({ EditCommissionRate }) => ({

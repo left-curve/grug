@@ -18,11 +18,6 @@ export type TypedDataProperty = {
   type: SolidityTypes;
 };
 
-export type TypedDataParameter<T = TypedDataProperty> = {
-  type: T[];
-  extraTypes: Record<string, TypedDataProperty[]>;
-};
-
 export type SolidityTypes =
   | "string"
   | "address"
@@ -43,36 +38,25 @@ export type MessageType = [
   { name: "sender"; type: "address" },
   { name: "data"; type: "Metadata" },
   { name: "gas_limit"; type: "uint32" },
-  { name: "messages"; type: "TxMessage[]" },
+  { name: "messages"; type: "string[]" },
 ];
 
 export type MetadataType = [
-  { name: "username"; type: "string" },
-  { name: "chainId"; type: "string" },
+  { name: "user_index"; type: "uint32" },
+  { name: "chain_id"; type: "string" },
   { name: "nonce"; type: "uint32" },
 ];
 
-export type TxMessageType =
-  | { name: "configure"; type: "Configure" }
-  | { name: "upgrade"; type: "Upgrade" }
-  | { name: "transfer"; type: "Transfer" }
-  | { name: "upload"; type: "Upload" }
-  | { name: "instantiate"; type: "Instantiate" }
-  | { name: "execute"; type: "Execute" }
-  | { name: "migrate"; type: "Migrate" };
-
-export type TypedData<TType extends TxMessageType | unknown = TxMessageType | unknown> = {
-  types: EIP712Types<TType>;
+export type TypedData = {
+  types: EIP712Types;
   primaryType: "Message";
   domain: EIP712Domain;
   message: EIP712Message;
 };
 
-export type EIP712Types<TMessage extends TxMessageType | unknown = TxMessageType | unknown> =
-  Record<"Message", MessageType> &
-    Record<"TxMessage", TMessage[]> &
-    Record<"Metadata", TypedDataProperty[]> &
-    Record<"EIP712Domain", DomainType>;
+export type EIP712Types = Record<"Message", MessageType> &
+  Record<"Metadata", TypedDataProperty[]> &
+  Record<"EIP712Domain", DomainType>;
 
 export type EIP712Message = {
   sender: Address;

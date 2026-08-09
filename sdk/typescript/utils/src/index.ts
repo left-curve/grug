@@ -61,11 +61,7 @@ export {
   isMobileOrTable,
 } from "./browser.js";
 
-export {
-  getCoinsTypedData,
-  composeTxTypedData,
-  composeArbitraryTypedData,
-} from "./typedData.js";
+export { composeTxTypedData, composeArbitraryTypedData } from "./typedData.js";
 
 export {
   type FormatNumberOptions,

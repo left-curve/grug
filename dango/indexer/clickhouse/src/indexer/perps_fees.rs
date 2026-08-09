@@ -489,6 +489,8 @@ mod tests {
             client_order_id: None,
             fill_id: Some(Uint64::new(42)),
             is_maker: Some(false),
+            remaining_order_size: None,
+            remaining_position_size: None,
         }
     }
 
@@ -500,6 +502,7 @@ mod tests {
             fill_price: UsdPrice::new_int(fill_price_int),
             realized_pnl: UsdValue::new_int(0),
             realized_funding: Some(UsdValue::new_int(0)),
+            remaining_position_size: None,
         }
     }
 

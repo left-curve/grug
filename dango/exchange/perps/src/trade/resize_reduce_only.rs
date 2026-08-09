@@ -380,13 +380,16 @@ mod tests {
     fn user_state_with(position: i128, reserved: i128, open_orders: usize) -> UserState {
         let mut positions = BTreeMap::new();
         if position != 0 {
-            positions.insert(pair(), Position {
-                size: Quantity::new_int(position),
-                entry_price: UsdPrice::new_int(2_000),
-                entry_funding_per_unit: FundingPerUnit::ZERO,
-                conditional_order_above: None,
-                conditional_order_below: None,
-            });
+            positions.insert(
+                pair(),
+                Position {
+                    size: Quantity::new_int(position),
+                    entry_price: UsdPrice::new_int(2_000),
+                    entry_funding_per_unit: FundingPerUnit::ZERO,
+                    conditional_order_above: None,
+                    conditional_order_below: None,
+                },
+            );
         }
         UserState {
             unlocks: VecDeque::new(),

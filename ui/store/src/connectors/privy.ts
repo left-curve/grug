@@ -1,9 +1,9 @@
-import { decodeHex, encodeBase64, encodeUtf8 } from "@left-curve/encoding";
+import { decodeHex, encodeBase64, encodeUtf8, sortedJsonStringify } from "@left-curve/encoding";
 
 import { createKeyHash, createSignerClient, toAccount } from "@left-curve/sdk";
 import { getUser } from "@left-curve/sdk/actions";
 
-import { composeArbitraryTypedData } from "@left-curve/utils";
+import { camelToSnake, composeArbitraryTypedData, recursiveTransform } from "@left-curve/utils";
 import { createConnector } from "./createConnector.js";
 
 import Privy, {
@@ -12,7 +12,7 @@ import Privy, {
   LocalStorage,
 } from "@privy-io/js-sdk-core";
 
-import type { Eip712Signature } from "@left-curve/types";
+import type { Eip712Signature, JsonValue } from "@left-curve/types";
 import type { Address } from "@left-curve/types";
 import type { EIP1193Provider } from "../types/eip1193.js";
 
@@ -151,7 +151,19 @@ export function privy(parameters: PrivyConnectorParameters) {
         await this.switchChain?.({ chainId: ETHEREUM_HEX_CHAIN_ID });
         const [controllerAddress] = await provider.request({ method: "eth_requestAccounts" });
 
-        const typedData = composeArbitraryTypedData({ message, types, primaryType });
+        // EIP-712 has no sum type, so any field the doc declares as `string`
+        // but whose value is an object (e.g. onboarding's `key`, a `Key` enum)
+        // is bound as its canonical JSON string -- matching the chain's
+        // reconstruction. The non-EIP-712 signers sign the object form instead.
+        const boundMessage = { ...(message as Record<string, JsonValue>) };
+        for (const { name, type } of types[primaryType] ?? []) {
+          const value = boundMessage[name];
+          if (type === "string" && typeof value === "object" && value !== null) {
+            boundMessage[name] = sortedJsonStringify(recursiveTransform(value, camelToSnake));
+          }
+        }
+
+        const typedData = composeArbitraryTypedData({ message: boundMessage, types, primaryType });
         const signData = JSON.stringify(typedData);
 
         const signature = await provider.request({
@@ -176,7 +188,19 @@ export function privy(parameters: PrivyConnectorParameters) {
         await this.switchChain?.({ chainId: ETHEREUM_HEX_CHAIN_ID });
         const [controllerAddress] = await provider.request({ method: "eth_requestAccounts" });
 
-        const signData = JSON.stringify(signDoc);
+        // EIP-712 has no sum type, so bind each message as its canonical JSON
+        // string (recursively key-sorted, compact) -- matching the `string[]`
+        // type declared in the doc and the chain's reconstruction. The rest of
+        // the doc (shared with the non-EIP-712 signers) keeps message objects.
+        const eip712SignDoc = {
+          ...signDoc,
+          message: {
+            ...signDoc.message,
+            messages: signDoc.message.messages.map((msg) => sortedJsonStringify(msg)),
+          },
+        };
+
+        const signData = JSON.stringify(eip712SignDoc);
 
         const signature = await provider.request({
           method: "eth_signTypedData_v4",

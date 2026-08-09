@@ -3,7 +3,6 @@ use {
     byteorder::LE,
     dango_app::{AppError, Db, Indexer, ProposalPreparer, Vm},
     dango_db_memory::MemDb,
-    dango_identity::Identity256,
     dango_math::Fraction,
     dango_order_book::UsdPrice,
     dango_primitives::{
@@ -78,10 +77,7 @@ impl MockPythSigner {
             .expect("payload serialization");
 
         let hash = dango_crypto::keccak256(&payload_bytes);
-        let (sig, recovery_id) = self
-            .signing_key
-            .sign_digest_recoverable(Identity256::from(hash))
-            .expect("signing");
+        let (sig, recovery_id) = self.signing_key.sign_prehash_recoverable(&hash);
 
         LeEcdsaMessage {
             payload: Binary::from_inner(payload_bytes),
@@ -95,7 +91,7 @@ pub fn mock_pyth_trusted_signer() -> Binary {
     let sk = SigningKey::from_bytes(&MOCK_SIGNER_SECRET.into()).expect("valid secret key");
     let pk: ByteArray<33> = sk
         .verifying_key()
-        .to_encoded_point(true)
+        .to_sec1_point(true)
         .to_bytes()
         .as_ref()
         .try_into()

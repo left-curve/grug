@@ -61,6 +61,6 @@ impl Addr {
         preimage.extend_from_slice(deployer.as_ref());
         preimage.extend_from_slice(code_hash.as_ref());
         preimage.extend_from_slice(salt);
-        Self::from_inner(preimage.hash256().hash160().into_inner())
+        Self::from_inner(preimage.sha2_256().ripemd160().into_inner())
     }
 }

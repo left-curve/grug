@@ -7,6 +7,7 @@
       - dango
       - cometbft
       - perp-liquidator
+      - withdrawal-approver
     cometbft_rpc_port: 26657
   vars_files:
     - roles/full-app/vars/main.yml
@@ -58,11 +59,14 @@
     - name: Show services
       debug: var=compose_services.stdout_lines
 
+    # Intersect with the services actually present in this deployment's
+    # compose file: host-gated services (perp-liquidator, withdrawal-approver)
+    # don't exist on every host, and compose errors on unknown service names.
     - name: Start service and wait to be healthy
       community.docker.docker_compose_v2:
         project_name: "{{ current_deployment }}"
         project_src: "{{ deployment_dir }}"
-        services: "{{ services }}"
+        services: "{{ services | intersect(compose_services.stdout_lines) }}"
         state: present
         recreate: always
         wait: true

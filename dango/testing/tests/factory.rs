@@ -29,13 +29,16 @@ use {
 #[tokio::test]
 async fn onboarding_without_deposit() {
     let (suite, mut accounts, codes, contracts, validator_sets) =
-        setup_test_naive_with_custom_genesis(Default::default(), GenesisOption {
-            account: AccountOption {
-                minimum_deposit: coins! { usdc::DENOM.clone() => 10_000_000 },
+        setup_test_naive_with_custom_genesis(
+            Default::default(),
+            GenesisOption {
+                account: AccountOption {
+                    minimum_deposit: coins! { usdc::DENOM.clone() => 10_000_000 },
+                    ..Preset::preset_test()
+                },
                 ..Preset::preset_test()
             },
-            ..Preset::preset_test()
-        });
+        );
     let mut suite = HyperlaneTestSuite::new(suite, validator_sets, &contracts);
 
     // Make an empty block to advance block height from 0 to 1.
@@ -52,7 +55,7 @@ async fn onboarding_without_deposit() {
     let user = TestAccount::new_random().predict_address(
         contracts.account_factory,
         3,
-        codes.account.to_bytes().hash256(),
+        codes.account.to_bytes().sha2_256(),
         true,
     );
 
@@ -157,21 +160,23 @@ async fn onboarding_without_deposit() {
 /// activate) an inactive account.
 #[tokio::test]
 async fn inactive_account_rejects_transfer_from_non_gateway() {
-    let (mut suite, mut accounts, codes, contracts, _) =
-        setup_test_naive_with_custom_genesis(Default::default(), GenesisOption {
+    let (mut suite, mut accounts, codes, contracts, _) = setup_test_naive_with_custom_genesis(
+        Default::default(),
+        GenesisOption {
             account: AccountOption {
                 minimum_deposit: coins! { usdc::DENOM.clone() => 10_000_000 },
                 ..Preset::preset_test()
             },
             ..Preset::preset_test()
-        });
+        },
+    );
 
     let chain_id = suite.chain_id.clone();
 
     let user = TestAccount::new_random().predict_address(
         contracts.account_factory,
         3,
-        codes.account.to_bytes().hash256(),
+        codes.account.to_bytes().sha2_256(),
         true,
     );
 
@@ -230,13 +235,16 @@ async fn inactive_account_rejects_transfer_from_non_gateway() {
 #[tokio::test]
 async fn gateway_deposit_activates_account() {
     let (suite, mut accounts, codes, contracts, validator_sets) =
-        setup_test_naive_with_custom_genesis(Default::default(), GenesisOption {
-            account: AccountOption {
-                minimum_deposit: coins! { usdc::DENOM.clone() => 10_000_000 },
+        setup_test_naive_with_custom_genesis(
+            Default::default(),
+            GenesisOption {
+                account: AccountOption {
+                    minimum_deposit: coins! { usdc::DENOM.clone() => 10_000_000 },
+                    ..Preset::preset_test()
+                },
                 ..Preset::preset_test()
             },
-            ..Preset::preset_test()
-        });
+        );
     let mut suite = HyperlaneTestSuite::new(suite, validator_sets, &contracts);
 
     // Make an empty block so that subsequent transactions are processed at a
@@ -248,7 +256,7 @@ async fn gateway_deposit_activates_account() {
     let user = TestAccount::new_random().predict_address(
         contracts.account_factory,
         3,
-        codes.account.to_bytes().hash256(),
+        codes.account.to_bytes().sha2_256(),
         true,
     );
 
@@ -305,13 +313,16 @@ async fn gateway_deposit_activates_account() {
 #[tokio::test]
 async fn gateway_transfer_to_inactive_account_is_accepted() {
     let (suite, mut accounts, codes, contracts, validator_sets) =
-        setup_test_naive_with_custom_genesis(Default::default(), GenesisOption {
-            account: AccountOption {
-                minimum_deposit: coins! { usdc::DENOM.clone() => 10_000_000 },
+        setup_test_naive_with_custom_genesis(
+            Default::default(),
+            GenesisOption {
+                account: AccountOption {
+                    minimum_deposit: coins! { usdc::DENOM.clone() => 10_000_000 },
+                    ..Preset::preset_test()
+                },
                 ..Preset::preset_test()
             },
-            ..Preset::preset_test()
-        });
+        );
     let mut suite = HyperlaneTestSuite::new(suite, validator_sets, &contracts);
 
     suite.make_empty_block().await;
@@ -321,7 +332,7 @@ async fn gateway_transfer_to_inactive_account_is_accepted() {
     let user = TestAccount::new_random().predict_address(
         contracts.account_factory,
         3,
-        codes.account.to_bytes().hash256(),
+        codes.account.to_bytes().sha2_256(),
         true,
     );
 
@@ -384,13 +395,16 @@ async fn gateway_transfer_to_inactive_account_is_accepted() {
 #[tokio::test]
 async fn gateway_deposits_accumulate_to_activate() {
     let (suite, mut accounts, codes, contracts, validator_sets) =
-        setup_test_naive_with_custom_genesis(Default::default(), GenesisOption {
-            account: AccountOption {
-                minimum_deposit: coins! { usdc::DENOM.clone() => 10_000_000 },
+        setup_test_naive_with_custom_genesis(
+            Default::default(),
+            GenesisOption {
+                account: AccountOption {
+                    minimum_deposit: coins! { usdc::DENOM.clone() => 10_000_000 },
+                    ..Preset::preset_test()
+                },
                 ..Preset::preset_test()
             },
-            ..Preset::preset_test()
-        });
+        );
     let mut suite = HyperlaneTestSuite::new(suite, validator_sets, &contracts);
 
     suite.make_empty_block().await;
@@ -400,7 +414,7 @@ async fn gateway_deposits_accumulate_to_activate() {
     let user = TestAccount::new_random().predict_address(
         contracts.account_factory,
         3,
-        codes.account.to_bytes().hash256(),
+        codes.account.to_bytes().sha2_256(),
         true,
     );
 
@@ -480,7 +494,7 @@ async fn onboarding_without_deposit_when_minimum_deposit_is_zero() {
     let user = TestAccount::new_random().predict_address(
         contracts.account_factory,
         3,
-        codes.account.to_bytes().hash256(),
+        codes.account.to_bytes().sha2_256(),
         true,
     );
 
@@ -571,7 +585,7 @@ async fn onboarding_with_deposit_when_minimum_deposit_is_zero() {
     let user = TestAccount::new_random().predict_address(
         contracts.account_factory,
         3,
-        codes.account.to_bytes().hash256(),
+        codes.account.to_bytes().sha2_256(),
         true,
     );
 
@@ -652,7 +666,7 @@ async fn onboarding_with_funds_attached_is_rejected() {
     let user = TestAccount::new_random().predict_address(
         contracts.account_factory,
         3,
-        codes.account.to_bytes().hash256(),
+        codes.account.to_bytes().sha2_256(),
         true,
     );
 
@@ -693,7 +707,7 @@ async fn update_key() {
     let user = TestAccount::new_random().predict_address(
         contracts.account_factory,
         0,
-        codes.account.to_bytes().hash256(),
+        codes.account.to_bytes().sha2_256(),
         true,
     );
 
@@ -756,7 +770,7 @@ async fn update_key() {
 
     // Add a new key to the user's account.
     let (_, pk) = TestAccount::new_key_pair();
-    let key_hash = pk.to_json_vec().unwrap().hash256();
+    let key_hash = pk.to_json_vec().unwrap().sha2_256();
     suite
         .execute(
             &mut user,
@@ -870,7 +884,7 @@ async fn new_user_gets_default_username() {
     let user = TestAccount::new_random().predict_address(
         contracts.account_factory,
         0,
-        codes.account.to_bytes().hash256(),
+        codes.account.to_bytes().sha2_256(),
         true,
     );
 

@@ -78,10 +78,13 @@ mod tests {
     /// Seed `STATE` with the given treasury balance (all other fields default).
     fn seed_treasury(storage: &mut dyn Storage, treasury: UsdValue) {
         STATE
-            .save(storage, &State {
-                treasury,
-                ..Default::default()
-            })
+            .save(
+                storage,
+                &State {
+                    treasury,
+                    ..Default::default()
+                },
+            )
             .unwrap();
     }
 
@@ -141,12 +144,16 @@ mod tests {
             .with_funds(Coins::default());
         seed_treasury(&mut ctx.storage, UsdValue::new_int(1_000));
         USER_STATES
-            .save(&mut ctx.storage, OWNER, &UserState {
-                margin: UsdValue::new_int(500),
-                reserved_margin: UsdValue::new_int(100),
-                open_order_count: 2,
-                ..Default::default()
-            })
+            .save(
+                &mut ctx.storage,
+                OWNER,
+                &UserState {
+                    margin: UsdValue::new_int(500),
+                    reserved_margin: UsdValue::new_int(100),
+                    open_order_count: 2,
+                    ..Default::default()
+                },
+            )
             .unwrap();
 
         withdraw_treasury(ctx.as_mutable()).should_succeed();

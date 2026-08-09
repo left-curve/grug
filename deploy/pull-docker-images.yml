@@ -54,6 +54,13 @@
           image: ghcr.io/left-curve/bots/perps-liquidator
           tag: "{{ perp_liquidator_tag }}"
           enabled: true
+        # withdrawal-approver only runs on its per-network host (static
+        # withdrawal-approver-<network> inventory groups) and only once the
+        # master switch is on — before that the image may not exist on GHCR.
+        - name: withdrawal-approver
+          image: ghcr.io/left-curve/bots/withdrawal-approver
+          tag: "{{ withdrawal_approver_tag }}"
+          enabled: "{{ withdrawal_approver_enabled | bool and inventory_hostname in withdrawal_approver_hosts }}"
       when: item.enabled | bool
       register: bot_pull
       retries: 3

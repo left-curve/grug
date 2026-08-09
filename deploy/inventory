@@ -4,6 +4,33 @@ ansible_python_interpreter=/usr/bin/python3
 deploy_user="deploy"
 # ansible_user="debian"
 
+# Per-host alias groups: `--limit hetzner7` works with any playbook, and other
+# groups can include the host by name via `:children`. The inventory hostname
+# stays the tailscale IP so host_vars/<ip>.yml keeps applying.
+[hetzner1]
+100.126.8.2
+
+[hetzner2]
+100.90.163.19
+
+[hetzner3]
+100.76.197.30
+
+[hetzner4]
+100.109.200.70
+
+[hetzner5]
+100.72.62.100
+
+[hetzner6]
+100.66.152.68
+
+[hetzner7]
+100.126.43.113
+
+[hetzner8]
+100.99.36.21
+
 [github_runners]
 100.114.160.24
 100.75.192.25
@@ -24,6 +51,8 @@ deploy_user="deploy"
 100.76.197.30  # hetzner3
 100.109.200.70 # hetzner4
 100.66.152.68  # hetzner6
+100.126.43.113 # hetzner7
+100.99.36.21   # hetzner8
 
 [clickhouse]
 100.96.253.40  # ovh1
@@ -34,6 +63,8 @@ deploy_user="deploy"
 100.76.197.30  # hetzner3
 100.109.200.70 # hetzner4
 100.66.152.68  # hetzner6
+100.126.43.113 # hetzner7
+100.99.36.21   # hetzner8
 
 [db]
 100.96.253.40  # ovh1
@@ -45,6 +76,8 @@ deploy_user="deploy"
 100.76.197.30  # hetzner3
 100.109.200.70 # hetzner4
 100.66.152.68  # hetzner6
+100.126.43.113 # hetzner7
+100.99.36.21   # hetzner8
 
 [bots]
 100.96.253.40  # ovh1
@@ -70,14 +103,13 @@ deploy_user="deploy"
 100.76.197.30  # hetzner3
 100.109.200.70 # hetzner4
 100.66.152.68  # hetzner6
+100.126.43.113 # hetzner7
+100.99.36.21   # hetzner8
 
 [uptimekuma]
 100.122.37.57  # ovh3
 
 [monitoring]
-100.122.37.57  # ovh3
-
-[minio]
 100.122.37.57  # ovh3
 
 [homer]
@@ -92,6 +124,8 @@ deploy_user="deploy"
 100.76.197.30  # hetzner3
 100.109.200.70 # hetzner4
 100.66.152.68  # hetzner6
+100.126.43.113 # hetzner7
+100.99.36.21   # hetzner8
 
 [vaultwarden]
 100.122.37.57  # ovh3
@@ -127,6 +161,16 @@ referral-dashboard-mainnet
 [perps-bot]
 100.126.8.2    # hetzner1
 
+[batch-block-backup-testnet]
+100.90.163.19  # hetzner2
+
+[batch-block-backup-mainnet]
+100.126.8.2    # hetzner1
+
+[batch-block-backup:children]
+batch-block-backup-testnet
+batch-block-backup-mainnet
+
 [dango-assistant]
 100.96.253.40  # ovh1
 
@@ -149,6 +193,33 @@ perp-liquidator-devnet
 perp-liquidator-testnet
 perp-liquidator-mainnet
 
+# The withdrawal-approver must be a single instance per network (sole
+# responder to gateway withdrawal requests). No devnet group on purpose.
+[withdrawal-approver-testnet]
+100.90.163.19  # hetzner2
+
+[withdrawal-approver-mainnet]
+100.126.8.2    # hetzner1
+
+[withdrawal-approver:children]
+withdrawal-approver-testnet
+withdrawal-approver-mainnet
+
+# The monitor bot runs on ovh3 (the monitoring host), deliberately separated
+# from the nodes it watches. Only mainnet is deployed for now; the testnet
+# group is pre-declared so a future rollout is a single
+# `just deploy-monitor-bot testnet`. No devnet group on purpose: devnet has no
+# archive instance, which the bot's fill_price check requires.
+[monitor-bot-testnet]
+100.122.37.57  # ovh3
+
+[monitor-bot-mainnet]
+100.122.37.57  # ovh3
+
+[monitor-bot:children]
+monitor-bot-testnet
+monitor-bot-mainnet
+
 [hyperlane]
 100.72.62.100  # hetzner5
 100.126.8.2    # hetzner1
@@ -156,4 +227,26 @@ perp-liquidator-mainnet
 100.76.197.30  # hetzner3
 100.109.200.70 # hetzner4
 100.66.152.68  # hetzner6
+
+[indexer-testnet]
+100.99.36.21   # hetzner8
+
+[indexer-mainnet]
+100.126.43.113 # hetzner7
+
+[indexer:children]
+indexer-testnet
+indexer-mainnet
+
+# One group per network; each network's instance config lives in
+# group_vars/archive-<network>/main.yml, shared secrets in group_vars/archive/.
+[archive-mainnet:children]
+hetzner7
+
+[archive-testnet:children]
+hetzner8
+
+[archive:children]
+archive-mainnet
+archive-testnet
 

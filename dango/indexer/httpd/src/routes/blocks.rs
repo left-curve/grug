@@ -9,6 +9,7 @@ use {
     dango_primitives::FullBlock,
     serde::Deserialize,
     std::path::PathBuf,
+    utoipa::IntoParams,
 };
 
 /// Maximum number of blocks returned by `/block/full/range` in one request.
@@ -27,6 +28,19 @@ pub fn services() -> Scope {
         .service(latest_full_block)
 }
 
+#[utoipa::path(
+    get,
+    path = "/block/info",
+    tag = "block",
+    summary = "Latest block info",
+    description = "Metadata and transactions of the latest finalized block, \
+                   read from the node's block cache.",
+    responses(
+        (status = 200, description = "The latest finalized block (metadata + transactions)"),
+        (status = 404, description = "The latest block's file is not in the cache yet"),
+        (status = 500, description = "The chain query failed or the block file could not be read"),
+    ),
+)]
 #[cfg_attr(feature = "tracing", tracing::instrument(skip_all))]
 #[get("/info")]
 pub async fn latest_block_info(app_ctx: web::Data<FullContext>) -> Result<HttpResponse, Error> {
@@ -40,6 +54,22 @@ pub async fn latest_block_info(app_ctx: web::Data<FullContext>) -> Result<HttpRe
     _block_by_height(block_height, &app_ctx)
 }
 
+#[utoipa::path(
+    get,
+    path = "/block/info/{block_height}",
+    tag = "block",
+    summary = "Block info by height",
+    description = "Metadata and transactions of the block at `block_height`, \
+                   read from the node's block cache.",
+    params(
+        ("block_height" = u64, Path, description = "Block height"),
+    ),
+    responses(
+        (status = 200, description = "The block at that height (metadata + transactions)"),
+        (status = 404, description = "No block at that height in the cache"),
+        (status = 500, description = "The block file could not be read"),
+    ),
+)]
 #[cfg_attr(feature = "tracing", tracing::instrument(skip_all))]
 #[get("/info/{block_height}")]
 pub async fn block_info_by_height(
@@ -66,6 +96,19 @@ fn _block_by_height(block_height: u64, app_ctx: &FullContext) -> Result<HttpResp
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/block/result",
+    tag = "block",
+    summary = "Latest block outcome",
+    description = "Execution outcome of the latest finalized block, read from \
+                   the node's block cache.",
+    responses(
+        (status = 200, description = "The latest finalized block's outcome"),
+        (status = 404, description = "The latest block's file is not in the cache yet"),
+        (status = 500, description = "The chain query failed or the block file could not be read"),
+    ),
+)]
 #[cfg_attr(feature = "tracing", tracing::instrument(skip_all))]
 #[get("/result")]
 pub async fn block_result(app_ctx: web::Data<FullContext>) -> Result<HttpResponse, Error> {
@@ -79,6 +122,22 @@ pub async fn block_result(app_ctx: web::Data<FullContext>) -> Result<HttpRespons
     _block_results_by_height(block_height, &app_ctx)
 }
 
+#[utoipa::path(
+    get,
+    path = "/block/result/{block_height}",
+    tag = "block",
+    summary = "Block outcome by height",
+    description = "Execution outcome of the block at `block_height`, read from \
+                   the node's block cache.",
+    params(
+        ("block_height" = u64, Path, description = "Block height"),
+    ),
+    responses(
+        (status = 200, description = "The block's outcome"),
+        (status = 404, description = "No block at that height in the cache"),
+        (status = 500, description = "The block file could not be read"),
+    ),
+)]
 #[cfg_attr(feature = "tracing", tracing::instrument(skip_all))]
 #[get("/result/{block_height}")]
 pub async fn block_result_by_height(
@@ -111,6 +170,20 @@ fn _block_results_by_height(
 // ---- /full: block info + outcome together ----
 
 /// The latest finalized block — both its info and its outcome.
+#[utoipa::path(
+    get,
+    path = "/block/full",
+    tag = "block",
+    summary = "Latest full block",
+    description = "The latest finalized block as `{ block, outcome }` — info \
+                   and execution outcome together, read from the node's block \
+                   cache.",
+    responses(
+        (status = 200, description = "The latest full block (`{ block, outcome }`)"),
+        (status = 404, description = "The latest block's file is not in the cache yet"),
+        (status = 500, description = "The chain query failed or the block file could not be read"),
+    ),
+)]
 #[cfg_attr(feature = "tracing", tracing::instrument(skip_all))]
 #[get("/full")]
 pub async fn latest_full_block(app_ctx: web::Data<FullContext>) -> Result<HttpResponse, Error> {
@@ -125,6 +198,23 @@ pub async fn latest_full_block(app_ctx: web::Data<FullContext>) -> Result<HttpRe
 }
 
 /// A specific block by height — both its info and its outcome.
+#[utoipa::path(
+    get,
+    path = "/block/full/{block_height}",
+    tag = "block",
+    summary = "Full block by height",
+    description = "The block at `block_height` as `{ block, outcome }` — the \
+                   same `FullBlock` shape the `/ws` `fullBlock` channel \
+                   streams.",
+    params(
+        ("block_height" = u64, Path, description = "Block height"),
+    ),
+    responses(
+        (status = 200, description = "The full block (`{ block, outcome }`)"),
+        (status = 404, description = "No block at that height in the cache"),
+        (status = 500, description = "The block file could not be read"),
+    ),
+)]
 #[cfg_attr(feature = "tracing", tracing::instrument(skip_all))]
 #[get("/full/{block_height}")]
 pub async fn full_block_by_height(
@@ -139,6 +229,24 @@ pub async fn full_block_by_height(
 /// height with no block on disk, so the result is always a gap-free run from
 /// `from`: a range past the chain tip returns the blocks up to the tip, and if
 /// `from` itself is missing the result is empty.
+#[utoipa::path(
+    get,
+    path = "/block/full/range",
+    tag = "block",
+    summary = "Contiguous run of full blocks",
+    description = "Full blocks from `from` through `to` (inclusive), capped at \
+                   20 per request. Iteration stops at the first height with no \
+                   block in the cache, so the result is always a gap-free run \
+                   from `from`: a range past the chain tip returns the blocks \
+                   up to the tip, and if `from` itself is missing the result \
+                   is empty.",
+    params(RangeQuery),
+    responses(
+        (status = 200, description = "A gap-free run of full blocks from `from` (possibly empty)"),
+        (status = 400, description = "`from` greater than `to`"),
+        (status = 500, description = "A block file could not be read"),
+    ),
+)]
 #[cfg_attr(feature = "tracing", tracing::instrument(skip_all))]
 #[get("/full/range")]
 pub async fn full_block_range(
@@ -197,9 +305,14 @@ fn load_full_block(block_filename: PathBuf) -> Result<FullBlock, Error> {
     })
 }
 
-#[derive(Deserialize)]
+/// `/block/full/range` arguments.
+#[derive(Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
 struct RangeQuery {
+    /// First block height, inclusive.
     from: u64,
+    /// Last block height, inclusive; the span is capped at 20 blocks
+    /// (clamped to `from + 19`).
     to: u64,
 }
 

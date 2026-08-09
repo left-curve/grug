@@ -14,15 +14,15 @@ version       = { workspace = true }
 tracing = ["dep:tracing"]
 
 [dependencies]
-aes-gcm                     = { workspace = true, features = ["std"] }
+aes-gcm                     = { workspace = true }
 alloy                       = { workspace = true }
 anyhow                      = { workspace = true }
 async-trait                 = { workspace = true }
 bip32                       = { workspace = true }
+dango-archive-types         = { workspace = true }
 dango-auth                  = { workspace = true }
 dango-backtrace             = { workspace = true }
 dango-eth-utils             = { workspace = true }
-dango-identity              = { workspace = true }
 dango-indexer-graphql-types = { workspace = true }
 dango-primitives            = { workspace = true }
 dango-types                 = { workspace = true }
@@ -30,8 +30,7 @@ futures                     = { workspace = true }
 graphql_client              = { workspace = true }
 k256                        = { workspace = true }
 pbkdf2                      = { workspace = true }
-rand                        = { workspace = true }
-reqwest                     = { workspace = true, features = ["json"] }
+reqwest                     = { workspace = true, features = ["json", "query"] }
 serde                       = { workspace = true }
 serde_json                  = { workspace = true }
 sha2                        = { workspace = true }

@@ -42,6 +42,10 @@ const badgeVariants = tv(
           base: "bg-surface-tertiary-green border-surface-primary-green",
           text: "text-fg-primary-green",
         },
+        rice: {
+          base: "bg-surface-quaternary-rice border-outline-secondary-rice",
+          text: "text-fg-primary-rice",
+        },
       },
       size: {
         s: {

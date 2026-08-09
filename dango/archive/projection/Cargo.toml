@@ -1,0 +1,41 @@
+[package]
+authors       = { workspace = true }
+categories    = { workspace = true }
+documentation = { workspace = true }
+edition       = { workspace = true }
+license       = { workspace = true }
+name          = "dango-archive-projection"
+repository    = { workspace = true }
+rust-version  = { workspace = true }
+version       = { workspace = true }
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+default = ["metrics", "tracing"]
+metrics = ["dep:metrics"]
+tracing = ["dep:tracing"]
+
+[dependencies]
+actix-web                  = { workspace = true }
+async-trait                = { workspace = true }
+borsh                      = { workspace = true }
+clickhouse                 = { workspace = true }
+dango-archive-block-source = { workspace = true }
+dango-archive-httpd        = { workspace = true }
+dango-archive-types        = { workspace = true, features = ["utoipa"] }
+dango-primitives           = { workspace = true, features = ["chrono"] }
+futures                    = { workspace = true }
+metrics                    = { workspace = true, optional = true }
+sea-orm                    = { workspace = true }
+sea-orm-migration          = { workspace = true }
+serde                      = { workspace = true, features = ["derive"] }
+serde_json                 = { workspace = true }
+tracing                    = { workspace = true, optional = true }
+utoipa                     = { workspace = true }
+zstd                       = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
+uuid  = { workspace = true }

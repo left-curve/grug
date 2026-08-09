@@ -40,11 +40,12 @@ pub fn set_fee_share_ratio(
     let account_factory = account_factory(ctx.querier);
 
     // TODO: refactor to raw query (query_wasm_path).
-    let account =
-        ctx.querier
-            .query_wasm_smart(account_factory, account_factory::QueryAccountRequest {
-                address: ctx.sender,
-            })?;
+    let account = ctx.querier.query_wasm_smart(
+        account_factory,
+        account_factory::QueryAccountRequest {
+            address: ctx.sender,
+        },
+    )?;
 
     let user_index = account.owner;
 

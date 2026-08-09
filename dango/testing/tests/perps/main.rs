@@ -23,6 +23,7 @@ mod trading;
 mod vault;
 mod vault_snapshots;
 mod vault_withdrawal_health;
+mod wind_down;
 
 /// Return the genesis-default global params (mirrors `PerpsOption::preset_test()`).
 pub fn default_param() -> Param {
@@ -60,15 +61,18 @@ pub async fn register_oracle_prices(
     eth_price: u128,
 ) {
     suite
-        .seed_oracle_prices(&mut accounts.owner, btree_map! {
-            usdc::DENOM.clone() => OracleTestEntry {
-                pyth_id: 1,
-                humanized_price: UsdPrice::new_int(1),
+        .seed_oracle_prices(
+            &mut accounts.owner,
+            btree_map! {
+                usdc::DENOM.clone() => OracleTestEntry {
+                    pyth_id: 1,
+                    humanized_price: UsdPrice::new_int(1),
+                },
+                pair_id() => OracleTestEntry {
+                    pyth_id: 2,
+                    humanized_price: UsdPrice::new_int(eth_price as i128),
+                },
             },
-            pair_id() => OracleTestEntry {
-                pyth_id: 2,
-                humanized_price: UsdPrice::new_int(eth_price as i128),
-            },
-        })
+        )
         .await;
 }

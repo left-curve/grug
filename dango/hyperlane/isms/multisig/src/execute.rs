@@ -60,10 +60,14 @@ fn set_validators(
         validators.len()
     );
 
-    VALIDATOR_SETS.save(ctx.storage, domain, &ValidatorSet {
-        threshold,
-        validators,
-    })?;
+    VALIDATOR_SETS.save(
+        ctx.storage,
+        domain,
+        &ValidatorSet {
+            threshold,
+            validators,
+        },
+    )?;
 
     Ok(Response::new())
 }
@@ -111,12 +115,18 @@ mod tests {
             .with_sender(Addr::mock(1))
             .with_funds(Coins::default());
 
-        instantiate(ctx.as_mutable(), InstantiateMsg {
-            validator_sets: BTreeMap::from([(0, ValidatorSet {
-                threshold: 0,
-                validators: BTreeSet::new(),
-            })]),
-        })
+        instantiate(
+            ctx.as_mutable(),
+            InstantiateMsg {
+                validator_sets: BTreeMap::from([(
+                    0,
+                    ValidatorSet {
+                        threshold: 0,
+                        validators: BTreeSet::new(),
+                    },
+                )]),
+            },
+        )
         .should_fail_with_error("threshold must be greater than zero for domain 0");
     }
 
@@ -126,12 +136,18 @@ mod tests {
             .with_sender(Addr::mock(1))
             .with_funds(Coins::default());
 
-        instantiate(ctx.as_mutable(), InstantiateMsg {
-            validator_sets: BTreeMap::from([(0, ValidatorSet {
-                threshold: 0,
-                validators: btree_set! { V1 },
-            })]),
-        })
+        instantiate(
+            ctx.as_mutable(),
+            InstantiateMsg {
+                validator_sets: BTreeMap::from([(
+                    0,
+                    ValidatorSet {
+                        threshold: 0,
+                        validators: btree_set! { V1 },
+                    },
+                )]),
+            },
+        )
         .should_fail_with_error("threshold must be greater than zero for domain 0");
     }
 
@@ -141,12 +157,18 @@ mod tests {
             .with_sender(Addr::mock(1))
             .with_funds(Coins::default());
 
-        instantiate(ctx.as_mutable(), InstantiateMsg {
-            validator_sets: BTreeMap::from([(0, ValidatorSet {
-                threshold: 2,
-                validators: btree_set! { V1 },
-            })]),
-        })
+        instantiate(
+            ctx.as_mutable(),
+            InstantiateMsg {
+                validator_sets: BTreeMap::from([(
+                    0,
+                    ValidatorSet {
+                        threshold: 2,
+                        validators: btree_set! { V1 },
+                    },
+                )]),
+            },
+        )
         .should_fail_with_error("not enough validators for domain 0");
     }
 
@@ -156,12 +178,18 @@ mod tests {
             .with_sender(Addr::mock(1))
             .with_funds(Coins::default());
 
-        instantiate(ctx.as_mutable(), InstantiateMsg {
-            validator_sets: BTreeMap::from([(0, ValidatorSet {
-                threshold: 1,
-                validators: btree_set! { V1 },
-            })]),
-        })
+        instantiate(
+            ctx.as_mutable(),
+            InstantiateMsg {
+                validator_sets: BTreeMap::from([(
+                    0,
+                    ValidatorSet {
+                        threshold: 1,
+                        validators: btree_set! { V1 },
+                    },
+                )]),
+            },
+        )
         .should_succeed();
     }
 

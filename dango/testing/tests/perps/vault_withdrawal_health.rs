@@ -72,9 +72,12 @@ async fn vault_withdrawal_at_breakeven_makes_vault_liquidatable() {
         .should_succeed();
 
     let lp_state: perps::UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
     let lp_shares = lp_state.vault_shares;
@@ -133,9 +136,12 @@ async fn vault_withdrawal_at_breakeven_makes_vault_liquidatable() {
         .should_succeed();
 
     let vault_orders: BTreeMap<OrderId, QueryOrdersByUserResponseItem> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryOrdersByUserRequest {
-            user: contracts.perps,
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryOrdersByUserRequest {
+                user: contracts.perps,
+            },
+        )
         .should_succeed();
 
     let vault_bids: Vec<_> = vault_orders
@@ -191,9 +197,12 @@ async fn vault_withdrawal_at_breakeven_makes_vault_liquidatable() {
 
     // Verify vault has a long position.
     let vault_state: perps::UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: contracts.perps,
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: contracts.perps,
+            },
+        )
         .should_succeed()
         .unwrap();
     let vault_pos = vault_state
@@ -215,16 +224,19 @@ async fn vault_withdrawal_at_breakeven_makes_vault_liquidatable() {
     register_oracle_prices(&mut suite, &mut accounts, 1_900).await;
 
     let vault_ext: perps::UserStateExtended = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateExtendedRequest {
-            user: contracts.perps,
-            include_equity: true,
-            include_maintenance_margin: true,
-            include_available_margin: false,
-            include_unrealized_pnl: true,
-            include_unrealized_funding: false,
-            include_liquidation_price: false,
-            include_all: false,
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateExtendedRequest {
+                user: contracts.perps,
+                include_equity: true,
+                include_maintenance_margin: true,
+                include_available_margin: false,
+                include_unrealized_pnl: true,
+                include_unrealized_funding: false,
+                include_liquidation_price: false,
+                include_all: false,
+            },
+        )
         .should_succeed();
 
     let equity_before = vault_ext.equity.unwrap();
@@ -235,9 +247,12 @@ async fn vault_withdrawal_at_breakeven_makes_vault_liquidatable() {
     );
     // Confirm breakeven: equity ≈ margin (no unrealized PnL).
     let vault_state_bev: perps::UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: contracts.perps,
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: contracts.perps,
+            },
+        )
         .should_succeed()
         .unwrap();
     assert_eq!(

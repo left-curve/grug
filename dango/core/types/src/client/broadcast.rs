@@ -276,7 +276,7 @@ where
         StdError: From<C::Error>,
     {
         let code = code.into();
-        let code_hash = code.hash256();
+        let code_hash = code.sha2_256();
         let salt = salt.into();
         let address = Addr::derive(signer.address(), code_hash, &salt);
         let admin = admin_opt.decide(address);

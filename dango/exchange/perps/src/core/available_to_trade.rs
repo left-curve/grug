@@ -182,23 +182,29 @@ mod tests {
     ) -> (UserState, NoCachePerpQuerier<'static>) {
         let mut positions = btree_map! {};
         if current_pos != 0 {
-            positions.insert(perp_eth::DENOM.clone(), Position {
-                size: Quantity::new_int(current_pos),
-                // entry_price = oracle so unrealized pnl is zero
-                entry_price: CURRENT_PRICE,
-                entry_funding_per_unit: FundingPerUnit::new_int(0),
-                conditional_order_above: None,
-                conditional_order_below: None,
-            });
+            positions.insert(
+                perp_eth::DENOM.clone(),
+                Position {
+                    size: Quantity::new_int(current_pos),
+                    // entry_price = oracle so unrealized pnl is zero
+                    entry_price: CURRENT_PRICE,
+                    entry_funding_per_unit: FundingPerUnit::new_int(0),
+                    conditional_order_above: None,
+                    conditional_order_below: None,
+                },
+            );
         }
         if other_pos != 0 {
-            positions.insert(perp_btc::DENOM.clone(), Position {
-                size: Quantity::new_int(other_pos),
-                entry_price: OTHER_PRICE,
-                entry_funding_per_unit: FundingPerUnit::new_int(0),
-                conditional_order_above: None,
-                conditional_order_below: None,
-            });
+            positions.insert(
+                perp_btc::DENOM.clone(),
+                Position {
+                    size: Quantity::new_int(other_pos),
+                    entry_price: OTHER_PRICE,
+                    entry_funding_per_unit: FundingPerUnit::new_int(0),
+                    conditional_order_above: None,
+                    conditional_order_below: None,
+                },
+            );
         }
 
         let reserved = if has_orders {

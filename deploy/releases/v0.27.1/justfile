@@ -1,0 +1,167 @@
+# What this release rolls out, besides the dango/bots images:
+#
+# - CometBFT v0.38.21 -> v0.39.3 (binary swap; no data migration -- the node
+#   restarts in place on its existing data dir).
+# - config.toml regenerated from the v0.39.3 template (was v1.0.0-based),
+#   including the block-time retune: peer_gossip_sleep_duration 100ms -> 10ms,
+#   send/recv_rate 20 MB/s, timeout_propose 500ms, timeout_commit 100ms.
+# - Mixed 0.38.21/0.39.3 operation is protocol-safe (BlockProtocol/P2PProtocol
+#   unchanged), which is what makes this one-node-at-a-time roll possible.
+#
+# IMPORTANT: run these recipes from a checkout at or after commit b3288e8d8
+# ("chore: raise cometbft timeout_commit to 100ms..."). The cometbft image tag
+# (v0.39.3) and the regenerated config come from the checked-out deploy files,
+# not from the pinned dango image -- an older checkout would deploy the old
+# cometbft alongside the new dango.
+#
+# Notes for the recipes below:
+#
+# - dango_image_tag is pinned to v0.27.1 (the const below).
+# - Upgrade ONE validator at a time. With 4 mainnet validators, the other 3
+#   keep producing blocks (>= 2/3) while the target restarts, so the chain
+#   stays live throughout the rolling upgrade. Wait for the target to be fully
+#   synced AND signing again before starting the next host -- during a
+#   single-node upgrade the network has zero fault margin left.
+# - For each recipe, persistent_peers is set to the *other three* validators
+#   via -e cometbft_peers. Under `--limit <one host>` the play only sees that
+#   host, so the default peer resolution (ansible_play_hosts) would render an
+#   EMPTY persistent_peers into config.toml and the node would come back with
+#   nobody to dial. The override makes the role fetch the node IDs of the
+#   out-of-play peers over SSH and render nodeid@wireguard_ip:port entries.
+#   (See deploy/NODE_MIGRATION.md step 7 and
+#   roles/full-app/tasks/prep_after_lock.yml for the mechanism.)
+# - skip_cometbft_sync=true skips the post-deploy health checks. On a rolling
+#   upgrade the target comes back BEHIND the head and reports catching_up=true
+#   until block-sync finishes; if that outlasts the role's hardcoded 5-min
+#   "Wait for CometBFT to sync" gate, full-app.yml's rescue STOPS the stack --
+#   the worst possible outcome mid-roll on mainnet. Catch-up should only take
+#   a minute or two this time (no backlog prune like v0.25.2), but the gate's
+#   failure mode is bad enough that we skip it and verify sync MANUALLY.
+# - Suggested order: hetzner5 -> hetzner6 -> hetzner1 -> hetzner3. hetzner1/3
+#   serve the partner-facing internal API: on v0.39.3 the broadcast_tx_*
+#   endpoints return errors while a node is block-syncing (new 0.39 behavior),
+#   so doing those two last -- and one at a time -- keeps partner impact to a
+#   brief window per host.
+# - Block times will be irregular during the mixed phase (old nodes still
+#   gossip with 100ms polling and propose with timeout_commit=50ms). They
+#   settle at ~220-230 ms once all four validators are upgraded -- same as
+#   observed on testnet.
+#
+# Use the following to watch the target node catch up after each deploy:
+#
+# ```bash
+# while true; do
+#   date
+#
+#   echo "===== cometbft status ====="
+#   ssh deploy@hetzner5 'docker exec $(docker ps -q --filter name=cometbft | head -1) curl -s localhost:26657/status'
+#
+#   echo "======== sleeping ========="
+#   sleep 20
+# done
+# ```
+#
+# Move on to the next host only when, in the output above:
+#
+# - node_info.version says "0.39.0" (the v0.39.3 build reports 0.39.0+49b8283)
+# - sync_info.catching_up is false
+# - and the node is signing again: its address appears in the signatures of a
+#   fresh block, e.g.
+#   `curl -s localhost:26657/commit | jq '.result.signed_header.commit.signatures | length'`
+#   returns 4 (all validators present).
+
+set positional-arguments
+
+# Use bash so `pipefail` propagates ansible's exit code through `| tee ...`
+# (the default `sh -cu` would silently swallow ansible failures behind tee).
+set shell := ["bash", "-uo", "pipefail", "-c"]
+
+# Always load deploy/ansible.cfg, regardless of cwd or a stray ~/.ansible.cfg.
+export ANSIBLE_CONFIG := justfile_directory() + "/../../ansible.cfg"
+
+# Tailscale IPs. Mirrors the constants in deploy/justfile.
+hetzner1 := "100.126.8.2"
+hetzner3 := "100.76.197.30"
+hetzner5 := "100.72.62.100"
+hetzner6 := "100.66.152.68"
+
+# Dango docker image tag. The build pipeline tags images with the git commit
+# SHA, so this is the commit hash for tag v0.27.1 ("chore: bump dango-cli to
+# 0.27.1"; the same image already running on devnet and testnet). The CometBFT
+# upgrade commits that follow it on main only touch deploy/docker files, so
+# this is the newest dango image content-wise.
+dango_image_tag := "3dbc0357442ac5cdb4cc9aad930da09e220bef5b"
+
+# Bot images (faucet-bot, dex-bot, perps-bot, perp-liquidator) are pinned
+# separately from dango, since they are built from a different repo/commit
+# that is compatible with the v0.27.1 dango API. `latest` would track main
+# and could break against v0.27.1.
+bots_image_tag := "6c3fdab93077447052b4d1dff63d2e9807a138fc"
+
+# List available recipes
+default:
+    @just --list
+
+# Upgrade mainnet only on hetzner1, pinned to v0.27.1
+deploy-mainnet-hetzner1:
+    cd ../.. \
+      && mkdir -p logs \
+      && uv run ansible-playbook full-app.yml \
+        -e '{"traefik_enabled": true, "cometbft_generate_keys": true, "github_deployments_enabled": false, "expose_ports": false, "delete_postgres_database_at_merge": false, "delete_clickhouse_database_at_merge": false, "deploy_includes_postgres": false, "deploy_includes_clickhouse": false, "chain_id": "dango-1", "dango_network": "mainnet", "system_wide_directories": true, "deploy_env": "production", "skip_cometbft_sync": true}' \
+        -e dango_image_tag={{ dango_image_tag }} \
+        -e faucet_bot_tag={{ bots_image_tag }} \
+        -e dex_bot_tag={{ bots_image_tag }} \
+        -e perps_bot_tag={{ bots_image_tag }} \
+        -e perp_liquidator_tag={{ bots_image_tag }} \
+        -e withdrawal_approver_tag={{ bots_image_tag }} \
+        -e cometbft_peers={{ hetzner3 }},{{ hetzner5 }},{{ hetzner6 }} \
+        --limit {{ hetzner1 }} \
+        2>&1 | tee logs/$(date -u +%Y%m%d%H%M%S)-deploy-mainnet-hetzner1.log
+
+# Upgrade mainnet only on hetzner3, pinned to v0.27.1
+deploy-mainnet-hetzner3:
+    cd ../.. \
+      && mkdir -p logs \
+      && uv run ansible-playbook full-app.yml \
+        -e '{"traefik_enabled": true, "cometbft_generate_keys": true, "github_deployments_enabled": false, "expose_ports": false, "delete_postgres_database_at_merge": false, "delete_clickhouse_database_at_merge": false, "deploy_includes_postgres": false, "deploy_includes_clickhouse": false, "chain_id": "dango-1", "dango_network": "mainnet", "system_wide_directories": true, "deploy_env": "production", "skip_cometbft_sync": true}' \
+        -e dango_image_tag={{ dango_image_tag }} \
+        -e faucet_bot_tag={{ bots_image_tag }} \
+        -e dex_bot_tag={{ bots_image_tag }} \
+        -e perps_bot_tag={{ bots_image_tag }} \
+        -e perp_liquidator_tag={{ bots_image_tag }} \
+        -e withdrawal_approver_tag={{ bots_image_tag }} \
+        -e cometbft_peers={{ hetzner1 }},{{ hetzner5 }},{{ hetzner6 }} \
+        --limit {{ hetzner3 }} \
+        2>&1 | tee logs/$(date -u +%Y%m%d%H%M%S)-deploy-mainnet-hetzner3.log
+
+# Upgrade mainnet only on hetzner5, pinned to v0.27.1
+deploy-mainnet-hetzner5:
+    cd ../.. \
+      && mkdir -p logs \
+      && uv run ansible-playbook full-app.yml \
+        -e '{"traefik_enabled": true, "cometbft_generate_keys": true, "github_deployments_enabled": false, "expose_ports": false, "delete_postgres_database_at_merge": false, "delete_clickhouse_database_at_merge": false, "deploy_includes_postgres": false, "deploy_includes_clickhouse": false, "chain_id": "dango-1", "dango_network": "mainnet", "system_wide_directories": true, "deploy_env": "production", "skip_cometbft_sync": true}' \
+        -e dango_image_tag={{ dango_image_tag }} \
+        -e faucet_bot_tag={{ bots_image_tag }} \
+        -e dex_bot_tag={{ bots_image_tag }} \
+        -e perps_bot_tag={{ bots_image_tag }} \
+        -e perp_liquidator_tag={{ bots_image_tag }} \
+        -e withdrawal_approver_tag={{ bots_image_tag }} \
+        -e cometbft_peers={{ hetzner1 }},{{ hetzner3 }},{{ hetzner6 }} \
+        --limit {{ hetzner5 }} \
+        2>&1 | tee logs/$(date -u +%Y%m%d%H%M%S)-deploy-mainnet-hetzner5.log
+
+# Upgrade mainnet only on hetzner6, pinned to v0.27.1
+deploy-mainnet-hetzner6:
+    cd ../.. \
+      && mkdir -p logs \
+      && uv run ansible-playbook full-app.yml \
+        -e '{"traefik_enabled": true, "cometbft_generate_keys": true, "github_deployments_enabled": false, "expose_ports": false, "delete_postgres_database_at_merge": false, "delete_clickhouse_database_at_merge": false, "deploy_includes_postgres": false, "deploy_includes_clickhouse": false, "chain_id": "dango-1", "dango_network": "mainnet", "system_wide_directories": true, "deploy_env": "production", "skip_cometbft_sync": true}' \
+        -e dango_image_tag={{ dango_image_tag }} \
+        -e faucet_bot_tag={{ bots_image_tag }} \
+        -e dex_bot_tag={{ bots_image_tag }} \
+        -e perps_bot_tag={{ bots_image_tag }} \
+        -e perp_liquidator_tag={{ bots_image_tag }} \
+        -e withdrawal_approver_tag={{ bots_image_tag }} \
+        -e cometbft_peers={{ hetzner1 }},{{ hetzner3 }},{{ hetzner5 }} \
+        --limit {{ hetzner6 }} \
+        2>&1 | tee logs/$(date -u +%Y%m%d%H%M%S)-deploy-mainnet-hetzner6.log

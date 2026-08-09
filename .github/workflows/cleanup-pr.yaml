@@ -209,7 +209,7 @@ jobs:
           FAILED_DELETIONS=0
 
           # Delete pr-latest tags
-          PACKAGES=("left-curve%2Fdango")
+          PACKAGES=("left-curve%2Fdango" "left-curve%2Farchive")
           for package in "${PACKAGES[@]}"; do
             TOTAL_ATTEMPTS=$((TOTAL_ATTEMPTS + 1))
             if delete_image_versions "$package" "pr-${PR_NUMBER}-latest"; then

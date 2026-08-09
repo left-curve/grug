@@ -52,10 +52,13 @@ async fn vault_snapshots_accrue_daily() {
         .should_succeed();
 
     let snapshots: BTreeMap<Timestamp, VaultSnapshot> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryVaultSnapshotsRequest {
-            min: None,
-            max: None,
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryVaultSnapshotsRequest {
+                min: None,
+                max: None,
+            },
+        )
         .should_succeed();
 
     assert!(
@@ -72,10 +75,13 @@ async fn vault_snapshots_accrue_daily() {
     let day_1 = round_to_day(suite.block.timestamp);
 
     let snapshots: BTreeMap<Timestamp, VaultSnapshot> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryVaultSnapshotsRequest {
-            min: None,
-            max: None,
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryVaultSnapshotsRequest {
+                min: None,
+                max: None,
+            },
+        )
         .should_succeed();
 
     assert_eq!(snapshots.len(), 1);
@@ -108,10 +114,13 @@ async fn vault_snapshots_accrue_daily() {
     assert_eq!(day_3, day_2 + Duration::from_days(1));
 
     let snapshots: BTreeMap<Timestamp, VaultSnapshot> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryVaultSnapshotsRequest {
-            min: None,
-            max: None,
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryVaultSnapshotsRequest {
+                min: None,
+                max: None,
+            },
+        )
         .should_succeed();
     let keys: Vec<_> = snapshots.keys().copied().collect();
     assert_eq!(keys, vec![day_1, day_2, day_3]);
@@ -122,20 +131,26 @@ async fn vault_snapshots_accrue_daily() {
 
     // `min == max == day_2` → one entry.
     let snapshots: BTreeMap<Timestamp, VaultSnapshot> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryVaultSnapshotsRequest {
-            min: Some(day_2),
-            max: Some(day_2),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryVaultSnapshotsRequest {
+                min: Some(day_2),
+                max: Some(day_2),
+            },
+        )
         .should_succeed();
     assert_eq!(snapshots.len(), 1);
     assert!(snapshots.contains_key(&day_2));
 
     // Range covering day_2..=day_3 → two entries.
     let snapshots: BTreeMap<Timestamp, VaultSnapshot> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryVaultSnapshotsRequest {
-            min: Some(day_2),
-            max: Some(day_3),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryVaultSnapshotsRequest {
+                min: Some(day_2),
+                max: Some(day_3),
+            },
+        )
         .should_succeed();
     assert_eq!(snapshots.len(), 2);
     assert!(snapshots.contains_key(&day_2));

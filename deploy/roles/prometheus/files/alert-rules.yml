@@ -68,6 +68,18 @@ groups:
       summary: "High error rate detected"
       description: "Error rate is above 10% for more than 5 minutes."
 
+  # The monitor bot watches the exchange's invariants; this rule watches the
+  # monitor bot, so its own death is alerted through alertmanager -> Discord
+  # rather than only through its heartbeat going silent.
+  - alert: MonitorBotDown
+    expr: up{job="monitor-bot"} == 0
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Monitor bot is down ({{ $labels.dango_network }})"
+      description: "Prometheus has not been able to scrape the monitor bot on {{ $labels.instance }} for more than 5 minutes. Its exchange checks and Discord alerts are not running."
+
 - name: cloudflare-alerts
   rules:
   - alert: CloudflaredDown

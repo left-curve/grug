@@ -179,7 +179,7 @@ Expected: prints `<hostname>`.
 > Fix: generate a fresh auth key at <https://login.tailscale.com/admin/settings/keys>. Then update the vault:
 >
 > ```bash
-> just edit-secrets
+> just sops-edit-secrets
 > ```
 >
 > Replace the `tailscale_authkey` value, save and exit. The file is re-encrypted automatically. Re-run step 6.

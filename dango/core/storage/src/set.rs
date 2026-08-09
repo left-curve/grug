@@ -499,14 +499,17 @@ mod tests {
                 .collect::<StdResult<Vec<_>>>()
                 .unwrap();
 
-            assert_eq!(val, [
-                (Dec128::from_str("-1.5").unwrap(), "a".to_string()),
-                (Dec128::from_str("-1.5").unwrap(), "b".to_string()),
-                (Dec128::from_str("0").unwrap(), "abcb".to_string()),
-                (Dec128::from_str("1").unwrap(), "b".to_string()),
-                (Dec128::from_str("2").unwrap(), "a".to_string()),
-                (Dec128::from_str("2").unwrap(), "b".to_string())
-            ]);
+            assert_eq!(
+                val,
+                [
+                    (Dec128::from_str("-1.5").unwrap(), "a".to_string()),
+                    (Dec128::from_str("-1.5").unwrap(), "b".to_string()),
+                    (Dec128::from_str("0").unwrap(), "abcb".to_string()),
+                    (Dec128::from_str("1").unwrap(), "b".to_string()),
+                    (Dec128::from_str("2").unwrap(), "a".to_string()),
+                    (Dec128::from_str("2").unwrap(), "b".to_string())
+                ]
+            );
         }
 
         // Max
@@ -521,16 +524,19 @@ mod tests {
                 .collect::<StdResult<Vec<_>>>()
                 .unwrap();
 
-            assert_eq!(val, [
-                (Dec128::from_str("-2").unwrap(), "a".to_string()),
-                (Dec128::from_str("-2").unwrap(), "b".to_string()),
-                (Dec128::from_str("-2").unwrap(), "c".to_string()),
-                (Dec128::from_str("-2").unwrap(), "d".to_string()),
-                (Dec128::from_str("-2").unwrap(), "e".to_string()),
-                (Dec128::from_str("-1.5").unwrap(), "a".to_string()),
-                (Dec128::from_str("-1.5").unwrap(), "b".to_string()),
-                (Dec128::from_str("0").unwrap(), "abcb".to_string())
-            ]);
+            assert_eq!(
+                val,
+                [
+                    (Dec128::from_str("-2").unwrap(), "a".to_string()),
+                    (Dec128::from_str("-2").unwrap(), "b".to_string()),
+                    (Dec128::from_str("-2").unwrap(), "c".to_string()),
+                    (Dec128::from_str("-2").unwrap(), "d".to_string()),
+                    (Dec128::from_str("-2").unwrap(), "e".to_string()),
+                    (Dec128::from_str("-1.5").unwrap(), "a".to_string()),
+                    (Dec128::from_str("-1.5").unwrap(), "b".to_string()),
+                    (Dec128::from_str("0").unwrap(), "abcb".to_string())
+                ]
+            );
         }
 
         // Max Min
@@ -545,15 +551,18 @@ mod tests {
                 .collect::<StdResult<Vec<_>>>()
                 .unwrap();
 
-            assert_eq!(val, [
-                (Dec128::from_str("-2").unwrap(), "a".to_string()),
-                (Dec128::from_str("-2").unwrap(), "b".to_string()),
-                (Dec128::from_str("-2").unwrap(), "c".to_string()),
-                (Dec128::from_str("-2").unwrap(), "d".to_string()),
-                (Dec128::from_str("-2").unwrap(), "e".to_string()),
-                (Dec128::from_str("-1.5").unwrap(), "a".to_string()),
-                (Dec128::from_str("-1.5").unwrap(), "b".to_string())
-            ]);
+            assert_eq!(
+                val,
+                [
+                    (Dec128::from_str("-2").unwrap(), "a".to_string()),
+                    (Dec128::from_str("-2").unwrap(), "b".to_string()),
+                    (Dec128::from_str("-2").unwrap(), "c".to_string()),
+                    (Dec128::from_str("-2").unwrap(), "d".to_string()),
+                    (Dec128::from_str("-2").unwrap(), "e".to_string()),
+                    (Dec128::from_str("-1.5").unwrap(), "a".to_string()),
+                    (Dec128::from_str("-1.5").unwrap(), "b".to_string())
+                ]
+            );
         }
     }
 }

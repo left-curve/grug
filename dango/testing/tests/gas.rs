@@ -47,9 +47,12 @@ async fn gas_fee_rate_update_works() {
     let fee_old = Uint128::new(GAS as u128)
         .checked_mul_dec_ceil(OLD_FEE_RATE)
         .unwrap();
-    suite.balances().should_change(&accounts.user1, btree_map! {
-        usdc::DENOM.clone() => BalanceChange::Decreased(fee_old.into_inner()),
-    });
+    suite.balances().should_change(
+        &accounts.user1,
+        btree_map! {
+            usdc::DENOM.clone() => BalanceChange::Decreased(fee_old.into_inner()),
+        },
+    );
 
     // The owner raises the rate to `NEW_FEE_RATE`.
     let mut new_cfg = suite.query_config().unwrap();
@@ -73,7 +76,10 @@ async fn gas_fee_rate_update_works() {
     let fee_new = Uint128::new(GAS as u128)
         .checked_mul_dec_ceil(NEW_FEE_RATE)
         .unwrap();
-    suite.balances().should_change(&accounts.user1, btree_map! {
-        usdc::DENOM.clone() => BalanceChange::Decreased(fee_new.into_inner()),
-    });
+    suite.balances().should_change(
+        &accounts.user1,
+        btree_map! {
+            usdc::DENOM.clone() => BalanceChange::Decreased(fee_new.into_inner()),
+        },
+    );
 }

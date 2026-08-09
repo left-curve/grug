@@ -1,0 +1,17 @@
+set positional-arguments
+
+VERSION := "0.0.0-alpha.1"
+
+# Build the archive image locally.
+#
+# The binary must already be (cross-)compiled to
+# `target/<target>/release/archive`, e.g.:
+#   cross build --target x86_64-unknown-linux-gnu --release
+#
+# Usage: just build [target-triple] [tag]
+build target="x86_64-unknown-linux-gnu" tag=VERSION:
+  docker buildx build --load \
+    --build-arg TARGET_ARCH={{target}} \
+    --tag leftcurve/archive:{{tag}} \
+    -f {{justfile_directory()}}/Dockerfile \
+    {{justfile_directory()}}/../..

@@ -219,12 +219,13 @@ export function useAuthState(parameters: UseAuthStateParameters) {
 
       const seed = Math.floor(Math.random() * 0x100000000);
 
-      // Determine the EIP-712 sub-type for the Key enum variant.
-      const [keyVariant] = Object.keys(key);
-      const keyType = [{ name: keyVariant, type: "string" }];
-
       const { credential } = await connector.signArbitrary({
         primaryType: "Message" as const,
+        // `key` is a `Key` enum. EIP-712 has no sum type, so it's declared
+        // `string` and bound as its canonical JSON string by the EIP-712 signer
+        // (the non-EIP-712 signers sign the object form). This matches the
+        // chain's onboarding reconstruction, which commits the key to the
+        // signature (preventing key/seed/referrer front-running).
         message: {
           chainId: config.chain.id,
           key,
@@ -235,12 +236,11 @@ export function useAuthState(parameters: UseAuthStateParameters) {
         types: {
           Message: [
             { name: "chain_id", type: "string" },
-            { name: "key", type: "Key" },
+            { name: "key", type: "string" },
             { name: "key_hash", type: "string" },
             ...(referrer != null ? [{ name: "referrer", type: "uint32" }] : []),
             { name: "seed", type: "uint32" },
           ],
-          Key: keyType,
         },
       });
 

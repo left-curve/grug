@@ -204,9 +204,12 @@ async fn before_unlocking_starting_time() {
 
         // Check if the position is updated
         suite
-            .query_wasm_smart(vesting_addr, vesting::QueryPositionRequest {
-                user: accounts.user1.address(),
-            })
+            .query_wasm_smart(
+                vesting_addr,
+                vesting::QueryPositionRequest {
+                    user: accounts.user1.address(),
+                },
+            )
             .should_succeed_and(|res| res.position.claimed == res.position.total);
     }
 }
@@ -337,9 +340,12 @@ async fn after_unlocking_starting_time() {
 
         // Check if the position is updated
         suite
-            .query_wasm_smart(vesting_addr, vesting::QueryPositionRequest {
-                user: accounts.user1.address(),
-            })
+            .query_wasm_smart(
+                vesting_addr,
+                vesting::QueryPositionRequest {
+                    user: accounts.user1.address(),
+                },
+            )
             .should_succeed_and(|res| res.position.claimed == res.position.total);
     }
 }
@@ -394,9 +400,12 @@ async fn terminate_before_unlocking_starting_time_never_claimed() {
 
         // Check the status of the position after terminate
         suite
-            .query_wasm_smart(vesting_addr, QueryPositionRequest {
-                user: accounts.user1.address(),
-            })
+            .query_wasm_smart(
+                vesting_addr,
+                QueryPositionRequest {
+                    user: accounts.user1.address(),
+                },
+            )
             .should_succeed_and(|res| {
                 res.position.vesting_status == VestingStatus::Terminated(Uint128::new(40))
                     && res.claimable == Uint128::new(37)
@@ -436,9 +445,12 @@ async fn terminate_before_unlocking_starting_time_never_claimed() {
 
         // Check if the position is removed
         suite
-            .query_wasm_smart(vesting_addr, vesting::QueryPositionRequest {
-                user: accounts.user1.address(),
-            })
+            .query_wasm_smart(
+                vesting_addr,
+                vesting::QueryPositionRequest {
+                    user: accounts.user1.address(),
+                },
+            )
             .should_succeed_and(|res| {
                 res.position.vesting_status == VestingStatus::Terminated(Uint128::new(40))
                     && res.position.claimed == Uint128::new(40)
@@ -527,9 +539,12 @@ async fn terminate_before_unlocking_starting_time_with_claimed() {
 
         // Check the status of the position after terminate
         suite
-            .query_wasm_smart(vesting_addr, QueryPositionRequest {
-                user: accounts.user1.address(),
-            })
+            .query_wasm_smart(
+                vesting_addr,
+                QueryPositionRequest {
+                    user: accounts.user1.address(),
+                },
+            )
             .should_succeed_and(|res| {
                 res.position.vesting_status == VestingStatus::Terminated(Uint128::new(44))
                     && res.position.claimed == Uint128::new(37)
@@ -553,9 +568,12 @@ async fn terminate_before_unlocking_starting_time_with_claimed() {
 
         // Check if the position is removed
         suite
-            .query_wasm_smart(vesting_addr, vesting::QueryPositionRequest {
-                user: accounts.user1.address(),
-            })
+            .query_wasm_smart(
+                vesting_addr,
+                vesting::QueryPositionRequest {
+                    user: accounts.user1.address(),
+                },
+            )
             .should_succeed_and(|res| {
                 res.position.vesting_status == VestingStatus::Terminated(Uint128::new(44))
                     && res.position.claimed == Uint128::new(44)
@@ -616,9 +634,12 @@ async fn terminate_after_unlocking_starting_time() {
 
         // Check the status of the position after terminate
         suite
-            .query_wasm_smart(vesting_addr, QueryPositionRequest {
-                user: accounts.user1.address(),
-            })
+            .query_wasm_smart(
+                vesting_addr,
+                QueryPositionRequest {
+                    user: accounts.user1.address(),
+                },
+            )
             .should_succeed_and(|res| {
                 res.position.vesting_status == VestingStatus::Terminated(Uint128::new(37))
                     && res.claimable == Uint128::new(37)
@@ -639,9 +660,12 @@ async fn terminate_after_unlocking_starting_time() {
 
         // Check if the position is removed
         suite
-            .query_wasm_smart(vesting_addr, vesting::QueryPositionRequest {
-                user: accounts.user1.address(),
-            })
+            .query_wasm_smart(
+                vesting_addr,
+                vesting::QueryPositionRequest {
+                    user: accounts.user1.address(),
+                },
+            )
             .should_succeed_and(|res| {
                 res.position.vesting_status == VestingStatus::Terminated(Uint128::new(37))
                     && res.position.claimed == Uint128::new(37)

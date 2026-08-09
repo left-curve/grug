@@ -164,9 +164,7 @@ export type {
   MessageType,
   MetadataType,
   SolidityTypes,
-  TxMessageType,
   TypedData,
-  TypedDataParameter,
   TypedDataProperty,
   ArbitraryTypedData,
 } from "./typedData.js";

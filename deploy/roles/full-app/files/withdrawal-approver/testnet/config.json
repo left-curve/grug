@@ -1,0 +1,10 @@
+{
+  "app_settings": {
+    "fetch_sleep": "10s",
+    "review_sleep": "5s",
+    "page_limit": 30
+  },
+  "http_url": "http://dango:8080",
+  "log_level": "info",
+  "log_format": "text"
+}

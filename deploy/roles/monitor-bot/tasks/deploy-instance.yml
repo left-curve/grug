@@ -1,0 +1,50 @@
+---
+- name: "{{ network }} - Create directories"
+  file:
+    path: "{{ monitor_bot_dir }}/{{ network }}/{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - ""
+    - "data"
+
+- name: "{{ network }} - Template config.json"
+  template:
+    src: config.json.j2
+    dest: "{{ monitor_bot_dir }}/{{ network }}/config.json"
+    mode: "0644"
+
+# diff/no_log off: the rendered content is the Discord webhook URL, which is
+# a post-to-channel credential.
+- name: "{{ network }} - Template .env"
+  template:
+    src: env.j2
+    dest: "{{ monitor_bot_dir }}/{{ network }}/.env"
+    mode: "0600"
+  diff: false
+  no_log: true
+
+- name: "{{ network }} - Template docker-compose.yml"
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ monitor_bot_dir }}/{{ network }}/docker-compose.yml"
+    mode: "0644"
+
+- name: "{{ network }} - Login to GHCR"
+  community.docker.docker_login:
+    registry: ghcr.io
+    username: "{{ ghcr_user }}"
+    password: "{{ ghcr_token }}"
+  no_log: true
+
+- name: "{{ network }} - Launch stack"
+  community.docker.docker_compose_v2:
+    project_src: "{{ monitor_bot_dir }}/{{ network }}"
+    pull: always
+    state: present
+    recreate: always
+
+- name: "{{ network }} - Logout from GHCR"
+  community.docker.docker_login:
+    registry: ghcr.io
+    state: absent

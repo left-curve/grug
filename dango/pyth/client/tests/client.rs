@@ -22,7 +22,6 @@ use {
         binary_update::BinaryWsUpdate,
         message::Message as PythMessage,
     },
-    rand::Rng,
     reqwest::StatusCode,
     std::{
         net::SocketAddr,
@@ -41,10 +40,11 @@ const TOKEN: &str = "insert_lazer_token_here";
 async fn test_lazer_stream() {
     let client = PythClient::new(NonEmpty::new_unchecked(LAZER_ENDPOINTS_TEST), TOKEN).unwrap();
 
-    test_stream(client, vec![BTC_USD_ID, ETH_USD_ID], vec![
-        SOL_USD_ID,
-        HYPE_USD_ID,
-    ])
+    test_stream(
+        client,
+        vec![BTC_USD_ID, ETH_USD_ID],
+        vec![SOL_USD_ID, HYPE_USD_ID],
+    )
     .await;
 }
 
@@ -61,9 +61,8 @@ async fn test_lazer_stream() {
 #[tokio::test(flavor = "multi_thread")]
 async fn reconnection() {
     // Random port 15k - 16k.
-    let mut rng = rand::thread_rng();
-    let port = rng.gen_range(15000..16000);
-    let port_alive = rng.gen_range(15000..16000);
+    let port = rand::random_range(15000..16000);
+    let port_alive = rand::random_range(15000..16000);
 
     // Run the mock ws server to keep connection alive.
     run_server(port_alive, true).await;

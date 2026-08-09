@@ -142,14 +142,13 @@ impl dango_app::Indexer for Indexer {
         // perps feed has always worked (the perps address it needs only arrives
         // with `app_cfg` at `post_indexing`). The cold `reindex` path skips
         // `index_block`, so the rings stay live-only.
-        self.inner
-            .pending
-            .lock()
-            .unwrap()
-            .insert(block.info.height, FullBlock {
+        self.inner.pending.lock().unwrap().insert(
+            block.info.height,
+            FullBlock {
                 block: block.clone(),
                 outcome: block_outcome.clone(),
-            });
+            },
+        );
 
         Ok(())
     }

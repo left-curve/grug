@@ -14,7 +14,7 @@ use {
     dango_db_disk::DiskDb,
     dango_genesis::GenesisCodes,
     dango_indexer_hooked::HookedIndexer,
-    dango_indexer_httpd::{TendermintRpcClient, context::MinimalContext as HttpdContext},
+    dango_indexer_httpd::TendermintRpcClient,
     dango_primitives::{GIT_COMMIT, HttpdConfig},
     dango_proposal_preparer::ProposalPreparer,
     dango_vm_rust::RustVm,
@@ -69,16 +69,16 @@ impl StartCmd {
             // Below are parameters if we want to switch to `HybridVm`:
             // cfg.grug.wasm_cache_capacity,
             // [
-            //     codes.account_factory.to_bytes().hash256(),
-            //     codes.account_single.to_bytes().hash256(),
-            //     codes.bank.to_bytes().hash256(),
-            //     codes.gateway.to_bytes().hash256(),
-            //     codes.hyperlane.ism.to_bytes().hash256(),
-            //     codes.hyperlane.mailbox.to_bytes().hash256(),
-            //     codes.hyperlane.va.to_bytes().hash256(),
-            //     codes.oracle.to_bytes().hash256(),
-            //     codes.vesting.to_bytes().hash256(),
-            //     codes.warp.to_bytes().hash256(),
+            //     codes.account_factory.to_bytes().sha2_256(),
+            //     codes.account_single.to_bytes().sha2_256(),
+            //     codes.bank.to_bytes().sha2_256(),
+            //     codes.gateway.to_bytes().sha2_256(),
+            //     codes.hyperlane.ism.to_bytes().sha2_256(),
+            //     codes.hyperlane.mailbox.to_bytes().sha2_256(),
+            //     codes.hyperlane.va.to_bytes().sha2_256(),
+            //     codes.oracle.to_bytes().sha2_256(),
+            //     codes.vesting.to_bytes().sha2_256(),
+            //     codes.warp.to_bytes().sha2_256(),
             // ]
         );
 
@@ -105,19 +105,16 @@ impl StartCmd {
         let httpd_shutdown_flag = Arc::new(AtomicBool::new(false));
         let httpd_shutdown_flags = vec![httpd_shutdown_flag.clone()];
 
-        // Run ABCI server, optionally with indexer and httpd server.
+        // Run the ABCI server — the indexer always runs, hooked into the app —
+        // optionally with the httpd and metrics servers.
         //
         // Capture the result instead of `?`-propagating so we can *always*
         // wait for the indexer's pending post-indexing tasks to drain before
         // returning, even if one of the servers errored out (e.g. planned
         // halt propagated as an ABCI error).
-        let run_result: anyhow::Result<()> = match (
-            cfg.indexer.enabled,
-            cfg.httpd.enabled,
-            cfg.metrics_httpd.enabled,
-        ) {
-            (true, true, true) => {
-                // Indexer, HTTP server, and metrics server all enabled
+        let run_result: anyhow::Result<()> = match (cfg.httpd.enabled, cfg.metrics_httpd.enabled) {
+            (true, true) => {
+                // HTTP server and metrics server both enabled
                 tokio::try_join!(
                     Self::run_dango_httpd_server(
                         &cfg.httpd,
@@ -138,8 +135,8 @@ impl StartCmd {
                 )
                 .map(|_| ())
             },
-            (true, true, false) => {
-                // Indexer and HTTP server enabled, metrics disabled
+            (true, false) => {
+                // HTTP server enabled, metrics disabled
                 tokio::try_join!(
                     Self::run_dango_httpd_server(
                         &cfg.httpd,
@@ -159,8 +156,8 @@ impl StartCmd {
                 )
                 .map(|_| ())
             },
-            (true, false, true) => {
-                // Indexer and metrics enabled, HTTP server disabled
+            (false, true) => {
+                // Metrics enabled, HTTP server disabled
                 tokio::try_join!(
                     Self::run_metrics_httpd_server(&cfg.metrics_httpd, metrics_handler),
                     self.run_with_indexer(
@@ -176,8 +173,8 @@ impl StartCmd {
                 )
                 .map(|_| ())
             },
-            (true, false, false) => {
-                // Only indexer enabled
+            (false, false) => {
+                // Neither HTTP server nor metrics server
                 self.run_with_indexer(
                     cfg.grug,
                     cfg.tendermint,
@@ -186,67 +183,6 @@ impl StartCmd {
                     vm,
                     hooked_indexer.clone(),
                     hooked_indexer,
-                    vec![], // No HTTP server shutdown flags
-                )
-                .await
-            },
-            (false, true, false) => {
-                // No indexer, but HTTP server enabled (minimal mode), metrics disabled
-                let httpd_context = HttpdContext::new(app);
-
-                tokio::try_join!(
-                    Self::run_minimal_httpd_server(
-                        &cfg.httpd,
-                        httpd_context,
-                        httpd_shutdown_flag.clone()
-                    ),
-                    self.run_with_indexer(
-                        cfg.grug,
-                        cfg.tendermint,
-                        cfg.pyth,
-                        db,
-                        vm,
-                        NullIndexer,
-                        NullIndexer,
-                        httpd_shutdown_flags
-                    )
-                )
-                .map(|_| ())
-            },
-            (false, true, true) => {
-                // No indexer, but HTTP server enabled (minimal mode), metrics enabled
-                let httpd_context = HttpdContext::new(app);
-
-                tokio::try_join!(
-                    Self::run_minimal_httpd_server(
-                        &cfg.httpd,
-                        httpd_context,
-                        httpd_shutdown_flag.clone()
-                    ),
-                    self.run_with_indexer(
-                        cfg.grug,
-                        cfg.tendermint,
-                        cfg.pyth,
-                        db,
-                        vm,
-                        NullIndexer,
-                        NullIndexer,
-                        httpd_shutdown_flags
-                    ),
-                    Self::run_metrics_httpd_server(&cfg.metrics_httpd, metrics_handler)
-                )
-                .map(|_| ())
-            },
-            (false, false, _) => {
-                // No indexer, no HTTP server
-                self.run_with_indexer(
-                    cfg.grug,
-                    cfg.tendermint,
-                    cfg.pyth,
-                    db,
-                    vm,
-                    NullIndexer,
-                    NullIndexer,
                     vec![], // No HTTP server shutdown flags
                 )
                 .await
@@ -288,8 +224,7 @@ impl StartCmd {
 
         let clickhouse_indexer = dango_indexer_clickhouse::Indexer::new(clickhouse_context.clone());
 
-        let mut indexer_cache = dango_indexer_cache::Cache::new_with_dir(app_dir.indexer_dir());
-        indexer_cache.context.s3 = cfg.indexer.s3.clone();
+        let indexer_cache = dango_indexer_cache::Cache::new_with_dir(app_dir.indexer_dir());
         let indexer_cache_context = indexer_cache.context.clone();
 
         let mut hooked_indexer = HookedIndexer::new(indexer_cache, sql_indexer, clickhouse_indexer);
@@ -314,21 +249,6 @@ impl StartCmd {
             .map_err(|e| anyhow!("Failed to start indexer: {e}"))?;
 
         Ok((hooked_indexer, dango_httpd_context))
-    }
-
-    /// Run the minimal HTTP server (without indexer features)
-    /// The shutdown flag should be set when signals are received to return 503 for new requests.
-    async fn run_minimal_httpd_server(
-        cfg: &HttpdConfig,
-        context: HttpdContext,
-        shutdown_flag: Arc<AtomicBool>,
-    ) -> anyhow::Result<()> {
-        dango_indexer_httpd::server::run_minimal_server(cfg, context, shutdown_flag)
-            .await
-            .map_err(|err| {
-                tracing::error!("Failed to run minimal HTTP server: {err:?}");
-                anyhow::anyhow!("Failed to run minimal HTTP server: {err:?}")
-            })
     }
 
     /// Run the full-featured HTTP server (with indexer features)

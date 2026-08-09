@@ -264,13 +264,16 @@ async fn index(
         .zip(outcome.block_outcome.tx_outcomes.iter())
         .enumerate()
     {
-        index_txs.insert(*hash, SearchTxOutcome {
-            hash: *hash,
-            height: block_info.height,
-            index: index as u32,
-            tx: tx.clone(),
-            outcome: outcome.clone(),
-        });
+        index_txs.insert(
+            *hash,
+            SearchTxOutcome {
+                hash: *hash,
+                height: block_info.height,
+                index: index as u32,
+                tx: tx.clone(),
+                outcome: outcome.clone(),
+            },
+        );
     }
 
     let block = Block {

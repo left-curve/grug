@@ -80,10 +80,13 @@ fn account_factory(querier: impl DangoQuerier) -> Addr {
 }
 
 pub fn instantiate(ctx: MutableCtx, msg: InstantiateMsg) -> anyhow::Result<Response> {
-    STATE.save(ctx.storage, &State {
-        last_funding_time: ctx.block.timestamp,
-        ..Default::default()
-    })?;
+    STATE.save(
+        ctx.storage,
+        &State {
+            last_funding_time: ctx.block.timestamp,
+            ..Default::default()
+        },
+    )?;
 
     NEXT_ORDER_ID.save(ctx.storage, &OrderId::ONE)?;
     NEXT_FILL_ID.save(ctx.storage, &FillId::ONE)?;
@@ -312,6 +315,13 @@ pub fn query(ctx: ImmutableCtx, msg: QueryMsg) -> anyhow::Result<Json> {
         },
         QueryMsg::OrdersByUser { user } => {
             let res = query::query_orders_by_user(ctx, user)?;
+            res.to_json_value()
+        },
+        QueryMsg::OrderByClientOrderId {
+            user,
+            client_order_id,
+        } => {
+            let res = query::query_order_by_client_order_id(ctx, user, client_order_id)?;
             res.to_json_value()
         },
         QueryMsg::LiquidityDepth {

@@ -10,7 +10,7 @@ export const hyperlaneConfigs = {
         name: "Ethereum Network",
         order: 1,
         protocolFee: 0,
-        rpcUrl: "https://mainnet.infura.io/v3/00f81bbb13ef4da997f6351b8146807e",
+        rpcUrl: "https://ethereum-mainnet.core.chainstack.com/70a1cfb855fe87c4abe1dfbcfb58cadb",
         contracts: {
           mailbox: "0xc005dc82818d67AF737725bD4bf75435d065D239",
           proxyAdmin: "0x613942eff27c6886bb2a33a172cdaf03a009e601",
@@ -51,7 +51,7 @@ export const hyperlaneConfigs = {
         name: "Arbitrum Network",
         order: 0,
         protocolFee: 0,
-        rpcUrl: "https://arbitrum-mainnet.infura.io/v3/00f81bbb13ef4da997f6351b8146807e",
+        rpcUrl: "https://arbitrum-mainnet.core.chainstack.com/0e3277a137b9af07fcd4c8088d7f618d",
         contracts: {
           mailbox: "0x979ca5202784112f4738403dbec5d0f3b9daabb9",
           proxyAdmin: "0x947303e34c1a2b97fb00c68c1cc4ca97b3361fe6",
@@ -89,7 +89,7 @@ export const hyperlaneConfigs = {
         name: "Sepolia Network",
         order: 0,
         protocolFee: 1,
-        rpcUrl: "https://sepolia.infura.io/v3/2de96f6db6d34eccaa8935cabb9b29c8",
+        rpcUrl: "https://ethereum-sepolia-rpc.publicnode.com",
         contracts: {
           mailbox: "0xffaef09b3cd11d9b20d1a19becca54eec2884766",
           proxyAdmin: "0x59cf4f33ce42afa957b93e68031f07bf6d299d60",
@@ -122,7 +122,7 @@ export const hyperlaneConfigs = {
         name: "Arbitrum Sepolia Network",
         order: 1,
         protocolFee: 1,
-        rpcUrl: "https://arbitrum-sepolia.infura.io/v3/2de96f6db6d34eccaa8935cabb9b29c8",
+        rpcUrl: "https://arbitrum-sepolia-rpc.publicnode.com",
         contracts: {
           mailbox: "0x598face78a4302f11e3de0bee1894da0b2cb71f8",
           proxyAdmin: "0x947303e34c1a2b97fb00c68c1cc4ca97b3361fe6",

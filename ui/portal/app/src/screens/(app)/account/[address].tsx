@@ -1,11 +1,7 @@
 import { m } from "@left-curve/foundation/paraglide/messages.js";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useApp } from "@left-curve/foundation";
-import {
-  useExplorerAccount,
-  useExplorerTransactionsBySender,
-  usePrices,
-} from "@left-curve/store";
+import { useExplorerAccount, useExplorerTransactionsByAddress, usePrices } from "@left-curve/store";
 
 import { AddressVisualizer } from "~/components/foundation/AddressVisualizer";
 import { Badge, GlobalText, MobileTitle, Skeleton } from "~/components/foundation";
@@ -26,10 +22,11 @@ export default function AccountExplorerScreen() {
   const { settings } = useApp();
   const { calculateBalance } = usePrices();
 
-  const { data: txData, pagination, isLoading: txsLoading } = useExplorerTransactionsBySender(
-    account?.address as `0x${string}`,
-    !!account,
-  );
+  const {
+    data: txData,
+    pagination,
+    isLoading: txsLoading,
+  } = useExplorerTransactionsByAddress(account?.address as `0x${string}`, !!account);
 
   const totalCoins = account ? Object.values(account.balances).length : 0;
   const totalBalance = account
@@ -56,7 +53,8 @@ export default function AccountExplorerScreen() {
           title={m["explorer.accounts.notFound.title"]()}
           description={
             <>
-              {m["explorer.accounts.notFound.pre"]()} <GlobalText className="underline">{address}</GlobalText>{" "}
+              {m["explorer.accounts.notFound.pre"]()}{" "}
+              <GlobalText className="underline">{address}</GlobalText>{" "}
               {m["explorer.accounts.notFound.description"]()}
             </>
           }

@@ -2,7 +2,8 @@
 //!
 //! One socket carries any number of subscriptions, each identified by a
 //! client-chosen `id`. Client messages are `method`-tagged
-//! (`subscribe` / `unsubscribe` / `ping`); server messages are `channel`-tagged
+//! (`subscribe` / `unsubscribe` / `ping` / `broadcast` / `query`); server
+//! messages are `channel`-tagged
 //! (`subscriptionResponse` / `<channel>` / `pong`). The `id` of a `subscribe` is
 //! echoed on its acknowledgement and on every frame it produces, so concurrent
 //! subscriptions (e.g. several `perpsEvents` feeds with different filters) are
@@ -15,30 +16,56 @@
 //! channel to attribute them to — an unparseable frame, or an `unsubscribe` for
 //! an unknown `id` — use the dedicated `error` channel.
 //!
-//! Two channel types are served, both reusing the in-memory validator stream
-//! that backed the `full_block` / `perps_events` GraphQL subscriptions:
+//! The following channel types are served, all reusing the in-memory validator
+//! stream that backed the `full_block` / `perps_events` GraphQL subscriptions:
 //!
-//! - `fullBlock` — every finalized block (`{block, outcome}`).
 //! - `perpsEvents` — perps-contract events grouped per block, narrowed by the
 //!   `eventTypes` / `pairIds` / `users` / `orderIds` / `clientOrderIds` filters.
+//! - `blockInfo` — every finalized block's metadata
+//!   (`{height, timestamp, hash}`).
+//! - `block` — every finalized block without its execution outcome
+//!   (`{info, txs}`).
+//! - `fullBlock` — every finalized block in full (`{block, outcome}`).
+//! - `query` — a standing query: an initial snapshot at subscribe time, then a
+//!   re-run once per block whose height is a multiple of `interval`, each
+//!   frame a `{blockHeight, response}`. Identical concurrent subscriptions
+//!   share one execution per tick (see [`crate::query_memo`]).
+//! - `perpsPairState` / `perpsUserState` / `perpsOrdersByUser` /
+//!   `perpsLiquidityDepth` — standing-query aliases of the matching `/perps/*`
+//!   REST routes, taking the routes' snake_case parameters in place of a raw
+//!   grug `Query`. Each desugars at subscribe time — the perps contract
+//!   address is resolved server-side — into the same execution path as
+//!   `query`, so an alias and a raw `query` subscription for the same read
+//!   share executions through the memo. Frames are `{blockHeight, response}`
+//!   on the alias's own channel, with `response` unwrapped to the raw
+//!   contract response, exactly what the REST twin returns.
+//!
+//! Two one-shot request/response methods ride the same socket: `broadcast`
+//! (submit a signed transaction to the mempool) and `query` (run a read-only
+//! query against the latest finalized state, the same `Query`/`QueryResponse`
+//! shapes as REST `POST /query`). Each is answered with a single frame on its
+//! own channel, tagged with the request's `id`.
 //!
 //! The transport is otherwise a thin shell over
 //! [`dango_indexer_stream::Context`]; only the framing differs from the SSE and
 //! GraphQL transports. The message enums are left open (no `#[non_exhaustive]`
-//! barrier, but room in the protocol) so a future request/response write path
-//! (`broadcast` / `post`) and further read channels (`l2Book`, `candle`, …) can
-//! be added without breaking existing clients.
+//! barrier, but room in the protocol) so further read channels (`l2Book`,
+//! `candle`, …) can be added without breaking existing clients.
 
 use {
     crate::{
         context::FullContext,
+        graphql::query::core::CoreQuery,
+        query_memo::QueryFrame,
         request_ip::RequesterIp,
+        routes::perps::{LiquidityDepthQuery, OrdersByUserQuery, PairIdQuery, UserStateQuery},
         subscription_limiter::{ConnectionLimiter, SubscriptionLimiter, guard_subscription_stream},
     },
     actix_web::{HttpRequest, HttpResponse, Resource, guard, web},
     actix_ws::{AggregatedMessage, Session},
-    dango_indexer_stream::{Context, make_perps_filter},
-    dango_primitives::{HttpRequestDetails, Tx},
+    dango_indexer_stream::make_perps_filter,
+    dango_primitives::{HttpRequestDetails, Json, Query, QueryResponse, Tx},
+    dango_types::perps,
     futures_util::{StreamExt, stream},
     serde::{Deserialize, Serialize},
     std::{collections::HashSet, pin::Pin, sync::Arc, time::Duration},
@@ -72,6 +99,56 @@ pub fn services() -> Resource {
     )
 }
 
+/// Doc-only stub carrying the OpenAPI path item for `GET /ws` — never mounted;
+/// the real route is the upgrade-guarded resource in [`services`], which
+/// `#[utoipa::path]` cannot annotate. OpenAPI cannot model WebSocket traffic,
+/// so the entry is purely informational.
+#[utoipa::path(
+    get,
+    path = "/ws",
+    tag = "websocket",
+    summary = "Multiplexed WebSocket subscriptions",
+    description = "WebSocket upgrade endpoint. One socket carries any number \
+                   of subscriptions, each identified by a client-chosen `id`. \
+                   Client messages are `method`-tagged JSON: `subscribe` — \
+                   opening a `perpsEvents` feed (per-block perps events, \
+                   narrowed by `eventTypes` / `pairIds` / `users` / `orderIds` \
+                   / `clientOrderIds` filters), a `blockInfo` feed (every \
+                   finalized block's metadata, the `info` field of `Block`), \
+                   a `block` feed (every finalized block without its \
+                   execution outcome, the same shape as \
+                   `/block/info/{block_height}`), a `fullBlock` feed \
+                   (every finalized `{ block, outcome }`, the same shape as \
+                   `/block/full/{block_height}`), a `query` feed (a \
+                   standing read-only state query, re-run every `interval` \
+                   blocks), or a standing perps alias feed — \
+                   `perpsPairState`, `perpsUserState`, `perpsOrdersByUser`, \
+                   `perpsLiquidityDepth` — the WS twins of the matching \
+                   `/perps/*` REST routes, taking the same snake_case \
+                   parameters plus `interval`, with the contract address \
+                   resolved server-side and each frame's `response` being \
+                   the raw contract response — plus `unsubscribe`, `ping`, \
+                   `broadcast` (submit a signed `Tx` over the socket), and \
+                   `query` (run a one-time read-only state query, the same \
+                   `Query`/`QueryResponse` shapes as `POST /query`). \
+                   Server frames are `channel`-tagged: `subscriptionResponse`, \
+                   `perpsEvents`, `blockInfo`, `block`, `fullBlock`, \
+                   `perpsPairState`, `perpsUserState`, `perpsOrdersByUser`, \
+                   `perpsLiquidityDepth`, `broadcast`, `query`, `pong`, and \
+                   `error`. The server pings every 20 seconds and closes a \
+                   socket idle for 60 seconds. \
+                   **Swagger UI cannot open WebSocket connections** — this \
+                   entry is documentation only.",
+    responses(
+        (status = 101, description = "Switching Protocols — WebSocket handshake accepted; \
+                                      all further traffic is JSON frames"),
+        (status = 404, description = "Without an `Upgrade: websocket` header the route does \
+                                      not match and the request falls through to the 404 \
+                                      handler"),
+    ),
+)]
+pub fn ws_doc() {}
+
 // ---- client and server message types ----
 
 /// A message sent by the client. Discriminated by `method`.
@@ -104,6 +181,13 @@ enum ClientMessage {
     /// default; this lets a client already holding a `/ws` connection broadcast
     /// without a separate HTTP request.
     Broadcast { id: u64, tx: Tx },
+
+    /// Run a one-time, read-only query against the latest finalized state.
+    /// Answered on the `query` channel: the raw `QueryResponse` (`data`) — the
+    /// same shape the REST `POST /query` returns — or an `error` frame if the
+    /// query fails. The REST route is the default; this lets a client already
+    /// holding a `/ws` connection query state without a separate HTTP request.
+    Query { id: u64, query: Query },
 }
 
 /// The feed a `subscribe` selects, discriminated by `type`.
@@ -137,12 +221,97 @@ enum Subscription {
         client_order_ids: Option<HashSet<String>>,
     },
 
+    /// Every finalized block's metadata (height, timestamp, hash) — the `info`
+    /// field of `Block`. Delivered on the `blockInfo` channel.
+    BlockInfo {
+        #[serde(default)]
+        since: Option<u64>,
+    },
+
+    /// Every finalized block as produced by the consensus engine — metadata
+    /// and transactions, without the execution outcome. Delivered on the
+    /// `block` channel.
+    Block {
+        #[serde(default)]
+        since: Option<u64>,
+    },
+
     /// Every finalized block in full (`Block` + `BlockOutcome`). Delivered on
     /// the `fullBlock` channel.
     FullBlock {
         #[serde(default)]
         since: Option<u64>,
     },
+
+    /// A standing read-only query: an initial snapshot at subscribe time, then
+    /// a re-run once per block whose height is a multiple of `interval`, each
+    /// frame carrying `{blockHeight, response}` on the `query` channel.
+    ///
+    /// Live-only — there is no `since` replay, because historical state cannot
+    /// be re-queried; on reconnect, resubscribe and take the fresh snapshot.
+    Query {
+        query: Query,
+
+        #[serde(default = "default_query_interval")]
+        interval: u64,
+    },
+
+    /// A standing `pair_state` read for one trading pair — open interest,
+    /// funding rate, index price — the WS twin of REST
+    /// `GET /perps/pair-state`, with the same snake_case parameters and the
+    /// same `interval` semantics as `query`. `response` is the contract's
+    /// `PairState`, verbatim; an unknown pair streams `null`, the WS analogue
+    /// of the REST 404.
+    PerpsPairState {
+        #[serde(flatten)]
+        params: PairIdQuery,
+
+        #[serde(default = "default_query_interval")]
+        interval: u64,
+    },
+
+    /// A standing `user_state_extended` read for one user — margin, equity,
+    /// positions, per the `include_*` flags — the WS twin of REST
+    /// `GET /perps/user-state`.
+    PerpsUserState {
+        #[serde(flatten)]
+        params: UserStateQuery,
+
+        #[serde(default = "default_query_interval")]
+        interval: u64,
+    },
+
+    /// A standing `orders_by_user` read — a user's resting limit orders keyed
+    /// by order ID — the WS twin of REST `GET /perps/order/by-user`. For
+    /// incremental order updates, prefer the push-based `perpsEvents` feed;
+    /// this is the periodically-refreshed snapshot form.
+    PerpsOrdersByUser {
+        #[serde(flatten)]
+        params: OrdersByUserQuery,
+
+        #[serde(default = "default_query_interval")]
+        interval: u64,
+    },
+
+    /// A standing `liquidity_depth` read — aggregated order book depth at one
+    /// of the pair's configured bucket sizes — the WS twin of REST
+    /// `GET /perps/liquidity-depth`. `interval: 1` gives per-block book
+    /// updates.
+    PerpsLiquidityDepth {
+        #[serde(flatten)]
+        params: LiquidityDepthQuery,
+
+        #[serde(default = "default_query_interval")]
+        interval: u64,
+    },
+}
+
+/// A `query` subscription that does not say otherwise re-runs every 10 blocks
+/// — matching the GraphQL `query_app` default, and keeping the load modest
+/// when many clients subscribe without choosing an interval. A client that
+/// wants per-block updates asks for `interval: 1` explicitly.
+const fn default_query_interval() -> u64 {
+    10
 }
 
 impl Subscription {
@@ -150,7 +319,14 @@ impl Subscription {
     fn channel(&self) -> &'static str {
         match self {
             Subscription::PerpsEvents { .. } => "perpsEvents",
+            Subscription::BlockInfo { .. } => "blockInfo",
+            Subscription::Block { .. } => "block",
             Subscription::FullBlock { .. } => "fullBlock",
+            Subscription::Query { .. } => "query",
+            Subscription::PerpsPairState { .. } => "perpsPairState",
+            Subscription::PerpsUserState { .. } => "perpsUserState",
+            Subscription::PerpsOrdersByUser { .. } => "perpsOrdersByUser",
+            Subscription::PerpsLiquidityDepth { .. } => "perpsLiquidityDepth",
         }
     }
 }
@@ -355,12 +531,20 @@ async fn handle_text(
                 },
             };
 
-            match open_stream(id, &subscription, guard, &app_ctx.stream_context) {
+            match open_stream(id, &subscription, guard, app_ctx).await {
                 Ok(frames) => {
                     streams.insert(id, frames);
                     send(session, ack(id, "subscribe", Some(channel))).await
                 },
-                Err(resync) => send(session, channel_error(channel, id, "resync", &resync)).await,
+                Err(SubscribeError::BadRequest(message)) => {
+                    send(session, channel_error(channel, id, "badRequest", &message)).await
+                },
+                Err(SubscribeError::Resync(message)) => {
+                    send(session, channel_error(channel, id, "resync", &message)).await
+                },
+                Err(SubscribeError::Unavailable(message)) => {
+                    send(session, channel_error(channel, id, "unavailable", &message)).await
+                },
             }
         },
         ClientMessage::Unsubscribe { id } => {
@@ -401,7 +585,49 @@ async fn handle_text(
                 },
             }
         },
+        ClientMessage::Query { id, query } => {
+            // Reject an `id` already bound to a live subscription on this socket,
+            // so the client can demultiplex the `query` reply unambiguously.
+            if streams.contains_key(&id) {
+                return send(
+                    session,
+                    channel_error("query", id, "badRequest", "id already in use"),
+                )
+                .await;
+            }
+
+            // Awaited inline: a query is a fast, in-process state read. Unlike
+            // `broadcast`, whose payload type carries its own rejection, a
+            // `QueryResponse` is success-only, so a failed query is an `error`
+            // frame — the WS mirror of the REST route's `400`. The reply drops
+            // the block height `query_app` reports, matching REST `/query`.
+            match CoreQuery::_query_app(&app_ctx.base, query).await {
+                Ok(res) => send(session, data_frame("query", id, &res.response)).await,
+                Err(err) => {
+                    send(
+                        session,
+                        channel_error("query", id, "queryFailed", &err.message),
+                    )
+                    .await
+                },
+            }
+        },
     }
+}
+
+/// Why a subscription could not be opened. Mapped to the co-located error
+/// frame's `code` at the `handle_text` call site.
+enum SubscribeError {
+    /// The request itself is invalid (e.g. a zero `interval`).
+    BadRequest(String),
+
+    /// The requested `since` predates the retained window.
+    Resync(String),
+
+    /// A server-side dependency is not ready — e.g. the contract addresses
+    /// cannot be resolved because the chain has not committed its genesis
+    /// state yet. The WS analogue of the REST 503; resubscribing retries.
+    Unavailable(String),
 }
 
 /// Open the validator stream for a subscription and project it to tagged JSON
@@ -409,12 +635,14 @@ async fn handle_text(
 /// exactly as long as the subscription. On a connect-time resync (the requested
 /// `since` predates the retained window) the guard is dropped and the resync
 /// message returned as `Err`.
-fn open_stream(
+async fn open_stream(
     id: u64,
     subscription: &Subscription,
     guard: Arc<crate::subscription_limiter::SubscriptionGuard>,
-    stream_ctx: &Context,
-) -> Result<FrameStream, String> {
+    app_ctx: &FullContext,
+) -> Result<FrameStream, SubscribeError> {
+    let stream_ctx = &app_ctx.stream_context;
+
     match subscription {
         Subscription::PerpsEvents {
             since,
@@ -435,23 +663,184 @@ fn open_stream(
             let raw = stream_ctx
                 .perps()
                 .subscribe(*since, filter)
-                .map_err(|resync| resync.to_string())?;
+                .map_err(|resync| SubscribeError::Resync(resync.to_string()))?;
             let frames = guard_subscription_stream(raw, Some(guard))
                 .map(move |block| data_frame("perpsEvents", id, &block));
 
             Ok(with_terminal("perpsEvents", id, frames))
         },
+        Subscription::BlockInfo { since } => {
+            let raw = stream_ctx
+                .blocks()
+                .subscribe(*since, |block| Some(block.block.info))
+                .map_err(|resync| SubscribeError::Resync(resync.to_string()))?;
+            let frames = guard_subscription_stream(raw, Some(guard))
+                .map(move |info| data_frame("blockInfo", id, &info));
+
+            Ok(with_terminal("blockInfo", id, frames))
+        },
+        Subscription::Block { since } => {
+            let raw = stream_ctx
+                .blocks()
+                .subscribe(*since, |block| Some(block.block.clone()))
+                .map_err(|resync| SubscribeError::Resync(resync.to_string()))?;
+            let frames = guard_subscription_stream(raw, Some(guard))
+                .map(move |block| data_frame("block", id, &block));
+
+            Ok(with_terminal("block", id, frames))
+        },
         Subscription::FullBlock { since } => {
             let raw = stream_ctx
                 .blocks()
                 .subscribe(*since, |block| Some(block.clone()))
-                .map_err(|resync| resync.to_string())?;
+                .map_err(|resync| SubscribeError::Resync(resync.to_string()))?;
             let frames = guard_subscription_stream(raw, Some(guard))
                 .map(move |block| data_frame("fullBlock", id, &block));
 
             Ok(with_terminal("fullBlock", id, frames))
         },
+        Subscription::Query { query, interval } => open_standing_query(
+            id,
+            query.clone(),
+            *interval,
+            "query",
+            Projection::Verbatim,
+            guard,
+            app_ctx,
+        ),
+        Subscription::PerpsPairState { params, interval } => {
+            let query = desugar_perps_query(app_ctx, &params.to_pair_state_msg()).await?;
+
+            open_standing_query(
+                id,
+                query,
+                *interval,
+                "perpsPairState",
+                Projection::UnwrapWasmSmart,
+                guard,
+                app_ctx,
+            )
+        },
+        Subscription::PerpsUserState { params, interval } => {
+            let query = desugar_perps_query(app_ctx, &params.to_query_msg()).await?;
+
+            open_standing_query(
+                id,
+                query,
+                *interval,
+                "perpsUserState",
+                Projection::UnwrapWasmSmart,
+                guard,
+                app_ctx,
+            )
+        },
+        Subscription::PerpsOrdersByUser { params, interval } => {
+            let query = desugar_perps_query(app_ctx, &params.to_query_msg()).await?;
+
+            open_standing_query(
+                id,
+                query,
+                *interval,
+                "perpsOrdersByUser",
+                Projection::UnwrapWasmSmart,
+                guard,
+                app_ctx,
+            )
+        },
+        Subscription::PerpsLiquidityDepth { params, interval } => {
+            let query = desugar_perps_query(app_ctx, &params.to_query_msg()).await?;
+
+            open_standing_query(
+                id,
+                query,
+                *interval,
+                "perpsLiquidityDepth",
+                Projection::UnwrapWasmSmart,
+                guard,
+                app_ctx,
+            )
+        },
     }
+}
+
+/// Resolve the perps contract address and wrap an alias subscription's query
+/// message into the `wasm_smart` query it desugars to. The resolved query is
+/// byte-identical to what an equivalent raw `query` subscription would carry,
+/// so the two share memo entries.
+async fn desugar_perps_query(
+    app_ctx: &FullContext,
+    msg: &perps::QueryMsg,
+) -> Result<Query, SubscribeError> {
+    let contract = app_ctx.base.perps_address().await.map_err(|err| {
+        SubscribeError::Unavailable(format!(
+            "failed to resolve the perps contract address: {err}"
+        ))
+    })?;
+
+    Query::wasm_smart(contract, msg).map_err(|err| SubscribeError::BadRequest(err.to_string()))
+}
+
+/// Open a standing query: a memo-backed initial snapshot at subscribe time,
+/// then a re-run once per block whose height is a multiple of `interval`,
+/// projected to frames on `channel`. Shared by the raw `query` subscription
+/// and the alias subscriptions that desugar to it.
+fn open_standing_query(
+    id: u64,
+    query: Query,
+    interval: u64,
+    channel: &'static str,
+    projection: Projection,
+    guard: Arc<crate::subscription_limiter::SubscriptionGuard>,
+    app_ctx: &FullContext,
+) -> Result<FrameStream, SubscribeError> {
+    if interval == 0 {
+        return Err(SubscribeError::BadRequest(
+            "`interval` must be >= 1".to_string(),
+        ));
+    }
+
+    let blocks = app_ctx.stream_context.blocks();
+
+    // The initial snapshot is keyed by the ring tip, so simultaneous
+    // identical subscriptions (e.g. a reconnect storm) share one
+    // execution. Height 0 covers the empty-ring case, before the first
+    // block is published.
+    let tip = blocks.tip().unwrap_or(0);
+
+    // The interval filter lives in the ring projection: non-matching
+    // blocks are suppressed (the subscriber's watermark still advances
+    // over them) and matching ones are projected to their height. The
+    // alignment is absolute — `height % interval == 0` — so every
+    // subscription with the same query and interval ticks at the same
+    // heights, which is what lets the memo collapse them.
+    let raw = blocks
+        .subscribe(None, move |block| {
+            let height = block.block.info.height;
+            height.is_multiple_of(interval).then_some(height)
+        })
+        .map_err(|resync| SubscribeError::Resync(resync.to_string()))?;
+
+    let memo = app_ctx.query_memo.clone();
+    let base = app_ctx.base.clone();
+
+    let initial = {
+        let memo = memo.clone();
+        let base = base.clone();
+        let query = query.clone();
+
+        stream::once(async move { memo.query_at(tip, query, base).await })
+    };
+    let ticks = raw.then(move |height| {
+        let memo = memo.clone();
+        let base = base.clone();
+        let query = query.clone();
+
+        async move { memo.query_at(height, query, base).await }
+    });
+
+    let items = guard_subscription_stream(initial.chain(ticks), Some(guard));
+
+    Ok(query_frames(channel, id, items, projection))
 }
 
 /// Append a terminal `error` frame so that when a subscription ends on its own
@@ -473,6 +862,131 @@ where
     });
 
     Box::pin(frames.chain(terminal))
+}
+
+/// How a standing query's executions are rendered into data frames.
+#[derive(Clone, Copy)]
+enum Projection {
+    /// The full [`QueryFrame`], its `response` being the enveloped
+    /// `QueryResponse` — the raw `query` subscription's format.
+    Verbatim,
+
+    /// The `response` unwrapped to the raw contract response inside the
+    /// `wasm_smart` envelope — the alias subscriptions' format, mirroring
+    /// what their REST twins return. The memoized value stays enveloped, so
+    /// coalescing with raw subscriptions is unaffected.
+    UnwrapWasmSmart,
+}
+
+/// The alias subscriptions' frame: the same `{blockHeight, response}` shape
+/// as [`QueryFrame`], with `response` borrowing the unwrapped contract
+/// response out of the memo's shared frame — unwrapping never copies the
+/// payload.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AliasQueryFrame<'a> {
+    block_height: u64,
+    response: &'a Json,
+}
+
+/// Serialize one standing-query execution into a data frame, per the
+/// subscription's projection.
+fn standing_query_frame(
+    channel: &'static str,
+    id: u64,
+    frame: &QueryFrame,
+    projection: Projection,
+) -> String {
+    match (projection, &frame.response) {
+        (Projection::UnwrapWasmSmart, QueryResponse::WasmSmart(inner)) => data_frame(
+            channel,
+            id,
+            &AliasQueryFrame {
+                block_height: frame.block_height,
+                response: inner,
+            },
+        ),
+        // A non-`wasm_smart` response is unreachable for desugared alias
+        // queries; fall back to the verbatim envelope rather than dropping
+        // the frame.
+        (Projection::UnwrapWasmSmart, _) | (Projection::Verbatim, _) => {
+            data_frame(channel, id, frame)
+        },
+    }
+}
+
+/// Project a standing query's executions to tagged JSON text frames on
+/// `channel`, enforcing the per-subscriber delivery contract:
+///
+/// - Each frame's `blockHeight` strictly exceeds the previous frame's. A tick
+///   whose result would duplicate an already-delivered height — possible when
+///   execution lags a full interval behind the ring, since a query always
+///   reads the *latest* state — is skipped, not re-sent.
+/// - A failed execution is a single terminal `queryFailed` error frame; the
+///   subscription ends without a trailing `resync`.
+/// - A feed that ends on its own (the ring outpaced the subscriber, or
+///   shutdown) closes with the standard terminal `resync` frame; there is no
+///   `since` replay, so "resync" here simply means resubscribe for a fresh
+///   snapshot.
+fn query_frames<S>(channel: &'static str, id: u64, items: S, projection: Projection) -> FrameStream
+where
+    S: stream::Stream<Item = Result<Arc<QueryFrame>, String>> + Send + 'static,
+{
+    enum Tick {
+        Item(Result<Arc<QueryFrame>, String>),
+        Ended,
+    }
+
+    let tagged = items
+        .map(Tick::Item)
+        .chain(stream::once(async { Tick::Ended }));
+
+    let frames = tagged
+        .scan((None::<u64>, false), move |(last_height, done), tick| {
+            let out = if *done {
+                // A terminal frame has been emitted; end the stream. This is
+                // what keeps the chained `Ended` from adding a `resync` after
+                // a `queryFailed`.
+                None
+            } else {
+                Some(match tick {
+                    // The first frame is always delivered (a fresh chain
+                    // legitimately serves height 0); later ones must advance.
+                    Tick::Item(Ok(frame))
+                        if last_height.is_none_or(|last| frame.block_height > last) =>
+                    {
+                        *last_height = Some(frame.block_height);
+                        Some(standing_query_frame(
+                            channel,
+                            id,
+                            frame.as_ref(),
+                            projection,
+                        ))
+                    },
+                    // A lag-induced repeat of an already-delivered height: the
+                    // state is unchanged, so the content is identical — skip.
+                    Tick::Item(Ok(_)) => None,
+                    Tick::Item(Err(message)) => {
+                        *done = true;
+                        Some(channel_error(channel, id, "queryFailed", &message))
+                    },
+                    Tick::Ended => {
+                        *done = true;
+                        Some(channel_error(
+                            channel,
+                            id,
+                            "resync",
+                            "subscription ended; resubscribe for a fresh snapshot",
+                        ))
+                    },
+                })
+            };
+
+            std::future::ready(out)
+        })
+        .filter_map(std::future::ready);
+
+    Box::pin(frames)
 }
 
 // ---- serialization helpers ----
@@ -616,6 +1130,40 @@ mod tests {
     }
 
     #[test]
+    fn deserializes_block_info_and_block() {
+        // `blockInfo`, with a `since` cursor.
+        let message: ClientMessage = serde_json::from_str(
+            r#"{"method":"subscribe","id":3,"subscription":{"type":"blockInfo","since":42}}"#,
+        )
+        .unwrap();
+
+        let ClientMessage::Subscribe { id, subscription } = message else {
+            panic!("expected a subscribe message");
+        };
+
+        assert_eq!(id, 3);
+        assert_eq!(subscription.channel(), "blockInfo");
+        assert!(matches!(
+            subscription,
+            Subscription::BlockInfo { since: Some(42) }
+        ));
+
+        // `block`, without `since` (live-only).
+        let message: ClientMessage = serde_json::from_str(
+            r#"{"method":"subscribe","id":4,"subscription":{"type":"block"}}"#,
+        )
+        .unwrap();
+
+        let ClientMessage::Subscribe { id, subscription } = message else {
+            panic!("expected a subscribe message");
+        };
+
+        assert_eq!(id, 4);
+        assert_eq!(subscription.channel(), "block");
+        assert!(matches!(subscription, Subscription::Block { since: None }));
+    }
+
+    #[test]
     fn serializes_control_frames() {
         let parse = |s: &str| serde_json::from_str::<serde_json::Value>(s).unwrap();
 
@@ -714,6 +1262,304 @@ mod tests {
             ))
             .unwrap(),
             json!({"channel": "broadcast", "id": 5, "error": {"code": "broadcastFailed", "message": "connection refused"}}),
+        );
+    }
+
+    #[test]
+    fn deserializes_query() {
+        // A parameterless query variant.
+        let message: ClientMessage =
+            serde_json::from_str(r#"{"method":"query","id":5,"query":{"config":{}}}"#).unwrap();
+
+        let ClientMessage::Query { id, query } = message else {
+            panic!("expected a query message");
+        };
+
+        assert_eq!(id, 5);
+        assert!(matches!(query, Query::Config(_)));
+
+        // A variant with fields, proving the nested payload parses.
+        let message: ClientMessage = serde_json::from_str(
+            r#"{"method":"query","id":6,"query":{"balance":{"address":"0x33361de42571d6aa20c37daa6da4b5ab67bfaad9","denom":"hyp/all/btc"}}}"#,
+        )
+        .unwrap();
+
+        assert!(matches!(
+            message,
+            ClientMessage::Query {
+                id: 6,
+                query: Query::Balance(_)
+            }
+        ));
+    }
+
+    #[test]
+    fn deserializes_query_subscription() {
+        let message: ClientMessage = serde_json::from_str(
+            r#"{"method":"subscribe","id":7,"subscription":{"type":"query","query":{"config":{}},"interval":5}}"#,
+        )
+        .unwrap();
+
+        let ClientMessage::Subscribe { id, subscription } = message else {
+            panic!("expected a subscribe message");
+        };
+
+        assert_eq!(id, 7);
+        assert_eq!(subscription.channel(), "query");
+
+        let Subscription::Query { query, interval } = subscription else {
+            panic!("expected a query subscription");
+        };
+
+        assert!(matches!(query, Query::Config(_)));
+        assert_eq!(interval, 5);
+
+        // An absent `interval` defaults to 10 (every tenth block).
+        let message: ClientMessage = serde_json::from_str(
+            r#"{"method":"subscribe","id":8,"subscription":{"type":"query","query":{"config":{}}}}"#,
+        )
+        .unwrap();
+
+        let ClientMessage::Subscribe { subscription, .. } = message else {
+            panic!("expected a subscribe message");
+        };
+
+        assert!(matches!(
+            subscription,
+            Subscription::Query { interval: 10, .. }
+        ));
+    }
+
+    #[test]
+    fn query_frame_stream_is_monotonic_with_terminal_error() {
+        use dango_primitives::QueryResponse;
+
+        let frame = |height: u64| {
+            Ok(Arc::new(QueryFrame {
+                block_height: height,
+                response: QueryResponse::WasmRaw(None),
+            }))
+        };
+
+        // A lag-induced duplicate height is skipped; a failed execution is a
+        // single terminal `queryFailed` frame with no trailing `resync`.
+        let items = stream::iter(vec![frame(5), frame(5), frame(6), Err("boom".to_string())]);
+        let got = futures::executor::block_on(
+            query_frames("query", 9, items, Projection::Verbatim).collect::<Vec<_>>(),
+        );
+
+        assert_eq!(got.len(), 3);
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&got[0]).unwrap(),
+            json!({"channel": "query", "id": 9, "data": {"blockHeight": 5, "response": {"wasm_raw": null}}}),
+        );
+        assert!(got[1].contains(r#""blockHeight":6"#));
+        assert_eq!(got[2], channel_error("query", 9, "queryFailed", "boom"));
+
+        // A feed that ends on its own closes with the terminal `resync` frame.
+        let items = stream::iter(vec![frame(5)]);
+        let got = futures::executor::block_on(
+            query_frames("query", 9, items, Projection::Verbatim).collect::<Vec<_>>(),
+        );
+
+        assert_eq!(got.len(), 2);
+        assert!(got[1].contains(r#""code":"resync""#), "got: {:?}", got[1]);
+
+        // The first frame is delivered whatever its height — a fresh chain
+        // legitimately serves height 0 — and only repeats are skipped.
+        let items = stream::iter(vec![frame(0), frame(0), frame(1)]);
+        let got = futures::executor::block_on(
+            query_frames("query", 9, items, Projection::Verbatim).collect::<Vec<_>>(),
+        );
+
+        assert_eq!(got.len(), 3, "got: {got:?}"); // heights 0 and 1, then resync
+        assert!(got[0].contains(r#""blockHeight":0"#));
+        assert!(got[1].contains(r#""blockHeight":1"#));
+    }
+
+    #[test]
+    fn serializes_query_frames() {
+        // A successful query rides a `data` frame on the `query` channel,
+        // carrying the raw `QueryResponse`.
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&data_frame(
+                "query",
+                5,
+                &json!({"balance": {"denom": "hyp/all/btc", "amount": "12345"}}),
+            ))
+            .unwrap(),
+            json!({"channel": "query", "id": 5, "data": {"balance": {"denom": "hyp/all/btc", "amount": "12345"}}}),
+        );
+
+        // A failed query is an `error` frame on the `query` channel — unlike
+        // `broadcast`, whose payload type carries its own rejection.
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&channel_error(
+                "query",
+                5,
+                "queryFailed",
+                "data not found",
+            ))
+            .unwrap(),
+            json!({"channel": "query", "id": 5, "error": {"code": "queryFailed", "message": "data not found"}}),
+        );
+    }
+
+    #[test]
+    fn deserializes_perps_alias_subscriptions() {
+        use dango_primitives::{Addr, JsonSerExt};
+
+        // Snake_case wire params inside the camelCase envelope, explicit
+        // `interval`.
+        let message: ClientMessage = serde_json::from_str(
+            r#"{"method":"subscribe","id":5,"subscription":{"type":"perpsLiquidityDepth","pair_id":"perp/ethusd","bucket_size":"10","limit":5,"interval":1}}"#,
+        )
+        .unwrap();
+
+        let ClientMessage::Subscribe {
+            id: 5,
+            subscription,
+        } = message
+        else {
+            panic!("expected a subscribe message with id 5");
+        };
+
+        assert_eq!(subscription.channel(), "perpsLiquidityDepth");
+
+        let Subscription::PerpsLiquidityDepth { params, interval } = subscription else {
+            panic!("expected a perpsLiquidityDepth subscription");
+        };
+
+        assert_eq!(interval, 1);
+
+        // The desugared wire message is exactly what an equivalent raw
+        // `query` subscription would embed — the memo-coalescing guarantee,
+        // pinned against an explicit literal.
+        assert_eq!(
+            params.to_query_msg().to_json_value().unwrap(),
+            dango_primitives::json!({
+                "liquidity_depth": {
+                    "pair_id": "perp/ethusd",
+                    "bucket_size": "10",
+                    "limit": 5,
+                },
+            }),
+        );
+
+        // `interval` and the `include_*` flags default when absent.
+        let user = Addr::mock(1);
+        let message: ClientMessage = serde_json::from_str(&format!(
+            r#"{{"method":"subscribe","id":6,"subscription":{{"type":"perpsUserState","user":"{user}","include_all":true}}}}"#,
+        ))
+        .unwrap();
+
+        let ClientMessage::Subscribe { subscription, .. } = message else {
+            panic!("expected a subscribe message");
+        };
+
+        assert_eq!(subscription.channel(), "perpsUserState");
+
+        let Subscription::PerpsUserState { params, interval } = subscription else {
+            panic!("expected a perpsUserState subscription");
+        };
+
+        assert_eq!(interval, default_query_interval());
+        assert_eq!(
+            params.to_query_msg().to_json_value().unwrap(),
+            dango_primitives::json!({
+                "user_state_extended": {
+                    "user": user,
+                    "include_equity": false,
+                    "include_available_margin": false,
+                    "include_maintenance_margin": false,
+                    "include_unrealized_pnl": false,
+                    "include_unrealized_funding": false,
+                    "include_liquidation_price": false,
+                    "include_all": true,
+                },
+            }),
+        );
+
+        // The two remaining aliases, briefly.
+        let message: ClientMessage = serde_json::from_str(
+            r#"{"method":"subscribe","id":7,"subscription":{"type":"perpsPairState","pair_id":"perp/ethusd"}}"#,
+        )
+        .unwrap();
+
+        let ClientMessage::Subscribe { subscription, .. } = message else {
+            panic!("expected a subscribe message");
+        };
+
+        assert_eq!(subscription.channel(), "perpsPairState");
+
+        let Subscription::PerpsPairState { params, .. } = subscription else {
+            panic!("expected a perpsPairState subscription");
+        };
+
+        assert_eq!(
+            params.to_pair_state_msg().to_json_value().unwrap(),
+            dango_primitives::json!({"pair_state": {"pair_id": "perp/ethusd"}}),
+        );
+
+        let message: ClientMessage = serde_json::from_str(&format!(
+            r#"{{"method":"subscribe","id":8,"subscription":{{"type":"perpsOrdersByUser","user":"{user}"}}}}"#,
+        ))
+        .unwrap();
+
+        let ClientMessage::Subscribe { subscription, .. } = message else {
+            panic!("expected a subscribe message");
+        };
+
+        assert_eq!(subscription.channel(), "perpsOrdersByUser");
+
+        let Subscription::PerpsOrdersByUser { params, .. } = subscription else {
+            panic!("expected a perpsOrdersByUser subscription");
+        };
+
+        assert_eq!(
+            params.to_query_msg().to_json_value().unwrap(),
+            dango_primitives::json!({"orders_by_user": {"user": user}}),
+        );
+    }
+
+    #[test]
+    fn alias_frames_unwrap_the_wasm_smart_envelope() {
+        let frame = QueryFrame {
+            block_height: 7,
+            response: QueryResponse::WasmSmart(dango_primitives::json!({"long_oi": "5"})),
+        };
+
+        // The alias projection unwraps the `wasm_smart` envelope, so the
+        // frame's `response` is what the REST twin returns.
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&standing_query_frame(
+                "perpsPairState",
+                3,
+                &frame,
+                Projection::UnwrapWasmSmart,
+            ))
+            .unwrap(),
+            json!({
+                "channel": "perpsPairState",
+                "id": 3,
+                "data": {"blockHeight": 7, "response": {"long_oi": "5"}},
+            }),
+        );
+
+        // The raw `query` projection keeps the envelope.
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&standing_query_frame(
+                "query",
+                3,
+                &frame,
+                Projection::Verbatim,
+            ))
+            .unwrap(),
+            json!({
+                "channel": "query",
+                "id": 3,
+                "data": {"blockHeight": 7, "response": {"wasm_smart": {"long_oi": "5"}}},
+            }),
         );
     }
 }

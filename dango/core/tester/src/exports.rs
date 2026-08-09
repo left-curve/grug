@@ -2,8 +2,8 @@ use {
     crate::{
         ExecuteMsg, InstantiateMsg, QueryMsg, execute_stack_overflow, failing_query,
         force_write_on_query, infinite_loop, query_backtrace, query_force_write, query_loop,
-        query_recover_secp256k1, query_stack_overflow, query_verify_ed25519,
-        query_verify_ed25519_batch, query_verify_secp256k1, query_verify_secp256r1,
+        query_recover_secp256k1, query_stack_overflow, query_verify_secp256k1,
+        query_verify_secp256r1,
     },
     dango_primitives::{ImmutableCtx, Json, JsonSerExt, MutableCtx, Response, StdResult},
 };
@@ -43,14 +43,6 @@ pub fn query(ctx: ImmutableCtx, msg: QueryMsg) -> StdResult<Json> {
             recovery_id,
             compressed,
         } => query_recover_secp256k1(ctx, sig, msg_hash, recovery_id, compressed)?.to_json_value(),
-        QueryMsg::VerifyEd25519 { pk, sig, msg_hash } => {
-            query_verify_ed25519(ctx, pk, sig, msg_hash)?.to_json_value()
-        },
-        QueryMsg::VerifyEd25519Batch {
-            pks,
-            sigs,
-            prehash_msgs,
-        } => query_verify_ed25519_batch(ctx, pks, sigs, prehash_msgs)?.to_json_value(),
         QueryMsg::Backtrace { query } => query_backtrace(ctx, query).to_json_value(),
         QueryMsg::FailingQuery { msg } => failing_query(msg)?.to_json_value(),
     }

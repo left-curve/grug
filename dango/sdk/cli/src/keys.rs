@@ -6,7 +6,6 @@ use {
     colored::Colorize,
     dango_primitives::JsonDeExt,
     dango_sdk::{Keystore, Secp256k1, Secret},
-    rand::rngs::OsRng,
     std::{
         collections::BTreeMap,
         fs,
@@ -77,7 +76,12 @@ fn add(dir: &Path, name: &str, recover: bool, coin_type: usize) -> anyhow::Resul
         let phrase = read_text("🔑 Enter your BIP-39 mnemonic".bold())?;
         Mnemonic::new(phrase, Language::English)?
     } else {
-        Mnemonic::random(OsRng, Language::English)
+        // Generate the entropy ourselves instead of using bip32's `random`
+        // constructor, which requires RNGs of the outdated rand_core version
+        // pinned by bip32.
+        let mut entropy = [0u8; 32];
+        getrandom::fill(&mut entropy)?;
+        Mnemonic::from_entropy(entropy, Language::English)
     };
 
     // Ask for password and save encrypted keystore.

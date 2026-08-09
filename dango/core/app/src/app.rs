@@ -914,7 +914,7 @@ where
             .iter()
             .filter_map(|raw_tx| {
                 if let Ok(tx) = raw_tx.deserialize_json() {
-                    Some((tx, raw_tx.hash256()))
+                    Some((tx, raw_tx.sha2_256()))
                 } else {
                     // The transaction failed to deserialize.
                     //

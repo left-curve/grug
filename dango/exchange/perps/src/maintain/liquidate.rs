@@ -710,6 +710,13 @@ fn execute_close_schedule(
                 adl_price: Some(adl_price),
                 adl_realized_pnl,
                 adl_realized_funding: Some(adl_funding),
+                remaining_position_size: Some(
+                    user_state
+                        .positions
+                        .get(pair_id)
+                        .map(|p| p.size)
+                        .unwrap_or_default(),
+                ),
             })?;
 
             #[cfg(feature = "metrics")]
@@ -728,6 +735,13 @@ fn execute_close_schedule(
                 adl_price: None,
                 adl_realized_pnl: UsdValue::ZERO,
                 adl_realized_funding: Some(UsdValue::ZERO),
+                remaining_position_size: Some(
+                    user_state
+                        .positions
+                        .get(pair_id)
+                        .map(|p| p.size)
+                        .unwrap_or_default(),
+                ),
             })?;
         }
     }
@@ -931,6 +945,13 @@ fn execute_adl(
             fill_price: bankruptcy_price,
             realized_pnl: counter_settlement.pnl.closing,
             realized_funding: Some(counter_settlement.pnl.funding),
+            remaining_position_size: Some(
+                counter_state
+                    .positions
+                    .get(pair_id)
+                    .map(|p| p.size)
+                    .unwrap_or_default(),
+            ),
         })?;
 
         remaining = remaining.checked_sub(user_close)?;
@@ -1046,13 +1067,16 @@ mod tests {
             .unwrap()
             .unwrap_or_default();
 
-        user_state.positions.insert(pair_id.clone(), Position {
-            size: Quantity::new_int(size),
-            entry_price: UsdPrice::new_int(entry_price),
-            entry_funding_per_unit: FundingPerUnit::ZERO,
-            conditional_order_above: None,
-            conditional_order_below: None,
-        });
+        user_state.positions.insert(
+            pair_id.clone(),
+            Position {
+                size: Quantity::new_int(size),
+                entry_price: UsdPrice::new_int(entry_price),
+                entry_funding_per_unit: FundingPerUnit::ZERO,
+                conditional_order_above: None,
+                conditional_order_below: None,
+            },
+        );
 
         USER_STATES.save(storage, user, &user_state).unwrap();
 
@@ -1128,11 +1152,11 @@ mod tests {
             ..Default::default()
         };
 
-        setup_storage(&mut ctx.storage, &param, &[(
-            pair_btc(),
-            btc_pair_param(),
-            pair_state,
-        )]);
+        setup_storage(
+            &mut ctx.storage,
+            &param,
+            &[(pair_btc(), btc_pair_param(), pair_state)],
+        );
 
         // User has long 1 BTC at 50000, oracle at 50000.
         // Collateral = 10000 USD (well above MM = 50000 * 5% = 2500).
@@ -1142,10 +1166,13 @@ mod tests {
         pair_params.insert(pair_btc(), btc_pair_param());
 
         let mut pair_states = BTreeMap::new();
-        pair_states.insert(pair_btc(), PairState {
-            index_price: UsdPrice::new_int(50_000),
-            ..Default::default()
-        });
+        pair_states.insert(
+            pair_btc(),
+            PairState {
+                index_price: UsdPrice::new_int(50_000),
+                ..Default::default()
+            },
+        );
 
         let mut oracle_prices = BTreeMap::new();
         oracle_prices.insert(pair_btc(), UsdPrice::new_int(50_000));
@@ -1188,11 +1215,11 @@ mod tests {
             ..Default::default()
         };
 
-        setup_storage(&mut ctx.storage, &param, &[(
-            pair_btc(),
-            btc_pair_param(),
-            pair_state.clone(),
-        )]);
+        setup_storage(
+            &mut ctx.storage,
+            &param,
+            &[(pair_btc(), btc_pair_param(), pair_state.clone())],
+        );
 
         // User has long 10 BTC at entry 50000. Oracle is now 47500.
         // equity < MM → liquidatable
@@ -1259,11 +1286,11 @@ mod tests {
             ..Default::default()
         };
 
-        setup_storage(&mut ctx.storage, &param, &[(
-            pair_btc(),
-            btc_pair_param(),
-            pair_state.clone(),
-        )]);
+        setup_storage(
+            &mut ctx.storage,
+            &param,
+            &[(pair_btc(), btc_pair_param(), pair_state.clone())],
+        );
 
         // User long 10 BTC at 50000, oracle 47500 → liquidatable.
         save_position(&mut ctx.storage, USER, &pair_btc(), 10, 50_000);
@@ -1342,11 +1369,11 @@ mod tests {
             ..Default::default()
         };
 
-        setup_storage(&mut ctx.storage, &param, &[(
-            pair_btc(),
-            btc_pair_param(),
-            pair_state.clone(),
-        )]);
+        setup_storage(
+            &mut ctx.storage,
+            &param,
+            &[(pair_btc(), btc_pair_param(), pair_state.clone())],
+        );
 
         // User long 1 BTC @ $50,000, margin $2,500, oracle $48,000.
         // Equity = $2,500 + ($48,000-$50,000) = $500.
@@ -1466,11 +1493,11 @@ mod tests {
             ..Default::default()
         };
 
-        setup_storage(&mut ctx.storage, &param, &[(
-            pair_btc(),
-            btc_pair_param(),
-            pair_state.clone(),
-        )]);
+        setup_storage(
+            &mut ctx.storage,
+            &param,
+            &[(pair_btc(), btc_pair_param(), pair_state.clone())],
+        );
 
         // User long 1 BTC @ $50,000, margin $2,000, oracle $48,000.
         // Equity = $0, deficit = $2,400 → full position closed.
@@ -1610,11 +1637,11 @@ mod tests {
             ..Default::default()
         };
 
-        setup_storage(&mut ctx.storage, &param, &[(
-            pair_btc(),
-            btc_pair_param(),
-            pair_state.clone(),
-        )]);
+        setup_storage(
+            &mut ctx.storage,
+            &param,
+            &[(pair_btc(), btc_pair_param(), pair_state.clone())],
+        );
 
         save_position(&mut ctx.storage, USER, &pair_btc(), 1, 50_000);
 
@@ -1748,11 +1775,11 @@ mod tests {
             ..Default::default()
         };
 
-        setup_storage(&mut ctx.storage, &param, &[(
-            pair_btc(),
-            btc_pair_param(),
-            pair_state.clone(),
-        )]);
+        setup_storage(
+            &mut ctx.storage,
+            &param,
+            &[(pair_btc(), btc_pair_param(), pair_state.clone())],
+        );
 
         // Vault (CONTRACT) long 1 BTC @ $50,000.
         save_position(&mut ctx.storage, CONTRACT, &pair_btc(), 1, 50_000);
@@ -1897,11 +1924,11 @@ mod tests {
             ..Default::default()
         };
 
-        setup_storage(&mut ctx.storage, &param, &[(
-            pair_btc(),
-            btc_pair_param(),
-            pair_state.clone(),
-        )]);
+        setup_storage(
+            &mut ctx.storage,
+            &param,
+            &[(pair_btc(), btc_pair_param(), pair_state.clone())],
+        );
 
         // User long 1 BTC @ $50,000, margin $1,200, oracle $48,000.
         // Equity = -$800, deficit large → full position closed.
@@ -2016,11 +2043,11 @@ mod tests {
             ..Default::default()
         };
 
-        setup_storage(&mut ctx.storage, &param, &[(
-            pair_btc(),
-            btc_pair_param(),
-            pair_state.clone(),
-        )]);
+        setup_storage(
+            &mut ctx.storage,
+            &param,
+            &[(pair_btc(), btc_pair_param(), pair_state.clone())],
+        );
 
         // User long 10 BTC @ $50,000, margin $2,400, oracle $47,500.
         // PnL = 10*(47500-50000) = -$25,000. Equity = $2,400 - $25,000 = -$22,600.
@@ -2116,11 +2143,11 @@ mod tests {
             ..Default::default()
         };
 
-        setup_storage(&mut ctx.storage, &param, &[(
-            pair_btc(),
-            btc_pair_param(),
-            pair_state.clone(),
-        )]);
+        setup_storage(
+            &mut ctx.storage,
+            &param,
+            &[(pair_btc(), btc_pair_param(), pair_state.clone())],
+        );
 
         // Alice: long 10 BTC @ $2,000, oracle $2,200 (position in profit). Her
         // margin is set negative to model a prior withdrawal / loss realised
@@ -2212,11 +2239,11 @@ mod tests {
             ..Default::default()
         };
 
-        setup_storage(&mut ctx.storage, &param, &[(
-            pair_btc(),
-            btc_pair_param(),
-            pair_state.clone(),
-        )]);
+        setup_storage(
+            &mut ctx.storage,
+            &param,
+            &[(pair_btc(), btc_pair_param(), pair_state.clone())],
+        );
 
         // USER has long 1 BTC at $50,000. Oracle at $47,500 → deeply underwater.
         // Equity = $100 + ($47,500-$50,000) = -$2,400.
@@ -2336,11 +2363,11 @@ mod tests {
             ..Default::default()
         };
 
-        setup_storage(&mut ctx.storage, &param, &[(
-            pair_btc(),
-            btc_pair_param(),
-            pair_state.clone(),
-        )]);
+        setup_storage(
+            &mut ctx.storage,
+            &param,
+            &[(pair_btc(), btc_pair_param(), pair_state.clone())],
+        );
 
         // USER has long 10 BTC at entry $50k. Oracle drops to $47,500.
         // Equity < maintenance margin → liquidatable.
@@ -2475,11 +2502,11 @@ mod tests {
                 ..Default::default()
             };
 
-            setup_storage(&mut ctx.storage, &param, &[(
-                pair_btc(),
-                btc_pair_param(),
-                pair_state.clone(),
-            )]);
+            setup_storage(
+                &mut ctx.storage,
+                &param,
+                &[(pair_btc(), btc_pair_param(), pair_state.clone())],
+            );
 
             save_position(&mut ctx.storage, USER, &pair_btc(), 10, 50_000);
 
@@ -2545,11 +2572,11 @@ mod tests {
                 ..Default::default()
             };
 
-            setup_storage(&mut ctx.storage, &param, &[(
-                pair_btc(),
-                btc_pair_param(),
-                pair_state.clone(),
-            )]);
+            setup_storage(
+                &mut ctx.storage,
+                &param,
+                &[(pair_btc(), btc_pair_param(), pair_state.clone())],
+            );
 
             save_position(&mut ctx.storage, USER, &pair_btc(), 10, 50_000);
 

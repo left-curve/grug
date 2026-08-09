@@ -71,34 +71,6 @@ pub fn query_recover_secp256k1(
         .map(Into::into)
 }
 
-pub fn query_verify_ed25519(
-    ctx: ImmutableCtx,
-    pk: Binary,
-    sig: Binary,
-    msg_hash: Binary,
-) -> StdResult<()> {
-    ctx.api.ed25519_verify(&msg_hash, &sig, &pk)
-}
-
-macro_rules! slice_of_slices {
-    ($vec:expr) => {{
-        $vec.iter().map(|v| &v[..]).collect::<Vec<_>>()
-    }};
-}
-
-pub fn query_verify_ed25519_batch(
-    ctx: ImmutableCtx,
-    pks: Vec<Binary>,
-    sigs: Vec<Binary>,
-    prehash_msgs: Vec<Binary>,
-) -> StdResult<()> {
-    let m = slice_of_slices!(prehash_msgs);
-    let s = slice_of_slices!(sigs);
-    let p = slice_of_slices!(pks);
-
-    ctx.api.ed25519_batch_verify(&m, &s, &p)
-}
-
 pub fn query_stack_overflow(ctx: ImmutableCtx) -> StdResult<()> {
     ctx.querier
         .query_wasm_smart(ctx.contract, QueryStackOverflowRequest {})?;

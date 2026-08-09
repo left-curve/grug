@@ -22,7 +22,7 @@ fn gas_genesis(sender_balance: u128) -> GenesisOption {
         salt: NewUserSalt {
             key,
             key_hash: match &key {
-                Key::Secp256k1(pk) => pk.hash256(),
+                Key::Secp256k1(pk) => pk.sha2_256(),
                 _ => unreachable!("test genesis users use secp256k1 keys"),
             },
             seed,

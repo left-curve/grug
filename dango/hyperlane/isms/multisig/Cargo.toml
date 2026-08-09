@@ -16,8 +16,6 @@ dango-primitives      = { workspace = true }
 dango-storage         = { workspace = true }
 
 [dev-dependencies]
-dango-identity = { workspace = true }
-hex-literal    = { workspace = true }
-k256           = { workspace = true }
-rand           = { workspace = true }
-test-case      = { workspace = true }
+hex-literal = { workspace = true }
+k256        = { workspace = true }
+test-case   = { workspace = true }

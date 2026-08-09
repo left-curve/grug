@@ -10,14 +10,17 @@ use {
 };
 
 pub fn instantiate(ctx: MutableCtx, msg: InstantiateMsg) -> anyhow::Result<Response> {
-    UNLOCKING_SCHEDULE.save(ctx.storage, &Schedule {
-        // Unlocking start time is defined as the token generation time.
-        // Since this contract is to be deployed at genesis, and the token is
-        // generated also at genesis, the start time is simply the block time.
-        start_time: ctx.block.timestamp,
-        cliff: msg.unlocking_cliff,
-        period: msg.unlocking_period,
-    })?;
+    UNLOCKING_SCHEDULE.save(
+        ctx.storage,
+        &Schedule {
+            // Unlocking start time is defined as the token generation time.
+            // Since this contract is to be deployed at genesis, and the token is
+            // generated also at genesis, the start time is simply the block time.
+            start_time: ctx.block.timestamp,
+            cliff: msg.unlocking_cliff,
+            period: msg.unlocking_period,
+        },
+    )?;
 
     Ok(Response::new())
 }
@@ -38,11 +41,15 @@ fn create(ctx: MutableCtx, user: Addr, schedule: Schedule) -> anyhow::Result<Res
 
     let coin = ctx.funds.into_one_coin_of_denom(&dango::DENOM)?;
 
-    POSITIONS.save(ctx.storage, user, &Position {
-        vesting_status: VestingStatus::Active(schedule),
-        total: coin.amount,
-        claimed: Uint128::ZERO,
-    })?;
+    POSITIONS.save(
+        ctx.storage,
+        user,
+        &Position {
+            vesting_status: VestingStatus::Active(schedule),
+            total: coin.amount,
+            claimed: Uint128::ZERO,
+        },
+    )?;
 
     Ok(Response::new())
 }

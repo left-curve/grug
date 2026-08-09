@@ -1,15 +1,7 @@
 import { getAppConfig } from "#actions/app/queries/getAppConfig.js";
 import { type ExecuteReturnType, execute } from "#actions/app/mutations/execute.js";
 
-import type {
-  Addr32,
-  Address,
-  Client,
-  Coins,
-  Remote,
-  Signer,
-  TypedDataParameter,
-} from "@left-curve/types";
+import type { Addr32, Address, Client, Coins, Remote, Signer } from "@left-curve/types";
 
 export type TransferRemoteParameters = {
   remote: Remote;
@@ -35,32 +27,10 @@ export async function transferRemote(
     },
   };
 
-  const typedData: TypedDataParameter = {
-    type: [{ name: "transfer_remote", type: "TransferRemote" }],
-    extraTypes: {
-      TransferRemote: [
-        { name: "recipient", type: "string" },
-        typeof remote === "string"
-          ? { name: "remote", type: "string" }
-          : { name: "remote", type: "Remote" },
-      ],
-      ...(typeof remote === "string"
-        ? {}
-        : {
-            Remote: [{ name: "warp", type: "Warp" }],
-            Warp: [
-              { name: "domain", type: "uint32" },
-              { name: "contract", type: "string" },
-            ],
-          }),
-    },
-  };
-
   return await execute(client, {
     execute: {
       contract: addresses.gateway,
       msg,
-      typedData,
       funds,
     },
     sender,

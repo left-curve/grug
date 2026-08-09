@@ -1,4 +1,4 @@
-FROM golang:1.24-bookworm AS builder
+FROM golang:1.25-bookworm AS builder
 
 LABEL org.opencontainers.image.description="CometBFT builder for Dango"
 LABEL org.opencontainers.image.source="https://github.com/left-curve/left-curve"
@@ -7,7 +7,7 @@ LABEL org.opencontainers.image.source="https://github.com/left-curve/left-curve"
 RUN apt update && apt install -y git make
 
 # Git tag of the cometbft repo.
-ARG COMETBFT_GIT_TAG="v0.38.21"
+ARG COMETBFT_GIT_TAG="v0.39.3"
 ENV COMETBFT_GIT_TAG=$COMETBFT_GIT_TAG
 
 # Download cometbft source code, build, then delete.

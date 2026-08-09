@@ -1,6 +1,5 @@
 use {
-    dango_auth::MAX_NONCE_INCREASE,
-    dango_identity::Identity256,
+    dango_auth::{MAX_NONCE_INCREASE, VerifyData, build_eip712_typed_data},
     dango_primitives::{
         Addr, Binary, ByteArray, Hash256, HashExt, Inner, JsonSerExt, MOCK_CHAIN_ID, Message,
         NonEmpty, SignData, Timestamp, Tx, coins,
@@ -13,8 +12,8 @@ use {
         },
     },
     data_encoding::BASE64URL_NOPAD,
-    k256::ecdsa::signature::DigestSigner,
-    rand::{Rng, RngCore},
+    k256::{ecdsa::signature::hazmat::PrehashSigner, elliptic_curve::Generate},
+    rand::Rng,
     sha2::{Digest, Sha256},
 };
 
@@ -98,29 +97,68 @@ fn generate_secp256k1_session_test_data() -> anyhow::Result<()> {
 
 // ---------------------------------- eip712 -----------------------------------
 
+fn generate_eip712_standard_test_data() -> anyhow::Result<()> {
+    let (sk, eth_addr) = generate_random_ethereum_key_pair();
+    let eth_addr_dango = Addr::from_inner(eth_addr);
+    let eth_addr_key_hash = eth_addr.sha2_256();
+
+    let verify_data = VerifyData::Transaction(generate_random_unsigned_transaction()?);
+
+    let credential = {
+        let eip712_sig = eip712_sign(&sk, &verify_data)?;
+        Credential::Standard(StandardCredential {
+            key_hash: eth_addr_key_hash,
+            signature: Signature::Eip712(eip712_sig),
+        })
+    };
+
+    let VerifyData::Transaction(sign_doc) = verify_data else {
+        unreachable!()
+    };
+
+    let tx = Tx {
+        sender: sign_doc.sender,
+        gas_limit: sign_doc.gas_limit,
+        msgs: sign_doc.messages,
+        data: sign_doc.data.to_json_value()?,
+        credential: credential.to_json_value()?,
+    };
+
+    println!("user_address = {}", sign_doc.sender);
+    println!("user_index   = {}", sign_doc.data.user_index);
+    println!("user_keyhash = {}", hex::encode(eth_addr_key_hash));
+    println!("user_key     = ethereum:{}", eth_addr_dango);
+    println!("tx:\n{}", tx.to_json_string_pretty()?);
+
+    Ok(())
+}
+
 fn generate_eip712_session_test_data() -> anyhow::Result<()> {
     // Main key is an Ethereum key; session key is secp256k1.
     let (sk1, eth_addr) = generate_random_ethereum_key_pair();
     let eth_addr_dango = Addr::from_inner(eth_addr);
-    let eth_addr_key_hash = eth_addr.hash256();
+    let eth_addr_key_hash = eth_addr.sha2_256();
 
     let (sk2, vk2, _) = generate_random_secp256k1_key_pair()?;
     let sign_doc = generate_random_unsigned_transaction()?;
 
-    let session_info = SessionInfo {
+    let verify_data = VerifyData::Session(SessionInfo {
         chain_id: MOCK_CHAIN_ID.to_string(),
         session_key: vk2.into(),
         expire_at: Timestamp::from_nanos(u128::MAX),
-    };
+    });
 
-    // Sign SessionInfo via EIP-712.
+    // Main key signs the SessionInfo via EIP-712.
     let authorization = {
-        let session_info_json = session_info.to_json_value()?;
-        let eip712_sig = eip712_sign_arbitrary(&sk1, session_info_json)?;
+        let eip712_sig = eip712_sign(&sk1, &verify_data)?;
         StandardCredential {
             key_hash: eth_addr_key_hash,
             signature: Signature::Eip712(eip712_sig),
         }
+    };
+
+    let VerifyData::Session(session_info) = verify_data else {
+        unreachable!()
     };
 
     // Session key signs the transaction.
@@ -152,19 +190,17 @@ fn generate_eip712_session_test_data() -> anyhow::Result<()> {
 fn generate_eip712_onboard_test_data() -> anyhow::Result<()> {
     let (sk, eth_addr) = generate_random_ethereum_key_pair();
     let eth_addr_dango = Addr::from_inner(eth_addr);
-    let eth_addr_key_hash = eth_addr.hash256();
+    let eth_addr_key_hash = eth_addr.sha2_256();
 
-    let register_data = RegisterUserData {
+    let verify_data = VerifyData::Onboard(RegisterUserData {
         chain_id: MOCK_CHAIN_ID.to_string(),
         key: dango_types::auth::Key::Ethereum(eth_addr_dango),
         key_hash: eth_addr_key_hash,
         seed: 0,
         referrer: None,
-    };
+    });
 
-    let register_json = register_data.to_json_value()?;
-    let eip712_sig = eip712_sign_arbitrary(&sk, register_json)?;
-
+    let eip712_sig = eip712_sign(&sk, &verify_data)?;
     let signature_json = Signature::Eip712(eip712_sig).to_json_string_pretty()?;
 
     println!("user_key     = ethereum:{}", eth_addr_dango);
@@ -179,13 +215,13 @@ fn generate_eip712_onboard_test_data() -> anyhow::Result<()> {
 
 fn generate_passkey_session_test_data() -> anyhow::Result<()> {
     // Main key is a passkey (Secp256r1); session key is secp256k1.
-    let sk1 = p256::ecdsa::SigningKey::random(&mut rand::rngs::OsRng);
+    let sk1 = p256::ecdsa::SigningKey::generate();
     let vk1: [u8; 33] = sk1
         .verifying_key()
-        .to_encoded_point(true)
+        .to_sec1_point(true)
         .as_bytes()
         .try_into()?;
-    let vk1_hash = vk1.hash256();
+    let vk1_hash = vk1.sha2_256();
 
     let (sk2, vk2, _) = generate_random_secp256k1_key_pair()?;
     let sign_doc = generate_random_unsigned_transaction()?;
@@ -235,14 +271,17 @@ fn generate_passkey_session_test_data() -> anyhow::Result<()> {
 
 fn generate_random_unsigned_transaction() -> anyhow::Result<SignDoc> {
     let mut sender = Addr::mock(0);
-    rand::thread_rng().fill_bytes(&mut sender);
+    rand::rng().fill_bytes(&mut sender);
 
     let mut recipient = Addr::mock(0);
-    rand::thread_rng().fill_bytes(&mut recipient);
+    rand::rng().fill_bytes(&mut recipient);
 
-    let user_index = rand::thread_rng().r#gen();
-    let nonce = rand::thread_rng().gen_range(0..MAX_NONCE_INCREASE);
-    let gas_limit = rand::thread_rng().r#gen();
+    let user_index = rand::random();
+    let nonce = rand::random_range(0..MAX_NONCE_INCREASE);
+    // EIP-712 types `gas_limit` as uint32 (see `tx_eip712_resolver`), matching
+    // the frontend and the raw-secp256k1 range in practice, so keep the
+    // generated value within u32 range.
+    let gas_limit = u64::from(rand::random::<u32>());
 
     let messages = NonEmpty::new_unchecked(vec![Message::transfer(
         recipient,
@@ -267,30 +306,22 @@ fn generate_random_unsigned_transaction() -> anyhow::Result<SignDoc> {
 /// Return the private key, public key, and SHA-256 hash of the public key.
 fn generate_random_secp256k1_key_pair()
 -> anyhow::Result<(k256::ecdsa::SigningKey, [u8; 33], Hash256)> {
-    let sk = k256::ecdsa::SigningKey::random(&mut rand::rngs::OsRng);
+    let sk = k256::ecdsa::SigningKey::generate();
     let vk: [u8; 33] = sk
         .verifying_key()
-        .to_encoded_point(true)
+        .to_sec1_point(true)
         .as_bytes()
         .try_into()?;
-    let vk_hash = vk.hash256();
+    let vk_hash = vk.sha2_256();
 
     Ok((sk, vk, vk_hash))
 }
 
 /// Generate a random Ethereum key pair, returning (signing_key, 20-byte address).
 fn generate_random_ethereum_key_pair() -> (k256::ecdsa::SigningKey, [u8; 20]) {
-    let sk = k256::ecdsa::SigningKey::random(&mut rand::rngs::OsRng);
+    let sk = k256::ecdsa::SigningKey::generate();
     let addr = dango_eth_utils::derive_address(sk.verifying_key());
     (sk, addr)
-}
-
-fn capitalize(s: &str) -> String {
-    let mut chars = s.chars();
-    match chars.next() {
-        Some(c) => c.to_uppercase().chain(chars).collect(),
-        None => String::new(),
-    }
 }
 
 fn secp256k1_sign<T>(sk: &k256::ecdsa::SigningKey, sign_doc: &T) -> anyhow::Result<ByteArray<64>>
@@ -299,92 +330,27 @@ where
     anyhow::Error: From<T::Error>,
 {
     let prehash_sign_data = sign_doc.to_prehash_sign_data()?;
-    let sign_data = prehash_sign_data.hash256();
-    let digest = Identity256::from(sign_data.into_inner());
-    let signature: k256::ecdsa::Signature = sk.sign_digest(digest);
+    let sign_data = prehash_sign_data.sha2_256();
+    let signature: k256::ecdsa::Signature = sk.sign_prehash(&sign_data.into_inner())?;
 
     Ok(ByteArray::from_inner(signature.to_bytes().into()))
 }
 
-/// Sign arbitrary data via EIP-712, producing an `Eip712Signature`.
+/// Sign a payload via EIP-712, producing an `Eip712Signature`.
 ///
-/// The message fields are sorted alphabetically by `to_json_value()`.
-/// All values are typed as "string" in the EIP-712 type system, which matches
-/// how the frontend `composeArbitraryTypedData` works for arbitrary messages.
-fn eip712_sign_arbitrary(
-    sk: &k256::ecdsa::SigningKey,
-    message: dango_primitives::Json,
-) -> anyhow::Result<Eip712Signature> {
-    // Build the EIP-712 "Message" type from the message keys.
-    // All fields are typed as "string" (matching the frontend pattern).
-    let message_inner = message.clone().into_inner();
-    let message_map = message_inner
-        .as_object()
-        .expect("message must be a JSON object");
-
-    let mut message_types = Vec::new();
-    for key in message_map.keys() {
-        let eip712_type = if message_map[key].is_object() {
-            // For nested objects (like `key: { "ethereum": "0x..." }`),
-            // use a sub-struct type named after the capitalized key.
-            capitalize(key)
-        } else if message_map[key].is_number() {
-            "uint32".to_string()
-        } else {
-            "string".to_string()
-        };
-        message_types.push(serde_json::json!({ "name": key, "type": eip712_type }));
-    }
-
-    let mut types = serde_json::json!({
-        "EIP712Domain": [
-            { "name": "name", "type": "string" },
-            { "name": "chainId", "type": "uint256" },
-            { "name": "verifyingContract", "type": "address" }
-        ],
-        "Message": message_types
-    });
-
-    // Add sub-struct types for any nested objects.
-    for (key, value) in message_map {
-        if let Some(obj) = value.as_object() {
-            let type_name = capitalize(key);
-            let sub_types: Vec<_> = obj
-                .keys()
-                .map(|k| serde_json::json!({ "name": k, "type": "string" }))
-                .collect();
-            types
-                .as_object_mut()
-                .unwrap()
-                .insert(type_name, serde_json::json!(sub_types));
-        }
-    }
-
-    // Convert the dango_primitives::Json message to serde_json::Value for the typed data.
-    let msg_value: serde_json::Value = serde_json::from_str(&message.to_string())?;
-
-    let typed_data_json = serde_json::json!({
-        "domain": {
-            "name": "DangoArbitraryMessage",
-            "chainId": 1,
-            "verifyingContract": "0x0000000000000000000000000000000000000000"
-        },
-        "message": msg_value,
-        "primaryType": "Message",
-        "types": types
-    });
-
-    let typed_data_str = serde_json::to_string(&typed_data_json)?;
-
-    // Parse with alloy to compute the EIP-712 signing hash.
-    let typed_data: alloy::dyn_abi::TypedData = serde_json::from_str(&typed_data_str)?;
+/// Routes through the same `dango_auth::build_eip712_typed_data` the chain
+/// verifies against, so generated fixtures always match the on-chain
+/// reconstruction. Enum-typed fields (transaction `messages`, onboarding `key`)
+/// are bound as canonical JSON strings.
+fn eip712_sign(sk: &k256::ecdsa::SigningKey, data: &VerifyData) -> anyhow::Result<Eip712Signature> {
+    let typed_data = build_eip712_typed_data(data)?;
     let signing_hash = typed_data.eip712_signing_hash()?;
 
-    // Sign with Ethereum-style recoverable signature.
+    // Sign with an Ethereum-style recoverable signature.
     let sig_bytes = dango_eth_utils::sign_digest(signing_hash.0, sk);
 
     Ok(Eip712Signature {
-        typed_data: Binary::from(typed_data_str.as_bytes().to_vec()),
+        typed_data: Binary::from(typed_data.to_json_vec()?),
         sig: ByteArray::from_inner(sig_bytes),
     })
 }
@@ -419,9 +385,7 @@ where
     let signed_hash: [u8; 32] = Sha256::digest(&signed_data).into();
 
     // Sign with p256.
-    use p256::ecdsa::signature::DigestSigner;
-    let digest = Identity256::from(signed_hash);
-    let signature: p256::ecdsa::Signature = sk.sign_digest(digest);
+    let signature: p256::ecdsa::Signature = sk.sign_prehash(&signed_hash)?;
 
     Ok(PasskeySignature {
         sig: ByteArray::from_inner(signature.to_bytes().into()),
@@ -436,6 +400,9 @@ fn main() -> anyhow::Result<()> {
 
     println!("\n====================== Secp256k1 Session ======================");
     generate_secp256k1_session_test_data()?;
+
+    println!("\n======================= EIP712 Standard ========================");
+    generate_eip712_standard_test_data()?;
 
     println!("\n======================== EIP712 Session ========================");
     generate_eip712_session_test_data()?;

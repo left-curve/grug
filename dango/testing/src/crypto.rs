@@ -1,17 +1,16 @@
 use {
-    dango_identity::Identity256,
     dango_primitives::ByteArray,
     k256::{
-        ecdsa::{Signature, SigningKey, signature::DigestSigner},
-        elliptic_curve::rand_core::OsRng,
+        ecdsa::{Signature, SigningKey, signature::hazmat::PrehashSigner},
+        elliptic_curve::Generate,
     },
 };
 
 pub fn generate_random_key() -> (SigningKey, ByteArray<33>) {
-    let sk = SigningKey::random(&mut OsRng);
+    let sk = SigningKey::generate();
     let pk = sk
         .verifying_key()
-        .to_encoded_point(true)
+        .to_sec1_point(true)
         .to_bytes()
         .as_ref()
         .try_into()
@@ -22,8 +21,7 @@ pub fn generate_random_key() -> (SigningKey, ByteArray<33>) {
 
 /// Note: This function expects the _hashed_ sign data.
 pub fn create_signature(sk: &SigningKey, sign_data: [u8; 32]) -> ByteArray<64> {
-    let sign_data = Identity256::from(sign_data);
-    let signature: Signature = sk.sign_digest(sign_data);
+    let signature: Signature = sk.sign_prehash(&sign_data).unwrap();
 
     ByteArray::from_inner(signature.to_bytes().into())
 }

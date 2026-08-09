@@ -383,7 +383,9 @@ impl SearchTxClient for HttpClient {
     }
 }
 
-async fn error_for_status(response: reqwest::Response) -> anyhow::Result<reqwest::Response> {
+pub(crate) async fn error_for_status(
+    response: reqwest::Response,
+) -> anyhow::Result<reqwest::Response> {
     if let Err(e) = response.error_for_status_ref() {
         bail!("{}: {}", e, response.text().await?)
     } else {

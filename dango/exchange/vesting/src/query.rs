@@ -47,10 +47,13 @@ fn query_positions(
             let (user, position) = res?;
             let claimable = position.compute_claimable(ctx.block.timestamp, &unlocking_schedule)?;
 
-            Ok((user, PositionResponse {
-                position,
-                claimable,
-            }))
+            Ok((
+                user,
+                PositionResponse {
+                    position,
+                    claimable,
+                },
+            ))
         })
         .collect()
 }

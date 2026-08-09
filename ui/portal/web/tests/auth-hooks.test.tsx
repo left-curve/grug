@@ -524,10 +524,9 @@ describe("auth and signin hooks", () => {
         seed: 1_073_741_824,
       },
       types: {
-        Key: [{ name: "ethereum", type: "string" }],
         Message: [
           { name: "chain_id", type: "string" },
-          { name: "key", type: "Key" },
+          { name: "key", type: "string" },
           { name: "key_hash", type: "string" },
           { name: "referrer", type: "uint32" },
           { name: "seed", type: "uint32" },
@@ -674,10 +673,9 @@ describe("auth and signin hooks", () => {
         seed: 3_221_225_472,
       },
       types: {
-        Key: [{ name: "ethereum", type: "string" }],
         Message: [
           { name: "chain_id", type: "string" },
-          { name: "key", type: "Key" },
+          { name: "key", type: "string" },
           { name: "key_hash", type: "string" },
           { name: "seed", type: "uint32" },
         ],
@@ -957,10 +955,9 @@ describe("auth and signin hooks", () => {
         seed: 536_870_912,
       },
       types: {
-        Key: [{ name: "secp256r1", type: "string" }],
         Message: [
           { name: "chain_id", type: "string" },
-          { name: "key", type: "Key" },
+          { name: "key", type: "string" },
           { name: "key_hash", type: "string" },
           { name: "seed", type: "uint32" },
         ],
@@ -1150,10 +1147,9 @@ describe("auth and signin hooks", () => {
         seed: 2_147_483_648,
       },
       types: {
-        Key: [{ name: "ethereum", type: "string" }],
         Message: [
           { name: "chain_id", type: "string" },
-          { name: "key", type: "Key" },
+          { name: "key", type: "string" },
           { name: "key_hash", type: "string" },
           { name: "seed", type: "uint32" },
         ],
@@ -1205,10 +1201,9 @@ describe("auth and signin hooks", () => {
         seed: 1_610_612_736,
       },
       types: {
-        Key: [{ name: "secp256r1", type: "string" }],
         Message: [
           { name: "chain_id", type: "string" },
-          { name: "key", type: "Key" },
+          { name: "key", type: "string" },
           { name: "key_hash", type: "string" },
           { name: "seed", type: "uint32" },
         ],

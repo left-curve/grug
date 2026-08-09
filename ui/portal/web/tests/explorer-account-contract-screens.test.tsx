@@ -19,7 +19,7 @@ const explorerScreenMocks = vi.hoisted(() => ({
   navigate: vi.fn(),
   useExplorerAccount: vi.fn(),
   useExplorerContract: vi.fn(),
-  useExplorerTransactionsBySender: vi.fn(),
+  useExplorerTransactionsByAddress: vi.fn(),
 }));
 
 vi.mock("@left-curve/store", () => ({
@@ -42,7 +42,7 @@ vi.mock("@left-curve/store", () => ({
   }),
   useExplorerAccount: explorerScreenMocks.useExplorerAccount,
   useExplorerContract: explorerScreenMocks.useExplorerContract,
-  useExplorerTransactionsBySender: explorerScreenMocks.useExplorerTransactionsBySender,
+  useExplorerTransactionsByAddress: explorerScreenMocks.useExplorerTransactionsByAddress,
   usePrices: () => ({
     calculateBalance: explorerScreenMocks.calculateBalance,
   }),
@@ -263,7 +263,7 @@ describe("account and contract explorer screens", () => {
       return null;
     });
     explorerScreenMocks.getContractInfo.mockResolvedValue(null);
-    explorerScreenMocks.useExplorerTransactionsBySender.mockReturnValue(transactionsResponse);
+    explorerScreenMocks.useExplorerTransactionsByAddress.mockReturnValue(transactionsResponse);
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
       value: {
@@ -314,7 +314,7 @@ describe("account and contract explorer screens", () => {
     );
 
     expect(screen.getByText("assets-table:bridge/usdc:1250000|uatom:2000000:")).toBeInTheDocument();
-    expect(explorerScreenMocks.useExplorerTransactionsBySender).toHaveBeenCalledWith(
+    expect(explorerScreenMocks.useExplorerTransactionsByAddress).toHaveBeenCalledWith(
       accountAddress,
       true,
     );
@@ -525,7 +525,7 @@ describe("account and contract explorer screens", () => {
     expect(screen.getByText("None")).toBeInTheDocument();
     expect(screen.getByText("$45.00 (2 Assets)")).toHaveClass("bg-surface-tertiary-green");
     expect(screen.getByText("assets-table:bridge/usdc:1250000|uatom:2000000:")).toBeInTheDocument();
-    expect(explorerScreenMocks.useExplorerTransactionsBySender).toHaveBeenCalledWith(
+    expect(explorerScreenMocks.useExplorerTransactionsByAddress).toHaveBeenCalledWith(
       contractAddress,
       true,
     );
@@ -533,7 +533,7 @@ describe("account and contract explorer screens", () => {
 
     cleanup();
     vi.clearAllMocks();
-    explorerScreenMocks.useExplorerTransactionsBySender.mockReturnValue(transactionsResponse);
+    explorerScreenMocks.useExplorerTransactionsByAddress.mockReturnValue(transactionsResponse);
     renderContractExplorer(<ContractExplorer.NotFound />, null);
 
     expect(screen.getByText(m["explorer.contracts.notFound.title"]())).toBeInTheDocument();
@@ -547,7 +547,7 @@ describe("account and contract explorer screens", () => {
     };
 
     explorerScreenMocks.calculateBalance.mockReturnValueOnce("$0.00");
-    explorerScreenMocks.useExplorerTransactionsBySender.mockReturnValue({
+    explorerScreenMocks.useExplorerTransactionsByAddress.mockReturnValue({
       ...transactionsResponse,
       data: {
         nodes: [],
@@ -582,7 +582,7 @@ describe("account and contract explorer screens", () => {
     });
     expect(screen.getByText("$0.00 (2 Assets)")).toHaveClass("bg-surface-tertiary-green");
     expect(screen.getByText("assets-table:bridge/usdc:0|uatom:0:")).toBeInTheDocument();
-    expect(explorerScreenMocks.useExplorerTransactionsBySender).toHaveBeenCalledWith(
+    expect(explorerScreenMocks.useExplorerTransactionsByAddress).toHaveBeenCalledWith(
       contractAddress,
       true,
     );

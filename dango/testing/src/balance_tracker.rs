@@ -125,7 +125,10 @@ where
         let delta = self.changes(account);
 
         for (denom, change) in changes {
-            let diff = delta.get(&denom).unwrap();
+            // A denom absent from both snapshots (zero balance before and
+            // after) has no delta entry; that is an unchanged balance, not
+            // an error.
+            let diff = delta.get(&denom).unwrap_or(&BalanceChange::Unchanged);
             if change != *diff {
                 panic!(
                     "incorrect balance! account: {}, denom: {}, expected: {:?}, actual: {:?}",

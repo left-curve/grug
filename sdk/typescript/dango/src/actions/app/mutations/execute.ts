@@ -1,13 +1,4 @@
-import type {
-  Address,
-  Client,
-  Funds,
-  Json,
-  Signer,
-  TxMessageType,
-  TypedDataParameter,
-} from "@left-curve/types";
-import { getCoinsTypedData } from "@left-curve/utils";
+import type { Address, Client, Funds, Json, Signer } from "@left-curve/types";
 import { type SignAndBroadcastTxReturnType, signAndBroadcastTx } from "./signAndBroadcastTx.js";
 
 export type ExecuteParameters = {
@@ -19,7 +10,6 @@ export type ExecuteParameters = {
 export type ExecuteMsg = {
   contract: Address;
   msg: Json;
-  typedData?: TypedDataParameter;
   funds?: Funds;
 };
 
@@ -33,44 +23,13 @@ export async function execute(
 
   const executeMsgs = Array.isArray(execute) ? execute : [execute];
 
-  const { messages, typedData } = executeMsgs.reduce(
-    (acc, { contract, msg, funds = {}, typedData }, index) => {
-      acc.messages.push({
-        execute: {
-          contract,
-          msg,
-          funds,
-        },
-      });
-
-      const { extraTypes = {}, type = [] } = typedData || {};
-
-      acc.typedData.type.push({
-        name: "execute",
-        type: `Execute${index}`,
-      } as unknown as TxMessageType);
-      acc.typedData.extraTypes[`Execute${index}`] = [
-        { name: "contract", type: "address" },
-        { name: "msg", type: `ExecuteMessage${index}` },
-        { name: "funds", type: `Funds${index}` },
-      ];
-      acc.typedData.extraTypes[`ExecuteMessage${index}`] = type;
-      acc.typedData.extraTypes[`Funds${index}`] = [...getCoinsTypedData(funds)];
-      acc.typedData.extraTypes = { ...acc.typedData.extraTypes, ...extraTypes };
-
-      return acc;
+  const messages = executeMsgs.map(({ contract, msg, funds = {} }) => ({
+    execute: {
+      contract,
+      msg,
+      funds,
     },
-    {
-      messages: [],
-      typedData: {
-        type: [],
-        extraTypes: {},
-      },
-    } as {
-      messages: { execute: Omit<ExecuteMsg, "typedData"> }[];
-      typedData: TypedDataParameter<TxMessageType>;
-    },
-  );
+  }));
 
-  return await signAndBroadcastTx(client, { sender, messages, typedData, gasLimit });
+  return await signAndBroadcastTx(client, { sender, messages, gasLimit });
 }

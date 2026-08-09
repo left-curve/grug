@@ -357,9 +357,10 @@ mod tests {
     fn pair_filter() {
         let f = make_perps_filter(None, pairs(&["perp/btcusd"]), None, None, None);
         let out = f(&block()).unwrap();
-        assert_eq!(out.events.iter().map(|e| e.idx).collect::<Vec<_>>(), vec![
-            0, 2
-        ]);
+        assert_eq!(
+            out.events.iter().map(|e| e.idx).collect::<Vec<_>>(),
+            vec![0, 2]
+        );
     }
 
     #[test]
@@ -367,9 +368,10 @@ mod tests {
         // mock(1) is the `user` of both the order_filled and order_persisted.
         let f = make_perps_filter(None, None, users(&[1]), None, None);
         let out = f(&block()).unwrap();
-        assert_eq!(out.events.iter().map(|e| e.idx).collect::<Vec<_>>(), vec![
-            0, 2
-        ]);
+        assert_eq!(
+            out.events.iter().map(|e| e.idx).collect::<Vec<_>>(),
+            vec![0, 2]
+        );
 
         // mock(2) is not the `user` of any event here.
         let f = make_perps_filter(None, None, users(&[2]), None, None);
@@ -386,9 +388,10 @@ mod tests {
             None,
         );
         let out = f(&block()).unwrap();
-        assert_eq!(out.events.iter().map(|e| e.idx).collect::<Vec<_>>(), vec![
-            2
-        ]);
+        assert_eq!(
+            out.events.iter().map(|e| e.idx).collect::<Vec<_>>(),
+            vec![2]
+        );
     }
 
     #[test]
@@ -396,16 +399,18 @@ mod tests {
         // order_id 100 belongs only to the order_filled (idx 0).
         let f = make_perps_filter(None, None, None, order_ids(&[100]), None);
         let out = f(&block()).unwrap();
-        assert_eq!(out.events.iter().map(|e| e.idx).collect::<Vec<_>>(), vec![
-            0
-        ]);
+        assert_eq!(
+            out.events.iter().map(|e| e.idx).collect::<Vec<_>>(),
+            vec![0]
+        );
 
         // A set spanning both resting orders keeps both, in block order.
         let f = make_perps_filter(None, None, None, order_ids(&[100, 101]), None);
         let out = f(&block()).unwrap();
-        assert_eq!(out.events.iter().map(|e| e.idx).collect::<Vec<_>>(), vec![
-            0, 2
-        ]);
+        assert_eq!(
+            out.events.iter().map(|e| e.idx).collect::<Vec<_>>(),
+            vec![0, 2]
+        );
 
         // The liquidated event (idx 1) carries no order_id, and no event has id
         // 999, so an order filter excludes everything.
@@ -418,9 +423,10 @@ mod tests {
         // Only the order_filled (idx 0) carries client_order_id 7.
         let f = make_perps_filter(None, None, None, None, client_order_ids(&[7]));
         let out = f(&block()).unwrap();
-        assert_eq!(out.events.iter().map(|e| e.idx).collect::<Vec<_>>(), vec![
-            0
-        ]);
+        assert_eq!(
+            out.events.iter().map(|e| e.idx).collect::<Vec<_>>(),
+            vec![0]
+        );
 
         // The liquidation and the cid-less resting order (idx 1, 2) cannot match
         // any client order filter.

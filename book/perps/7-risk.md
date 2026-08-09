@@ -6,6 +6,8 @@ This chapter describes how to choose the risk parameters that govern the perpetu
 
 The **initial margin ratio** (IMR) sets maximum leverage ($1 / \mathtt{imr}$). The **maintenance margin ratio** (MMR) sets the liquidation threshold. Both are per-pair.
 
+The IMR also bounds closed-session index drift: while a market is closed, the index price can move at most $\pm \mathtt{imr}$ from the last regular-session oracle price, so a thin off-hours book cannot walk the mark far from the true price.
+
 ### 1.1 Volatility-based derivation
 
 Start from the asset's historical daily return distribution:

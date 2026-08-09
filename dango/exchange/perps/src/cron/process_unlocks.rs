@@ -204,16 +204,24 @@ mod tests {
         let mut storage = MockStorage::new();
 
         USER_STATES
-            .save(&mut storage, USER_A, &UserState {
-                unlocks: unlocks_from(&[(500, 50)]),
-                ..Default::default()
-            })
+            .save(
+                &mut storage,
+                USER_A,
+                &UserState {
+                    unlocks: unlocks_from(&[(500, 50)]),
+                    ..Default::default()
+                },
+            )
             .unwrap();
         USER_STATES
-            .save(&mut storage, USER_B, &UserState {
-                unlocks: unlocks_from(&[(700, 60)]),
-                ..Default::default()
-            })
+            .save(
+                &mut storage,
+                USER_B,
+                &UserState {
+                    unlocks: unlocks_from(&[(700, 60)]),
+                    ..Default::default()
+                },
+            )
             .unwrap();
 
         process_unlocks(

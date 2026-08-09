@@ -271,6 +271,23 @@ services:
       retries: 3
 {% endif %}
 
+{% if withdrawal_approver_host_enabled | bool %}
+  withdrawal-approver:
+    image: ghcr.io/left-curve/bots/withdrawal-approver:${WITHDRAWAL_APPROVER_TAG:-latest}
+    pull_policy: missing
+    labels:
+      <<: *common-labels
+      service_name: "withdrawal_approver"
+    depends_on:
+      dango:
+        condition: service_healthy
+    restart: always
+    env_file:
+      - ./withdrawal-approver/.env
+    volumes:
+      - ./withdrawal-approver/config.json:/root/.dango-withdrawal-approver/config.json
+{% endif %}
+
   cometbft:
     image: ghcr.io/left-curve/left-curve/cometbft:${COMETBFT_TAG:-latest}
     pull_policy: missing

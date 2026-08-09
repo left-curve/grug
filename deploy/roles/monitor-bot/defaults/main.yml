@@ -1,0 +1,50 @@
+---
+monitor_bot_dir: "{{ deploy_home }}/monitor-bot"
+monitor_bot_image: "ghcr.io/left-curve/bots/monitor"
+monitor_bot_tag: "latest"
+monitor_bot_networks: []
+# Host ports for the bot's HTTP /health, /status, /metrics server, bound to
+# the wireguard IP (Prometheus on ovh3 resolves scrape hostnames to wireguard
+# IPs) and the tailscale IP (laptop debugging). Follows the bot port blocks
+# 9300s (points-bot), 9310 (perp-liquidator), 9320 (batch-block-backup).
+monitor_bot_http_ports:
+  devnet: 9330
+  testnet: 9331
+  mainnet: 9332
+# Optional "hostname:ip" entries rendered into the container's extra_hosts —
+# the archive role's trick of resolving an api-*.dango.zone hostname to a
+# node's wireguard IP so traffic hits that node's traefik directly, bypassing
+# Cloudflare. Off by default on purpose: the monitor should watch the same
+# public path users take, so that Cloudflare/load-balancer outages are
+# detected too. Only set this if Cloudflare's bot management starts blocking
+# the bot's requests and a WAF exception is not an option.
+monitor_bot_host_overrides: []
+# Contract addresses per network, injected into the bot's config — the bot
+# deliberately takes them from config instead of resolving them from the
+# chain at runtime, and refuses to start without them. A network absent from
+# this map fails the config template loudly at deploy time instead of
+# shipping a config the bot rejects at startup.
+monitor_bot_addresses:
+  mainnet:
+    perps: "0x90bc84df68d1aa59a857e04ed529e9a26edbea4f"
+    gateway: "0xc51e2cbe9636a90c86463ac3eb18fbee92b700d1"
+# Discord role mentioned on warning/critical alerts (the @Team role's
+# snowflake ID). Not a secret, so it lives in the world-readable config.json.
+# Info alerts and heartbeats never mention.
+monitor_bot_discord_role_id: "1260994713583095808"
+# EVM chains for the bridge-collateral checks (warp-contract USDC balance vs
+# the gateway reserve, and sudden-outflow detection), keyed by network. The
+# chain key must match the hyperlane vault's `relayer.<key>_rpc_url` entry:
+# the secret RPC URLs are injected through env.j2 from that vault, never
+# written into the world-readable config.json. Networks absent from this map
+# simply run without the bridge-collateral group.
+monitor_bot_bridge_chains:
+  mainnet:
+    ethereum:
+      domain: 1
+      warp_address: "0xd05909852aE07118857f9D071781671D12c0f36c"
+      usdc_address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+    arbitrum:
+      domain: 42161
+      warp_address: "0x9d0ea335355dA17eE89E50DF43AB823416Cf73d4"
+      usdc_address: "0xaf88d065e77c8cc2239327c5edb3a432268e5831"

@@ -1,3 +1,0 @@
-FAUCET_BOT_TAG=latest
-FRONTEND_BANNER=Localdango
-HTTPD__STATIC_FILES_PATH=../../indexer/httpd/static/

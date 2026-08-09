@@ -40,49 +40,9 @@ pub trait Api {
         compressed: bool,
     ) -> StdResult<Vec<u8>>;
 
-    /// Verify an ED25519 signature with the given hashed message and public
-    /// key.
-    ///
-    /// NOTE: This function takes the hash of the message, not the prehash.
-    fn ed25519_verify(&self, msg_hash: &[u8], sig: &[u8], pk: &[u8]) -> StdResult<()>;
-
-    /// Verify a batch of ED25519 signatures with the given hashed message and public
-    /// key.
-    /// NOTE: This function takes the hash of the messages, not the prehash.
-    fn ed25519_batch_verify(
-        &self,
-        prehash_msgs: &[&[u8]],
-        sigs: &[&[u8]],
-        pks: &[&[u8]],
-    ) -> StdResult<()>;
-
     /// Perform the SHA2-256 hash.
     fn sha2_256(&self, data: &[u8]) -> [u8; 32];
 
-    /// Perform the SHA2-512 hash.
-    fn sha2_512(&self, data: &[u8]) -> [u8; 64];
-
-    /// Perform the SHA2-512 hash, truncated to the first 32 bytes.
-    fn sha2_512_truncated(&self, data: &[u8]) -> [u8; 32];
-
-    /// Perform the SHA3-256 hash.
-    fn sha3_256(&self, data: &[u8]) -> [u8; 32];
-
-    /// Perform the SHA3-512 hash.
-    fn sha3_512(&self, data: &[u8]) -> [u8; 64];
-
-    /// Perform the SHA3-512 hash, truncated to the first 32 bytes.
-    fn sha3_512_truncated(&self, data: &[u8]) -> [u8; 32];
-
     /// Perform the Keccak-256 hash.
     fn keccak256(&self, data: &[u8]) -> [u8; 32];
-
-    /// Perform the BLAKE2s-256 hash.
-    fn blake2s_256(&self, data: &[u8]) -> [u8; 32];
-
-    /// Perform the BLAKE2b-512 hash.
-    fn blake2b_512(&self, data: &[u8]) -> [u8; 64];
-
-    /// Perform the BLAKE3 hash.
-    fn blake3(&self, data: &[u8]) -> [u8; 32];
 }

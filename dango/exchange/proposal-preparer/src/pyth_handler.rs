@@ -228,6 +228,22 @@ where
             txs.insert(0, oracle_tx.to_json_vec()?.into());
         }
 
+        // Once the exchange is wound down there are no positions to mark and
+        // no vault margin to quote with, so stop injecting the two perps
+        // maintenance transactions. The oracle price feed above keeps running,
+        // since other contracts still consume it.
+        let trading_enabled = querier
+            .query_wasm_smart(cfg.addresses.perps, perps::QueryParamRequest {})?
+            .trading_enabled;
+
+        if !trading_enabled {
+            #[cfg(feature = "metrics")]
+            histogram!("proposal_preparer.prepare_proposal.duration",)
+                .record(start.elapsed().as_secs_f64());
+
+            return Ok(txs);
+        }
+
         // Insert perps index-price refresh transaction.
         {
             let index_tx = Tx {

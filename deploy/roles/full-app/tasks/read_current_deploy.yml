@@ -40,7 +40,7 @@
 
     - name: Read .env values for system wide directories
       shell: |
-        grep -E '^(DANGO_DIRECTORY|COMETBFT_DIRECTORY|S3_PATH|S3_BUCKET)=' {{ ansible_facts['env']['HOME'] }}/deployments/{{ current_deployment }}/.env | \
+        grep -E '^(DANGO_DIRECTORY|COMETBFT_DIRECTORY)=' {{ ansible_facts['env']['HOME'] }}/deployments/{{ current_deployment }}/.env | \
         awk -F= '{print tolower($1) "=" $2}'
       register: existing_env_variables
       when: system_wide_directories and current_deployment is defined and env_file_exists.stat.exists

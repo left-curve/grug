@@ -17,6 +17,10 @@ http-request-details = []
 metrics              = ["dep:metrics"]
 s3                   = ["dep:aws-config", "dep:aws-credential-types", "dep:aws-sdk-s3"]
 tracing              = ["dep:tracing"]
+# In-process xz codec (links liblzma via xz2). Off by default so the base build
+# and cross-compiled producers stay pure-Rust; a shell-out codec can be used
+# instead by implementing `compress::Codec`.
+xz-codec = ["dep:xz2"]
 
 [dependencies]
 aws-config           = { workspace = true, optional = true }
@@ -27,14 +31,24 @@ dango-app            = { workspace = true }
 dango-backtrace      = { workspace = true }
 dango-disk-saver     = { workspace = true, features = ["tracing"] }
 dango-primitives     = { workspace = true, features = ["chrono", "sea-orm"] }
+lzma-rs              = { workspace = true }
 metrics              = { workspace = true, optional = true }
-roaring              = { workspace = true }
 serde                = { workspace = true }
 serde_json           = { workspace = true }
+tar                  = { workspace = true }
 tempfile             = { workspace = true }
 thiserror            = { workspace = true }
-tokio                = { workspace = true, features = ["rt", "rt-multi-thread", "sync"] }
+tokio                = { workspace = true, features = ["rt", "rt-multi-thread"] }
 tracing              = { workspace = true, optional = true }
+xz2                  = { workspace = true, optional = true }
 
 [dev-dependencies]
+anyhow   = { workspace = true }
 assertor = { workspace = true }
+dotenvy  = { workspace = true }
+tokio    = { workspace = true, features = ["macros"] }
+
+# Interactive S3 batch download + streaming decompression walkthrough.
+[[example]]
+name              = "batch_reader"
+required-features = ["s3", "xz-codec"]

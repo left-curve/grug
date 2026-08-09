@@ -438,34 +438,55 @@ describe("bridge UI", () => {
     vi.unstubAllEnvs();
   });
 
-  it("connects an EVM wallet before showing the deposit form", () => {
+  it("shows a sign-in button instead of swapper when disconnected", () => {
+    bridgeUiMocks.isConnected = false;
+
     renderBridgeDeposit();
 
-    fireEvent.click(screen.getByRole("button", { name: "connect wallet" }));
+    const loginButton = screen.getByRole("button", { name: m["common.signin"]() });
 
-    expect(bridgeUiMocks.setConnectorId).toHaveBeenCalledWith("browser-wallet");
-    expect(bridgeUiMocks.showModal).not.toHaveBeenCalled();
-  });
-
-  it("mounts the swapper deposit iframe from more deposit options", async () => {
-    renderBridgeDeposit();
-
-    const moreDepositOptions = screen.getByRole("button", {
-      name: new RegExp(m["bridge.deposit.moreOptions.title"]()),
-    });
-
-    expect(moreDepositOptions).toHaveTextContent(m["bridge.deposit.moreOptions.fee"]());
-
-    fireEvent.click(moreDepositOptions);
-
-    const swapperIframe = await screen.findByTitle("Swapper deposit");
-    expect(swapperIframe).toBeInTheDocument();
-    expect(swapperIframe.closest(".bg-surface-secondary-rice")).toBeInTheDocument();
+    expect(loginButton).toBeInTheDocument();
+    expect(screen.getByText(m["bridge.rateLimitWarning"]())).toBeInTheDocument();
+    expect(screen.queryByTitle("Swapper deposit")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("combobox", {
         name: m["bridge.selectCoin"](),
       }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("combobox", {
+        name: m["bridge.selectNetwork"](),
+      }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(loginButton);
+
+    expect(bridgeUiMocks.showModal).toHaveBeenCalledWith("authenticate", { action: "signin" });
+  });
+
+  it("mounts the swapper deposit iframe as the deposit flow", async () => {
+    renderBridgeDeposit();
+
+    const swapperIframe = await screen.findByTitle("Swapper deposit");
+    expect(swapperIframe).toBeInTheDocument();
+    expect(swapperIframe.closest(".bg-surface-secondary-rice")).toBeInTheDocument();
+    expect(screen.getByText(m["bridge.rateLimitWarning"]())).toBeInTheDocument();
+    expect(
+      screen.queryByRole("combobox", {
+        name: m["bridge.selectCoin"](),
+      }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("combobox", {
+        name: m["bridge.selectNetwork"](),
+      }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", {
+        name: m["bridge.deposit.moreOptions.back"](),
+      }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(m["bridge.deposit.moreOptions.title"]())).not.toBeInTheDocument();
 
     await waitFor(() => expect(bridgeUiMocks.swapperOptions).toHaveLength(1));
     expect(bridgeUiMocks.swapperOptions[0]).toEqual(
@@ -491,7 +512,13 @@ describe("bridge UI", () => {
           height: "560px",
           width: "100%",
         }),
-        supportedDepositOptions: ["transferCrypto", "depositWithCash", "walletDeposit"],
+        supportedDepositOptions: [
+          "transferCrypto",
+          "depositWithCash",
+          "walletDeposit",
+          "depositFromPerps",
+          "depositFromPolymarket",
+        ],
       }),
     );
     await waitFor(() => {
@@ -503,75 +530,31 @@ describe("bridge UI", () => {
     bridgeUiMocks.swapperOptions[0].onEvent?.({ type: "transaction_success" });
     expect(bridgeUiMocks.refreshBridgeBalances).toHaveBeenCalledOnce();
     expect(bridgeUiMocks.refreshUserStatus).toHaveBeenCalledOnce();
-
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: m["bridge.deposit.moreOptions.back"](),
-      }),
-    );
-
-    expect(bridgeUiMocks.swapperDestroy).toHaveBeenCalledOnce();
-    expect(
-      screen.queryByRole("combobox", {
-        name: m["bridge.selectCoin"](),
-      }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("combobox", {
-        name: m["bridge.selectNetwork"](),
-      }),
-    ).toBeInTheDocument();
   });
 
-  it("keeps more deposit options visible and asks users to log in before opening swapper", () => {
-    bridgeUiMocks.isConnected = false;
-
-    renderBridgeDeposit();
-
-    const moreDepositOptions = screen.getByRole("button", {
-      name: new RegExp(m["bridge.deposit.moreOptions.title"]()),
-    });
-
-    expect(moreDepositOptions).toBeInTheDocument();
-    expect(moreDepositOptions).toHaveTextContent(m["common.signin"]());
-    expect(moreDepositOptions).not.toHaveTextContent(m["bridge.deposit.moreOptions.cta"]());
-    expect(screen.queryByTitle("Swapper deposit")).not.toBeInTheDocument();
-
-    fireEvent.click(moreDepositOptions);
-
-    expect(bridgeUiMocks.showModal).toHaveBeenCalledWith("authenticate", { action: "signin" });
-  });
-
-  it("shows the Bitcoin deposit address without an EVM wallet flow", () => {
+  it("keeps swapper as the deposit flow for bitcoin and unsupported router states", async () => {
     bridgeUiMocks.network = "bitcoin";
 
-    renderBridgeDeposit();
+    const { unmount } = renderBridgeDeposit();
 
-    expect(screen.getByText(m["bridge.depositAddress"]())).toBeInTheDocument();
-    expect(screen.getByText("bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh")).toBeInTheDocument();
-    expect(screen.getByText(m["bridge.rateLimitWarning"]())).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "connect wallet" })).not.toBeInTheDocument();
+    expect(await screen.findByTitle("Swapper deposit")).toBeInTheDocument();
+    expect(screen.queryByText(m["bridge.depositAddress"]())).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: m["bridge.deposit.title"]() }),
+      screen.queryByText("bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh"),
     ).not.toBeInTheDocument();
-    expect(bridgeUiMocks.showModal).not.toHaveBeenCalled();
-  });
 
-  it("shows an unsupported warning instead of an EVM deposit form when config has no router", () => {
+    unmount();
+    bridgeUiMocks.swapperOptions = [];
+    bridgeUiMocks.network = "11155111";
     bridgeUiMocks.hasRouter = false;
 
     renderBridgeDeposit();
 
-    expect(screen.getByText(m["bridge.unsupportedAsset"]())).toBeInTheDocument();
-    expect(screen.getByText(m["bridge.rateLimitWarning"]())).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "connect wallet" })).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: m["bridge.deposit.title"]() }),
-    ).not.toBeInTheDocument();
-    expect(bridgeUiMocks.showModal).not.toHaveBeenCalled();
+    expect(await screen.findByTitle("Swapper deposit")).toBeInTheDocument();
+    expect(screen.queryByText(m["bridge.unsupportedAsset"]())).not.toBeInTheDocument();
   });
 
-  it("hides the deposit coin selector and keeps the withdraw coin selector", () => {
+  it("hides the deposit selectors and keeps the withdraw selectors", () => {
     bridgeUiMocks.chainId = "dango-1";
 
     const { unmount } = renderBridgeDeposit();
@@ -582,10 +565,10 @@ describe("bridge UI", () => {
       }),
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole("combobox", {
+      screen.queryByRole("combobox", {
         name: m["bridge.selectNetwork"](),
       }),
-    ).toBeInTheDocument();
+    ).not.toBeInTheDocument();
 
     unmount();
     renderBridgeWithdraw();
@@ -652,154 +635,6 @@ describe("bridge UI", () => {
     fireEvent.click(loginButton);
 
     expect(bridgeUiMocks.showModal).toHaveBeenCalledWith("authenticate", { action: "signin" });
-  });
-
-  it("opens deposit confirmation with allowance requirement and refresh reset wiring", async () => {
-    bridgeUiMocks.allowanceQueryData = 1_000_000n;
-    bridgeUiMocks.connector = {
-      icon: "/wallet.svg",
-      id: "browser-wallet",
-      name: "Browser Wallet",
-    };
-
-    renderBridgeDeposit();
-
-    fireEvent.change(screen.getByRole("textbox", { name: "amount" }), {
-      target: {
-        value: "3.25",
-      },
-    });
-
-    expect(screen.getByRole("textbox", { name: m["bridge.youGet"]() })).toHaveValue("3.25");
-    expect(screen.getByText("3.25:bridge/usdc")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: m["bridge.deposit.title"]() }));
-
-    expect(bridgeUiMocks.showModal).toHaveBeenCalledWith(
-      "BridgeDeposit",
-      expect.objectContaining({
-        allowanceMutation: bridgeUiMocks.allowanceMutation,
-        amount: "3.25",
-        coin: usdcCoin,
-        config: bridgeConfig,
-        deposit: bridgeUiMocks.deposit,
-        requiresAllowance: true,
-      }),
-    );
-
-    const [, modalProps] = bridgeUiMocks.showModal.mock.calls.at(-1) as [
-      string,
-      { reset: () => void },
-    ];
-
-    await act(async () => {
-      modalProps.reset();
-    });
-
-    expect(bridgeUiMocks.refetchEvmBalances).toHaveBeenCalledOnce();
-    expect(bridgeUiMocks.reset).toHaveBeenCalledOnce();
-  });
-
-  it("opens deposit confirmation without approval when the EVM allowance covers the parsed amount", () => {
-    bridgeUiMocks.allowanceQueryData = 5_000_000n;
-    bridgeUiMocks.connector = {
-      icon: "/wallet.svg",
-      id: "browser-wallet",
-      name: "Browser Wallet",
-    };
-
-    renderBridgeDeposit();
-
-    fireEvent.change(screen.getByRole("textbox", { name: "amount" }), {
-      target: {
-        value: "3.25",
-      },
-    });
-    fireEvent.click(screen.getByRole("button", { name: m["bridge.deposit.title"]() }));
-
-    expect(bridgeUiMocks.showModal).toHaveBeenCalledWith(
-      "BridgeDeposit",
-      expect.objectContaining({
-        allowanceMutation: bridgeUiMocks.allowanceMutation,
-        amount: "3.25",
-        coin: usdcCoin,
-        config: bridgeConfig,
-        deposit: bridgeUiMocks.deposit,
-        requiresAllowance: false,
-      }),
-    );
-  });
-
-  it("does not open deposit confirmation for a zero amount", () => {
-    bridgeUiMocks.allowanceQueryData = 5_000_000n;
-    bridgeUiMocks.connector = {
-      icon: "/wallet.svg",
-      id: "browser-wallet",
-      name: "Browser Wallet",
-    };
-
-    renderBridgeDeposit();
-
-    const depositButton = screen.getByRole("button", { name: m["bridge.deposit.title"]() });
-
-    expect(depositButton).toBeDisabled();
-
-    fireEvent.click(depositButton);
-
-    expect(bridgeUiMocks.showModal).not.toHaveBeenCalled();
-  });
-
-  it("blocks inactive account deposits below the chain minimum and allows the configured amount", async () => {
-    bridgeUiMocks.allowanceQueryData = 5_000_000n;
-    bridgeUiMocks.connector = {
-      icon: "/wallet.svg",
-      id: "browser-wallet",
-      name: "Browser Wallet",
-    };
-    bridgeUiMocks.userStatus = "inactive";
-
-    renderBridgeDeposit();
-
-    const amountInput = screen.getByRole("textbox", { name: "amount" });
-    const depositButton = screen.getByRole("button", { name: m["bridge.deposit.title"]() });
-
-    fireEvent.change(amountInput, {
-      target: {
-        value: "0.5",
-      },
-    });
-
-    expect(
-      screen.getByRole("alert", {
-        name: "",
-      }),
-    ).toHaveTextContent(m["bridge.activeAccount"]({ amount: "1 USDC" }));
-    expect(depositButton).toBeDisabled();
-
-    fireEvent.click(depositButton);
-
-    expect(bridgeUiMocks.showModal).not.toHaveBeenCalled();
-
-    fireEvent.change(amountInput, {
-      target: {
-        value: "1",
-      },
-    });
-
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    expect(depositButton).toBeEnabled();
-
-    fireEvent.click(depositButton);
-
-    expect(bridgeUiMocks.showModal).toHaveBeenCalledWith(
-      "BridgeDeposit",
-      expect.objectContaining({
-        amount: "1",
-        coin: usdcCoin,
-        config: bridgeConfig,
-        requiresAllowance: false,
-      }),
-    );
   });
 
   it("sets a destination address through the modal callback, subtracts fees, and opens withdraw confirmation", async () => {

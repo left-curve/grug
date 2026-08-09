@@ -377,15 +377,18 @@ mod tests {
         dango_primitives::{BorshSerExt, Bound, MockStorage, Order, StdResult},
     };
 
-    const FOOS: IndexedMap<(u64, u64), Foo, FooIndexes> = IndexedMap::new("foo", FooIndexes {
-        name: MultiIndex::new(|_, data| data.name.clone(), "foo", "foo__name"),
-        name_surname: MultiIndex::new(
-            |_, data| (data.name.clone(), data.surname.clone()),
-            "foo",
-            "foo__name_surname",
-        ),
-        id: UniqueIndex::new(|_, data| data.id, "foo", "foo__id"),
-    });
+    const FOOS: IndexedMap<(u64, u64), Foo, FooIndexes> = IndexedMap::new(
+        "foo",
+        FooIndexes {
+            name: MultiIndex::new(|_, data| data.name.clone(), "foo", "foo__name"),
+            name_surname: MultiIndex::new(
+                |_, data| (data.name.clone(), data.surname.clone()),
+                "foo",
+                "foo__name_surname",
+            ),
+            id: UniqueIndex::new(|_, data| data.id, "foo", "foo__id"),
+        },
+    );
 
     #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq, Eq)]
     struct Foo {
@@ -460,13 +463,16 @@ mod tests {
                 .map(|val| val.unwrap())
                 .collect::<Vec<_>>();
 
-            assert_eq!(val, [
-                (101, Foo::new("bar", "s_bar", 101)),
-                (102, Foo::new("bar", "s_bar", 102)),
-                (103, Foo::new("bar", "s_bar", 103)),
-                (104, Foo::new("bar", "s_fooes", 104)),
-                (105, Foo::new("foo", "s_foo", 105))
-            ]);
+            assert_eq!(
+                val,
+                [
+                    (101, Foo::new("bar", "s_bar", 101)),
+                    (102, Foo::new("bar", "s_bar", 102)),
+                    (103, Foo::new("bar", "s_bar", 103)),
+                    (104, Foo::new("bar", "s_fooes", 104)),
+                    (105, Foo::new("foo", "s_foo", 105))
+                ]
+            );
         }
     }
 
@@ -484,13 +490,16 @@ mod tests {
                 .collect::<StdResult<Vec<_>>>()
                 .unwrap();
 
-            assert_eq!(val, [
-                ("bar".to_string(), (0, 1), Foo::new("bar", "s_bar", 101)),
-                ("bar".to_string(), (0, 2), Foo::new("bar", "s_bar", 102)),
-                ("bar".to_string(), (1, 1), Foo::new("bar", "s_bar", 103)),
-                ("bar".to_string(), (1, 2), Foo::new("bar", "s_fooes", 104)),
-                ("foo".to_string(), (1, 3), Foo::new("foo", "s_foo", 105)),
-            ]);
+            assert_eq!(
+                val,
+                [
+                    ("bar".to_string(), (0, 1), Foo::new("bar", "s_bar", 101)),
+                    ("bar".to_string(), (0, 2), Foo::new("bar", "s_bar", 102)),
+                    ("bar".to_string(), (1, 1), Foo::new("bar", "s_bar", 103)),
+                    ("bar".to_string(), (1, 2), Foo::new("bar", "s_fooes", 104)),
+                    ("foo".to_string(), (1, 3), Foo::new("foo", "s_foo", 105)),
+                ]
+            );
         }
 
         // Given a specific index value, iterate records corresponding to it.
@@ -505,12 +514,15 @@ mod tests {
                 .collect::<StdResult<Vec<_>>>()
                 .unwrap();
 
-            assert_eq!(val, [
-                ((0, 1), Foo::new("bar", "s_bar", 101)),
-                ((0, 2), Foo::new("bar", "s_bar", 102)),
-                ((1, 1), Foo::new("bar", "s_bar", 103)),
-                ((1, 2), Foo::new("bar", "s_fooes", 104)),
-            ]);
+            assert_eq!(
+                val,
+                [
+                    ((0, 1), Foo::new("bar", "s_bar", 101)),
+                    ((0, 2), Foo::new("bar", "s_bar", 102)),
+                    ((1, 1), Foo::new("bar", "s_bar", 103)),
+                    ((1, 2), Foo::new("bar", "s_fooes", 104)),
+                ]
+            );
         }
     }
 
@@ -542,11 +554,14 @@ mod tests {
                 .collect::<StdResult<Vec<_>>>()
                 .unwrap();
 
-            assert_eq!(val, [
-                ((0, 1), Foo::new("bar", "s_bar", 101)),
-                ((0, 2), Foo::new("bar", "s_bar", 102)),
-                ((1, 1), Foo::new("bar", "s_bar", 103)),
-            ]);
+            assert_eq!(
+                val,
+                [
+                    ((0, 1), Foo::new("bar", "s_bar", 101)),
+                    ((0, 2), Foo::new("bar", "s_bar", 102)),
+                    ((1, 1), Foo::new("bar", "s_bar", 103)),
+                ]
+            );
         }
 
         // Given (A, B), iterate (C, D), with bounds.
@@ -566,10 +581,13 @@ mod tests {
                 .collect::<StdResult<Vec<_>>>()
                 .unwrap();
 
-            assert_eq!(val, [
-                ((0, 2), Foo::new("bar", "s_bar", 102)),
-                ((1, 1), Foo::new("bar", "s_bar", 103)),
-            ]);
+            assert_eq!(
+                val,
+                [
+                    ((0, 2), Foo::new("bar", "s_bar", 102)),
+                    ((1, 1), Foo::new("bar", "s_bar", 103)),
+                ]
+            );
         }
 
         // Given A, iterate (B, C, D), without bounds.
@@ -584,12 +602,15 @@ mod tests {
                 .collect::<StdResult<Vec<_>>>()
                 .unwrap();
 
-            assert_eq!(val, [
-                ((0, 1), Foo::new("bar", "s_bar", 101)),
-                ((0, 2), Foo::new("bar", "s_bar", 102)),
-                ((1, 1), Foo::new("bar", "s_bar", 103)),
-                ((1, 2), Foo::new("bar", "s_fooes", 104)),
-            ]);
+            assert_eq!(
+                val,
+                [
+                    ((0, 1), Foo::new("bar", "s_bar", 101)),
+                    ((0, 2), Foo::new("bar", "s_bar", 102)),
+                    ((1, 1), Foo::new("bar", "s_bar", 103)),
+                    ((1, 2), Foo::new("bar", "s_fooes", 104)),
+                ]
+            );
         }
 
         // Given A, iterate (B, C, D), with bounds.
@@ -610,11 +631,14 @@ mod tests {
                 .collect::<StdResult<Vec<_>>>()
                 .unwrap();
 
-            assert_eq!(val, [
-                ((0, 2), Foo::new("bar", "s_bar", 102)),
-                ((1, 1), Foo::new("bar", "s_bar", 103)),
-                ((1, 2), Foo::new("bar", "s_fooes", 104)),
-            ]);
+            assert_eq!(
+                val,
+                [
+                    ((0, 2), Foo::new("bar", "s_bar", 102)),
+                    ((1, 1), Foo::new("bar", "s_bar", 103)),
+                    ((1, 2), Foo::new("bar", "s_fooes", 104)),
+                ]
+            );
         }
 
         // Given (A, B, C), iterate D, without bounds.
@@ -631,10 +655,13 @@ mod tests {
                 .collect::<StdResult<Vec<_>>>()
                 .unwrap();
 
-            assert_eq!(val, [
-                ((0, 1), Foo::new("bar", "s_bar", 101)),
-                ((0, 2), Foo::new("bar", "s_bar", 102)),
-            ]);
+            assert_eq!(
+                val,
+                [
+                    ((0, 1), Foo::new("bar", "s_bar", 101)),
+                    ((0, 2), Foo::new("bar", "s_bar", 102)),
+                ]
+            );
         }
 
         // Given (A, B, C), iterate D, with bounds.
@@ -673,11 +700,14 @@ mod tests {
                 .collect::<StdResult<Vec<_>>>()
                 .unwrap();
 
-            assert_eq!(val, [
-                ((0, 1), Foo::new("bar", "s_bar", 101)),
-                ((0, 2), Foo::new("bar", "s_bar", 102)),
-                ((1, 1), Foo::new("bar", "s_bar", 103)),
-            ]);
+            assert_eq!(
+                val,
+                [
+                    ((0, 1), Foo::new("bar", "s_bar", 101)),
+                    ((0, 2), Foo::new("bar", "s_bar", 102)),
+                    ((1, 1), Foo::new("bar", "s_bar", 103)),
+                ]
+            );
         }
 
         // Given A, iterate (B, C, D) using prefix_keys, without bounds only B.
@@ -695,11 +725,14 @@ mod tests {
                 .collect::<StdResult<Vec<_>>>()
                 .unwrap();
 
-            assert_eq!(val, [
-                ("s_bar".to_string(), (0, 1)),
-                ("s_bar".to_string(), (0, 2)),
-                ("s_bar".to_string(), (1, 1)),
-            ]);
+            assert_eq!(
+                val,
+                [
+                    ("s_bar".to_string(), (0, 1)),
+                    ("s_bar".to_string(), (0, 2)),
+                    ("s_bar".to_string(), (1, 1)),
+                ]
+            );
         }
 
         // Given A, iterate (B, C, D) usign prefix_values, without bounds only B.
@@ -717,11 +750,14 @@ mod tests {
                 .collect::<StdResult<Vec<_>>>()
                 .unwrap();
 
-            assert_eq!(val, [
-                Foo::new("bar", "s_bar", 101),
-                Foo::new("bar", "s_bar", 102),
-                Foo::new("bar", "s_bar", 103),
-            ]);
+            assert_eq!(
+                val,
+                [
+                    Foo::new("bar", "s_bar", 101),
+                    Foo::new("bar", "s_bar", 102),
+                    Foo::new("bar", "s_bar", 103),
+                ]
+            );
         }
 
         // Given A, iterate (B, C, D) using values, without bounds only B.
@@ -734,12 +770,15 @@ mod tests {
                 .collect::<StdResult<Vec<_>>>()
                 .unwrap();
 
-            assert_eq!(val, [
-                Foo::new("bar", "s_bar", 101),
-                Foo::new("bar", "s_bar", 102),
-                Foo::new("bar", "s_bar", 103),
-                Foo::new("bar", "s_fooes", 104),
-            ]);
+            assert_eq!(
+                val,
+                [
+                    Foo::new("bar", "s_bar", 101),
+                    Foo::new("bar", "s_bar", 102),
+                    Foo::new("bar", "s_bar", 103),
+                    Foo::new("bar", "s_fooes", 104),
+                ]
+            );
         }
 
         // Given A, iterate (B, C, D) using values_raw, without bounds only B.
@@ -752,12 +791,15 @@ mod tests {
                 .collect::<StdResult<Vec<_>>>()
                 .unwrap();
 
-            assert_eq!(val, [
-                Foo::new("bar", "s_bar", 101).to_borsh_vec().unwrap(),
-                Foo::new("bar", "s_bar", 102).to_borsh_vec().unwrap(),
-                Foo::new("bar", "s_bar", 103).to_borsh_vec().unwrap(),
-                Foo::new("bar", "s_fooes", 104).to_borsh_vec().unwrap(),
-            ]);
+            assert_eq!(
+                val,
+                [
+                    Foo::new("bar", "s_bar", 101).to_borsh_vec().unwrap(),
+                    Foo::new("bar", "s_bar", 102).to_borsh_vec().unwrap(),
+                    Foo::new("bar", "s_bar", 103).to_borsh_vec().unwrap(),
+                    Foo::new("bar", "s_fooes", 104).to_borsh_vec().unwrap(),
+                ]
+            );
         }
     }
 }
@@ -816,15 +858,18 @@ mod cosmwasm_tests {
         }
     }
 
-    const DATA: IndexedMap<&str, Data, DataIndexes> = IndexedMap::new("data", DataIndexes {
-        name: MultiIndex::new(|_pk, d| d.name.to_string(), "data", "data__name"),
-        age: UniqueIndex::new(|_, d| d.age, "data", "data__age"),
-        name_lastname: UniqueIndex::new(
-            |_, d| index_string_tuple(&d.name, &d.last_name),
-            "data",
-            "data__name_lastname",
-        ),
-    });
+    const DATA: IndexedMap<&str, Data, DataIndexes> = IndexedMap::new(
+        "data",
+        DataIndexes {
+            name: MultiIndex::new(|_pk, d| d.name.to_string(), "data", "data__name"),
+            age: UniqueIndex::new(|_, d| d.age, "data", "data__age"),
+            name_lastname: UniqueIndex::new(
+                |_, d| index_string_tuple(&d.name, &d.last_name),
+                "data",
+                "data__name_lastname",
+            ),
+        },
+    );
 
     fn index_string(data: &str) -> Vec<u8> {
         data.as_bytes().to_vec()
@@ -1564,10 +1609,10 @@ mod cosmwasm_tests {
             .range(&storage, None, None, Order::Ascending)
             .collect();
         let result = result.unwrap();
-        assert_eq!(result, [
-            ("5628".to_string(), data2),
-            ("5629".to_string(), data3),
-        ]);
+        assert_eq!(
+            result,
+            [("5628".to_string(), data2), ("5629".to_string(), data3),]
+        );
     }
 
     #[test]
@@ -1680,10 +1725,13 @@ mod cosmwasm_tests {
             .range(&storage, None, None, Order::Ascending)
             .collect::<StdResult<Vec<_>>>()
             .unwrap();
-        assert_eq!(result, [
-            (("1".to_string(), "5627".to_string()), data1),
-            (("2".to_string(), "5628".to_string()), data2),
-        ]);
+        assert_eq!(
+            result,
+            [
+                (("1".to_string(), "5627".to_string()), data1),
+                (("2".to_string(), "5628".to_string()), data2),
+            ]
+        );
     }
 
     #[test]
@@ -1743,11 +1791,14 @@ mod cosmwasm_tests {
             )
             .collect::<StdResult<Vec<_>>>()
             .unwrap();
-        assert_eq!(result, [
-            (("2".to_string(), "5628".to_string()), data2.clone()),
-            (("2".to_string(), "5629".to_string()), data3.clone()),
-            (("3".to_string(), "5630".to_string()), data4)
-        ]);
+        assert_eq!(
+            result,
+            [
+                (("2".to_string(), "5628".to_string()), data2.clone()),
+                (("2".to_string(), "5629".to_string()), data3.clone()),
+                (("3".to_string(), "5630".to_string()), data4)
+            ]
+        );
 
         // let's try to iterate over a more restrictive prefix-range!
         let result = map
@@ -1759,10 +1810,13 @@ mod cosmwasm_tests {
             )
             .collect::<StdResult<Vec<_>>>()
             .unwrap();
-        assert_eq!(result, [
-            (("2".to_string(), "5628".to_string()), data2),
-            (("2".to_string(), "5629".to_string()), data3),
-        ]);
+        assert_eq!(
+            result,
+            [
+                (("2".to_string(), "5628".to_string()), data2),
+                (("2".to_string(), "5629".to_string()), data3),
+            ]
+        );
     }
 
     #[test]
@@ -1826,24 +1880,27 @@ mod cosmwasm_tests {
             )
             .collect::<StdResult<Vec<_>>>()
             .unwrap();
-        assert_eq!(result, [
-            (
-                ("1".to_string(), "1".to_string(), "5627".to_string()),
-                data1.clone()
-            ),
-            (
-                ("1".to_string(), "2".to_string(), "5628".to_string()),
-                data2.clone()
-            ),
-            (
-                ("2".to_string(), "1".to_string(), "5629".to_string()),
-                data3.clone()
-            ),
-            (
-                ("2".to_string(), "2".to_string(), "5630".to_string()),
-                data4
-            )
-        ]);
+        assert_eq!(
+            result,
+            [
+                (
+                    ("1".to_string(), "1".to_string(), "5627".to_string()),
+                    data1.clone()
+                ),
+                (
+                    ("1".to_string(), "2".to_string(), "5628".to_string()),
+                    data2.clone()
+                ),
+                (
+                    ("2".to_string(), "1".to_string(), "5629".to_string()),
+                    data3.clone()
+                ),
+                (
+                    ("2".to_string(), "2".to_string(), "5630".to_string()),
+                    data4
+                )
+            ]
+        );
 
         // let's prefix-range over inclusive bounds on both sides
         let result = map
@@ -1855,16 +1912,19 @@ mod cosmwasm_tests {
             )
             .collect::<StdResult<Vec<_>>>()
             .unwrap();
-        assert_eq!(result, [
-            (
-                ("1".to_string(), "1".to_string(), "5627".to_string()),
-                data1.clone()
-            ),
-            (
-                ("1".to_string(), "2".to_string(), "5628".to_string()),
-                data2.clone()
-            ),
-        ]);
+        assert_eq!(
+            result,
+            [
+                (
+                    ("1".to_string(), "1".to_string(), "5627".to_string()),
+                    data1.clone()
+                ),
+                (
+                    ("1".to_string(), "2".to_string(), "5628".to_string()),
+                    data2.clone()
+                ),
+            ]
+        );
     }
 
     mod bounds_unique_index {
@@ -1975,10 +2035,10 @@ mod cosmwasm_tests {
                 )
                 .collect::<StdResult<Vec<_>>>()
                 .unwrap();
-            assert_eq!(items, [
-                (2, "two2".to_string(), 2),
-                (3, "three".to_string(), 3)
-            ]);
+            assert_eq!(
+                items,
+                [(2, "two2".to_string(), 2), (3, "three".to_string(), 3)]
+            );
         }
     }
 

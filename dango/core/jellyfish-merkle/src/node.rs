@@ -64,7 +64,7 @@ pub fn hash_internal_node(left_hash: Option<Hash256>, right_hash: Option<Hash256
     preimage.extend_from_slice(INTERNAL_NODE_HASH_PREFIX);
     preimage.extend_from_slice(&left_hash.unwrap_or(Hash256::ZERO));
     preimage.extend_from_slice(&right_hash.unwrap_or(Hash256::ZERO));
-    preimage.hash256()
+    preimage.sha2_256()
 }
 
 pub fn hash_leaf_node(key_hash: Hash256, value_hash: Hash256) -> Hash256 {
@@ -72,5 +72,5 @@ pub fn hash_leaf_node(key_hash: Hash256, value_hash: Hash256) -> Hash256 {
     preimage.extend_from_slice(LEAF_NODE_HASH_PERFIX);
     preimage.extend_from_slice(&key_hash);
     preimage.extend_from_slice(&value_hash);
-    preimage.hash256()
+    preimage.sha2_256()
 }

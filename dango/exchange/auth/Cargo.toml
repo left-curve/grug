@@ -17,14 +17,13 @@ dango-storage    = { workspace = true }
 dango-types      = { workspace = true }
 data-encoding    = { workspace = true }
 hex              = { workspace = true }
+serde_json       = { workspace = true }
 sha2             = { workspace = true }
 
 [dev-dependencies]
 dango-eth-utils = { workspace = true }
-dango-identity  = { workspace = true }
 data-encoding   = { workspace = true }
 hex-literal     = { workspace = true }
 k256            = { workspace = true }
 p256            = { workspace = true }
 rand            = { workspace = true }
-serde_json      = { workspace = true }

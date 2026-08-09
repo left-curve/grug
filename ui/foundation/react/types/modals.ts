@@ -18,6 +18,7 @@ export const Modals = {
   BridgeWithdraw: "bridge-withdraw",
   BridgeDeposit: "bridge-deposit",
   AddressWarning: "address-warning",
+  WindingDown: "winding-down",
   EditCommissionRate: "edit-commission-rate",
   PerpsCloseOrder: "perps-close-order",
   PerpsCloseAll: "perps-close-all",

@@ -1,0 +1,55 @@
+---
+# The withdrawal-approver answers gateway withdrawal requests as the guardian
+# and must run as a single instance per network. Placement comes from the
+# static `withdrawal-approver-<network>` inventory groups (not from the play
+# hosts) so rolling deploys with `--limit <one host>` keep it stable; the
+# `withdrawal_approver_host_enabled` gate (see vars/main.yml) additionally
+# requires the master switch and a system-wide deploy, keeping the bot out of
+# preview-style runs. No group exists for devnet: testnet and mainnet only.
+
+- name: Check withdrawal-approver private key format
+  set_fact:
+    withdrawal_approver_key_ok: "{{ (withdrawal_approver_private_key | default('')) is match('^[0-9a-f]{64}$') }}"
+  no_log: true
+  when: withdrawal_approver_host_enabled | bool
+
+- name: Validate withdrawal-approver deploy inputs
+  assert:
+    that:
+      - withdrawal_approver_key_ok | bool
+      - withdrawal_approver_tag != 'latest'
+    fail_msg: >-
+      withdrawal-approver preflight failed: withdrawal_approver_private_key
+      must be exactly 64 lowercase hex chars with no 0x prefix (the bot parses
+      it as strict HEXLOWER and crash-loops on anything else), and
+      withdrawal_approver_tag must be pinned to a release tag (got
+      '{{ withdrawal_approver_tag }}') — an unpinned guardian would silently
+      track bots main.
+    quiet: true
+  when: withdrawal_approver_host_enabled | bool
+
+- name: Create withdrawal-approver config directory
+  file:
+    path: "{{ deployment_dir }}/withdrawal-approver"
+    state: directory
+    mode: '0755'
+  when: withdrawal_approver_host_enabled | bool
+
+- name: Copy withdrawal-approver config
+  copy:
+    src: "withdrawal-approver/{{ dango_network }}/config.json"
+    dest: "{{ deployment_dir }}/withdrawal-approver/config.json"
+    mode: '0644'
+  when: withdrawal_approver_host_enabled | bool
+
+# diff/no_log off: in --diff (or ANSIBLE_DIFF_ALWAYS=1) runs the rendered
+# content — the guardian private key — would land on stdout and be tee'd
+# into deploy/logs/*.log by the justfile recipes.
+- name: Template withdrawal-approver .env
+  template:
+    src: withdrawal-approver.env.j2
+    dest: "{{ deployment_dir }}/withdrawal-approver/.env"
+    mode: '0600'
+  diff: false
+  no_log: true
+  when: withdrawal_approver_host_enabled | bool

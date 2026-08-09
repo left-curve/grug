@@ -10,25 +10,20 @@ rust-version  = { workspace = true }
 version       = { workspace = true }
 
 [dependencies]
-blake2         = { workspace = true }
-blake3         = { workspace = true }
-dango-identity = { workspace = true }
-ed25519-dalek  = { workspace = true, features = ["batch", "digest"] }
-k256           = { workspace = true }
-p256           = { workspace = true }
-sha2           = { workspace = true }
-sha3           = { workspace = true }
-signature      = { workspace = true }
-thiserror      = { workspace = true }
+k256      = { workspace = true }
+p256      = { workspace = true }
+sha2      = { workspace = true }
+sha3      = { workspace = true }
+signature = { workspace = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
 criterion   = { workspace = true }
+getrandom   = { workspace = true }
 hex         = { workspace = true, features = ["serde"] }
 hex-literal = { workspace = true }
-rand        = { workspace = true }
 serde       = { workspace = true, features = ["alloc", "derive"] }
 serde_json  = { workspace = true }
-sha2        = { workspace = true }
 
 [[bench]]
 harness = false

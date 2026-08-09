@@ -1,0 +1,32 @@
+[package]
+authors       = { workspace = true }
+categories    = { workspace = true }
+documentation = { workspace = true }
+edition       = { workspace = true }
+license       = { workspace = true }
+name          = "dango-archive-testing"
+repository    = { workspace = true }
+rust-version  = { workspace = true }
+version       = { workspace = true }
+
+[dependencies]
+anyhow                     = { workspace = true }
+dango-archive-app          = { workspace = true }
+dango-archive-block-source = { workspace = true }
+dango-archive-httpd        = { workspace = true }
+dango-archive-projection   = { workspace = true }
+dango-genesis              = { workspace = true }
+dango-primitives           = { workspace = true }
+dango-sdk                  = { workspace = true }
+dango-testing              = { workspace = true }
+dango-types                = { workspace = true }
+reqwest                    = { workspace = true }
+sea-orm                    = { workspace = true }
+serde_json                 = { workspace = true }
+tempfile                   = { workspace = true }
+tokio                      = { workspace = true }
+uuid                       = { workspace = true }
+
+[dev-dependencies]
+# The `live_subscriber` test drives the `/ws` stream directly with `.next()`.
+futures = { workspace = true }

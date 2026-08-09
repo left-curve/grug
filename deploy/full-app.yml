@@ -40,7 +40,6 @@
       set_fact:
         deployment_name: "{{ hostvars[ansible_play_hosts[0]]['timestamp'] }}"
         timestamp: "{{ hostvars[ansible_play_hosts[0]]['timestamp'] }}"
-        s3_bucket: "dango-{{ dango_network }}-{{ timestamp }}"
         deployed_hosts: "{{ ansible_play_hosts }}"
 
     - name: Fetch PR title from GitHub API (once)

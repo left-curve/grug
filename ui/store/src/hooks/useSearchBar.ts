@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useReducer, useState } from "react";
+import { getArchiveApi } from "../archive/api.js";
 import { usePublicClient } from "./usePublicClient.js";
 import { useAppConfig } from "./useAppConfig.js";
 
@@ -65,13 +66,14 @@ export function useSearchBar(parameters: UseSearchBarParameters) {
 
   const queryClient = useQueryClient();
   const client = usePublicClient();
+  const archive = getArchiveApi(client.chain);
 
   const allNotFavApplets = useMemo(() => {
     return Object.values(applets).filter((applet) => !favApplets.includes(applet.id));
   }, [applets, favApplets]);
 
   const { data: _, ...query } = useQuery({
-    queryKey: ["searchBar", searchText, favApplets],
+    queryKey: ["searchBar", searchText, favApplets, archive ? "archive" : "public"],
     queryFn: async ({ signal }) => {
       if (!searchText.length) {
         setSearchResult(noResult);
@@ -100,6 +102,7 @@ export function useSearchBar(parameters: UseSearchBarParameters) {
 
       const promises: Promise<unknown>[] = [];
       const { accountFactory } = appConfig;
+      const transactionHash = getTransactionHash(searchText);
 
       if (isValidAddress(searchText)) {
         // search for contract
@@ -118,11 +121,11 @@ export function useSearchBar(parameters: UseSearchBarParameters) {
             }
           })(),
         );
-      } else if (searchText.length === 64) {
+      } else if (transactionHash) {
         // search for tx hash
         promises.push(
           (async () => {
-            const txs = await client.searchTxs({ hash: searchText });
+            const txs = await (archive ?? client).searchTxs({ hash: transactionHash });
             if (txs.nodes.length) {
               setSearchResult({ txs: txs.nodes });
               queryClient.setQueryData(["tx", searchText], txs.nodes[0]);
@@ -132,9 +135,11 @@ export function useSearchBar(parameters: UseSearchBarParameters) {
       } else if (!Number.isNaN(Number(searchText))) {
         promises.push(
           (async () => {
-            const block = await client.queryBlock({ height: +searchText });
-            setSearchResult({ block });
-            queryClient.setQueryData(["block", searchText], block);
+            const block = archive
+              ? await archive.queryBlock(+searchText)
+              : await client.queryBlock({ height: +searchText });
+            setSearchResult({ block: block ?? undefined });
+            if (block) queryClient.setQueryData(["block", searchText], block);
           })(),
         );
       } else {
@@ -157,4 +162,9 @@ export function useSearchBar(parameters: UseSearchBarParameters) {
   });
 
   return { searchText, setSearchText, searchResult, allNotFavApplets, ...query };
+}
+
+function getTransactionHash(value: string): string | null {
+  const hash = value.replace(/^0x/i, "");
+  return /^[a-fA-F0-9]{64}$/.test(hash) ? hash : null;
 }

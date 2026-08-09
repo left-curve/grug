@@ -499,6 +499,7 @@ class Param(TypedDict):
     referrer_commission_rates: RateSchedule
     vault_deposit_cap: UsdValue | None
     max_action_batch_size: int
+    trading_enabled: bool
 
 
 class State(TypedDict):

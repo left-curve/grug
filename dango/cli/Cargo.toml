@@ -7,7 +7,7 @@ license       = { workspace = true }
 name          = "dango-cli"
 repository    = { workspace = true }
 rust-version  = { workspace = true }
-version       = "0.26.0"
+version       = "0.29.0"
 
 [dependencies]
 anyhow                      = { workspace = true }
@@ -17,7 +17,7 @@ dango-app                   = { workspace = true, features = ["abci", "metrics",
 dango-config-parser         = { workspace = true }
 dango-db-disk               = { workspace = true, features = ["metrics", "tracing"] }
 dango-genesis               = { workspace = true, features = ["metrics"] }
-dango-indexer-cache         = { workspace = true, features = ["http-request-details", "metrics", "s3", "tracing"] }
+dango-indexer-cache         = { workspace = true, features = ["http-request-details", "metrics", "tracing"] }
 dango-indexer-clickhouse    = { workspace = true, features = ["metrics", "tracing"] }
 dango-indexer-hooked        = { workspace = true, features = ["tracing"] }
 dango-indexer-httpd         = { workspace = true, features = ["metrics", "tracing"] }

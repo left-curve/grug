@@ -1,0 +1,89 @@
+---
+- name: "{{ network }} - Auto-detect active deployment blocks_dir"
+  when: batch_block_backup_blocks_dir[network] is not defined
+  block:
+    - name: "{{ network }} - Read active deployment marker"
+      slurp:
+        src: "{{ deploy_home }}/deployments/{{ network }}.json"
+      register: batch_block_backup_deploy_marker
+
+    - name: "{{ network }} - Parse active deployment name"
+      set_fact:
+        batch_block_backup_active_deployment: >-
+          {{ (batch_block_backup_deploy_marker.content
+              | b64decode | from_json).current_deployment }}
+
+    # DANGO_DIRECTORY is the node's persistent data dir (decoupled from the
+    # blue/green deployment dir) mounted at /root/.dango; the block shard tree
+    # lives at <DANGO_DIRECTORY>/indexer/blocks on the host.
+    - name: "{{ network }} - Read DANGO_DIRECTORY from active deployment"
+      ansible.builtin.command:
+        cmd: >-
+          grep -m1 '^DANGO_DIRECTORY=' {{ deploy_home }}/deployments/{{
+          batch_block_backup_active_deployment }}/.env
+      register: batch_block_backup_dango_line
+      changed_when: false
+      failed_when: false
+
+    - name: "{{ network }} - Derive blocks_dir from DANGO_DIRECTORY"
+      set_fact:
+        batch_block_backup_resolved_blocks_dir: >-
+          {{ batch_block_backup_dango_line.stdout
+             | regex_replace('^DANGO_DIRECTORY=', '') | trim }}/indexer/blocks
+
+- name: "{{ network }} - Use configured blocks_dir override"
+  when: batch_block_backup_blocks_dir[network] is defined
+  set_fact:
+    batch_block_backup_resolved_blocks_dir: >-
+      {{ batch_block_backup_blocks_dir[network] }}
+
+- name: "{{ network }} - Check blocks_dir exists"
+  stat:
+    path: "{{ batch_block_backup_resolved_blocks_dir }}"
+  register: batch_block_backup_blocks_stat
+
+- name: "{{ network }} - Fail if blocks_dir is missing"
+  fail:
+    msg: >-
+      blocks_dir '{{ batch_block_backup_resolved_blocks_dir }}' was not found
+      on {{ inventory_hostname }}. Ensure the full-app node is deployed for
+      {{ network }}, or set
+      batch_block_backup_blocks_dir['{{ network }}'] explicitly.
+  when: not batch_block_backup_blocks_stat.stat.exists
+
+- name: "{{ network }} - Create directory"
+  file:
+    path: "{{ batch_block_backup_dir }}/{{ network }}"
+    state: directory
+    mode: "0755"
+
+- name: "{{ network }} - Template .env"
+  template:
+    src: env.j2
+    dest: "{{ batch_block_backup_dir }}/{{ network }}/.env"
+    mode: "0600"
+
+- name: "{{ network }} - Template docker-compose.yml"
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ batch_block_backup_dir }}/{{ network }}/docker-compose.yml"
+    mode: "0644"
+
+- name: "{{ network }} - Login to GHCR"
+  community.docker.docker_login:
+    registry: ghcr.io
+    username: "{{ ghcr_user }}"
+    password: "{{ ghcr_token }}"
+  no_log: true
+
+- name: "{{ network }} - Launch stack"
+  community.docker.docker_compose_v2:
+    project_src: "{{ batch_block_backup_dir }}/{{ network }}"
+    pull: always
+    state: present
+    recreate: always
+
+- name: "{{ network }} - Logout from GHCR"
+  community.docker.docker_login:
+    registry: ghcr.io
+    state: absent

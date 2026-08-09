@@ -14,9 +14,25 @@ pub use {
 
 use {
     crate::USER_STATES,
+    anyhow::ensure,
     dango_primitives::{Addr, StdResult, Storage},
-    dango_types::perps::UserState,
+    dango_types::perps::{Param, UserState},
 };
+
+/// Trading must be enabled.
+///
+/// Guards the actions that would open new risk on the exchange: placing an
+/// order, moving funds from a spot account into margin, and moving margin into
+/// the counterparty vault. Actions that reduce risk or return funds to the
+/// user are deliberately not guarded.
+pub fn ensure_trading_enabled(param: &Param) -> anyhow::Result<()> {
+    ensure!(
+        param.trading_enabled,
+        "trading is disabled; the exchange has been wound down"
+    );
+
+    Ok(())
+}
 
 /// 1. Load the user's state.
 /// 2. Perform a mutable action on the user state. The action may have side

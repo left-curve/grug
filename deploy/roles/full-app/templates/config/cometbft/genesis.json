@@ -805,6 +805,7 @@
                 "base": "0.001",
                 "tiers": {}
               },
+              "trading_enabled": true,
               "vault_cooldown_period": "86400",
               "vault_deposit_cap": null,
               "vault_total_weight": "7"

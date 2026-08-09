@@ -90,20 +90,6 @@ pub enum QueryMsg {
         recovery_id: u8,
         compressed: bool,
     },
-    /// Verify a single Ed25519 signature.
-    #[returns(())]
-    VerifyEd25519 {
-        pk: Binary,
-        sig: Binary,
-        msg_hash: Binary,
-    },
-    /// Verify a batch of Ed25519 signatures.
-    #[returns(())]
-    VerifyEd25519Batch {
-        pks: Vec<Binary>,
-        sigs: Vec<Binary>,
-        prehash_msgs: Vec<Binary>,
-    },
 }
 
 #[dango_primitives::derive(Serde)]

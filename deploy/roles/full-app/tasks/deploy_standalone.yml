@@ -5,6 +5,7 @@
       faucet-bot: "{{ faucet_bot_tag }}"
       perps-bot: "{{ perps_bot_tag }}"
       perp-liquidator: "{{ perp_liquidator_tag }}"
+      withdrawal-approver: "{{ withdrawal_approver_tag }}"
   run_once: true
 
 - name: Verify GHCR access for bot images
@@ -19,6 +20,9 @@
     - image: "ghcr.io/left-curve/bots/perps-liquidator:{{ perp_liquidator_tag }}"
       name: perp-liquidator
       enabled: "{{ inventory_hostname in (groups['perp-liquidator-' ~ dango_network] | default(groups['perp-liquidator-devnet'] | default([]))) }}"
+    - image: "ghcr.io/left-curve/bots/withdrawal-approver:{{ withdrawal_approver_tag }}"
+      name: withdrawal-approver
+      enabled: "{{ withdrawal_approver_host_enabled }}"
   when: item.enabled | bool
   register: ghcr_check
   ignore_errors: true

@@ -4,10 +4,10 @@ Guidelines for contributing code to this repository.
 
 ## Formatter
 
-Use _nightly_ toolchain to format your code before pushing:
+Format your code before pushing:
 
 ```bash
-cargo +nightly fmt --all
+cargo fmt --all
 ```
 
 An easier way to do this is using the following [just](https://github.com/casey/just) command:
@@ -20,12 +20,11 @@ Also, add the following config to your VS Code settings, and enable format:
 
 ```json
 {
-  "editor.formatOnSave": true,
-  "rust-analyzer.rustfmt.extraArgs": ["+nightly"]
+  "editor.formatOnSave": true
 }
 ```
 
-We use [several rustfmt configurations](./rustfmt.toml) that are not yet available in the stable channel.
+Our [rustfmt configurations](./rustfmt.toml) work with the stable toolchain; no nightly is required.
 
 Make sure to format macros by hand - rustfmt won't format macros.
 

@@ -180,10 +180,13 @@ impl IndexerBuilder<Defined<String>> {
             base_url.starts_with("postgres://") || base_url.starts_with("postgresql://");
         if !is_postgres {
             // Return unchanged for non-Postgres databases
-            return (self, TestDatabaseGuard {
-                server_prefix: String::new(),
-                db_name: String::new(),
-            });
+            return (
+                self,
+                TestDatabaseGuard {
+                    server_prefix: String::new(),
+                    db_name: String::new(),
+                },
+            );
         }
 
         // Generate a unique database name

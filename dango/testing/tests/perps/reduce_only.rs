@@ -191,9 +191,12 @@ fn order_at(
 /// OI, and after every fill the invariant `long_oi == short_oi` must hold.
 fn pair_state(suite: &TestSuiteNaive, contract: Addr, pair: &PairId) -> PairState {
     suite
-        .query_wasm_smart(contract, perps::QueryPairStateRequest {
-            pair_id: pair.clone(),
-        })
+        .query_wasm_smart(
+            contract,
+            perps::QueryPairStateRequest {
+                pair_id: pair.clone(),
+            },
+        )
         .should_succeed()
         .unwrap()
 }
@@ -1909,11 +1912,14 @@ async fn reduce_only_depth_correct_after_shrink() {
     // `None` if the book holds nothing there.
     let ask_depth_at = |suite: &TestSuiteNaive, price: i128| -> Option<Quantity> {
         suite
-            .query_wasm_smart(perps, perps::QueryLiquidityDepthRequest {
-                pair_id: pair.clone(),
-                bucket_size: UsdPrice::new_int(1),
-                limit: None,
-            })
+            .query_wasm_smart(
+                perps,
+                perps::QueryLiquidityDepthRequest {
+                    pair_id: pair.clone(),
+                    bucket_size: UsdPrice::new_int(1),
+                    limit: None,
+                },
+            )
             .should_succeed()
             .asks
             .get(&UsdPrice::new_int(price))

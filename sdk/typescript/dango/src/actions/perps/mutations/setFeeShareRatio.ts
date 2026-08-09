@@ -2,7 +2,7 @@ import { getAppConfig } from "#actions/app/queries/getAppConfig.js";
 import { execute } from "#actions/app/mutations/execute.js";
 import { truncateDec } from "@left-curve/utils";
 
-import type { Address, Client, Signer, TypedDataParameter } from "@left-curve/types";
+import type { Address, Client, Signer } from "@left-curve/types";
 import type { SignAndBroadcastTxReturnType } from "#actions/app/mutations/signAndBroadcastTx.js";
 
 export type SetFeeShareRatioParameters = {
@@ -30,19 +30,10 @@ export async function setFeeShareRatio(
     },
   };
 
-  const typedData: TypedDataParameter = {
-    type: [{ name: "referral", type: "Referral" }],
-    extraTypes: {
-      Referral: [{ name: "set_fee_share_ratio", type: "SetFeeShareRatio" }],
-      SetFeeShareRatio: [{ name: "share_ratio", type: "string" }],
-    },
-  };
-
   return await execute(client, {
     sender,
     execute: {
       msg,
-      typedData,
       contract: addresses.perps,
     },
   });

@@ -1,6 +1,11 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { Modals } from "@left-curve/applets-kit";
+import { m } from "@left-curve/foundation/paraglide/messages.js";
+
+import { resetAppletsKitMocks, setAppletsKitUseApp } from "./mocks/applets-kit";
+
 import { TestnetBanner } from "../src/components/foundation/TestnetBanner";
 
 class MockResizeObserver {
@@ -13,41 +18,39 @@ function setPathname(pathname: string) {
   window.history.pushState({}, "", pathname);
 }
 
-function setBanner(text: string | undefined) {
-  Object.defineProperty(window, "dango", {
-    configurable: true,
-    value: text === undefined ? {} : { banner: text },
-  });
-}
+const showModal = vi.fn();
 
 describe("TestnetBanner", () => {
   beforeEach(() => {
+    resetAppletsKitMocks();
     vi.stubGlobal("ResizeObserver", MockResizeObserver);
     setPathname("/trade");
-    setBanner("Dango testnet is live");
+    setAppletsKitUseApp({ showModal });
   });
 
   afterEach(() => {
     cleanup();
+    vi.clearAllMocks();
     vi.unstubAllGlobals();
   });
 
-  it("renders the configured runtime banner and lets users dismiss it", () => {
+  it("opens the winding-down modal when users click the banner", () => {
     render(<TestnetBanner />);
 
-    expect(screen.getAllByText("Dango testnet is live").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(m["announcement.title"]()).length).toBeGreaterThan(0);
 
-    fireEvent.click(screen.getByRole("button"));
+    fireEvent.click(screen.getByRole("button", { name: m["announcement.title"]() }));
 
-    expect(screen.queryByText("Dango testnet is live")).not.toBeInTheDocument();
+    expect(showModal).toHaveBeenCalledWith(Modals.WindingDown);
   });
 
-  it("does not render when the runtime banner is not configured", () => {
-    setBanner(undefined);
+  it("lets users dismiss the banner without opening the modal", () => {
+    render(<TestnetBanner />);
 
-    const { container } = render(<TestnetBanner />);
+    fireEvent.click(screen.getByRole("button", { name: m["common.dismiss"]() }));
 
-    expect(container).toBeEmptyDOMElement();
+    expect(screen.queryByText(m["announcement.title"]())).not.toBeInTheDocument();
+    expect(showModal).not.toHaveBeenCalled();
   });
 
   it("keeps the banner above the landing page chrome", () => {

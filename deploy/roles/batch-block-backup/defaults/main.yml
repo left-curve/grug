@@ -1,0 +1,21 @@
+---
+batch_block_backup_dir: "{{ deploy_home }}/batch-block-backup"
+batch_block_backup_image: "ghcr.io/left-curve/bots/block-backup"
+batch_block_backup_tag: "latest"
+batch_block_backup_networks: []
+# Port for the bot's HTTP /health, /status, /metrics server. Bound to the
+# host's tailscale IP so Prometheus can scrape it without exposing it publicly.
+# Same port on every network — testnet and mainnet run on separate hosts, so
+# there is no collision.
+batch_block_backup_http_port: 9320
+# Host path to the node's `blocks/` directory, keyed by network. Leave a
+# network unset to auto-detect the active full-app deployment's blocks dir at
+# deploy time (recommended). Set it explicitly to pin a fixed path.
+batch_block_backup_blocks_dir: {}
+# Lowest height that should be archived (see the image .env.example).
+batch_block_backup_start_height: 1
+# Comma-separated block heights whose batches should be rebuilt and re-uploaded
+# once at startup, keyed by network (e.g. {testnet: "200,300"}). One-shot: the
+# rebuild re-runs on every container restart while set, so redeploy without it
+# once the re-upload has completed.
+batch_block_backup_reupload_heights: {}

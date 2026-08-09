@@ -45,14 +45,13 @@ const reviewedExplicitSkips = [
   "tests/pages/transfer.spec.ts:send transaction flow",
 ];
 const reviewedHardcodedMessageLiteralCandidates = [
-  "tests/eip1193-connector.test.tsx:Transfer:1",
   "tests/message-exchanger.test.tsx:WebSocket:1",
   "tests/passkey-connector.test.tsx:Transfer:1",
   "tests/points-leaderboard-table.test.tsx:No data available:1",
-  "tests/privy-connector.test.tsx:Transfer:1",
   "tests/pro-trade-history.test.tsx:Ethereum:1",
   "tests/search-token.test.tsx:Ethereum:1",
   "tests/trading-view.test.tsx:TradingView:1",
+  "tests/use-search-bar.test.tsx:Transfer:1",
 ].sort();
 const reviewedUserIndexTruthinessChecks = [
   "../../store/src/hooks/useBoosters.ts:enabled: enabled && !!userIndex,",

@@ -195,9 +195,12 @@ async fn index_price(
     pair_id: &dango_order_book::PairId,
 ) -> Result<UsdPrice> {
     let state: Option<PairState> = client
-        .query_wasm_smart(perps, perps::QueryPairStateRequest {
-            pair_id: pair_id.clone(),
-        })
+        .query_wasm_smart(
+            perps,
+            perps::QueryPairStateRequest {
+                pair_id: pair_id.clone(),
+            },
+        )
         .await?;
 
     Ok(state
@@ -212,9 +215,12 @@ async fn tick_size(
     pair_id: &dango_order_book::PairId,
 ) -> Result<UsdPrice> {
     let param: Option<PairParam> = client
-        .query_wasm_smart(perps, perps::QueryPairParamRequest {
-            pair_id: pair_id.clone(),
-        })
+        .query_wasm_smart(
+            perps,
+            perps::QueryPairParamRequest {
+                pair_id: pair_id.clone(),
+            },
+        )
         .await?;
 
     Ok(param

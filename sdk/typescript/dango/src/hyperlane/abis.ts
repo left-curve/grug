@@ -13,11 +13,10 @@ export const HYPERLANE_ROUTER_ABI = [
 ] as const;
 
 export const INFURA_URLS = {
-  "1": "https://mainnet.infura.io/v3/00f81bbb13ef4da997f6351b8146807e",
-  "11155111": "https://sepolia.infura.io/v3/2de96f6db6d34eccaa8935cabb9b29c8",
-  "8453": "base",
-  "42161": "arbitrum",
-  "421614": "https://arbitrum-sepolia.infura.io/v3/2de96f6db6d34eccaa8935cabb9b29c8",
+  "1": "https://ethereum-mainnet.core.chainstack.com/70a1cfb855fe87c4abe1dfbcfb58cadb",
+  "11155111": "https://ethereum-sepolia-rpc.publicnode.com",
+  "42161": "https://arbitrum-mainnet.core.chainstack.com/0e3277a137b9af07fcd4c8088d7f618d",
+  "421614": "https://arbitrum-sepolia-rpc.publicnode.com",
 };
 
 export const ERC20_ABI = [

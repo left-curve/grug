@@ -150,7 +150,13 @@ export {
   useExplorerContract,
   type ExplorerContract,
 } from "./hooks/explorer/useExplorerContract.js";
+export { useExplorerTransactionsByAddress } from "./hooks/explorer/useExplorerTransactionsByAddress.js";
 export { useExplorerTransactionsBySender } from "./hooks/explorer/useExplorerTransactionsBySender.js";
+export {
+  getExplorerTransactionKey,
+  type ExplorerTransaction,
+  type ExplorerTransactionRole,
+} from "./hooks/explorer/transactionInvolvement.js";
 export {
   useExplorerUser,
   type AccountWithDetails,

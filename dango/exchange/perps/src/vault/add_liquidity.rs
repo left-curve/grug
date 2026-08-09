@@ -4,6 +4,7 @@ use {
         core::{compute_available_margin, compute_user_equity},
         querier::NoCachePerpQuerier,
         state::{PARAM, STATE, USER_STATES},
+        trade::ensure_trading_enabled,
     },
     anyhow::ensure,
     dango_math::{IsZero, MultiplyRatio, Number as _, Signed, Uint128},
@@ -27,6 +28,8 @@ pub fn add_liquidity(
     ensure!(ctx.funds.is_empty(), "no funds expected");
 
     let param = PARAM.load(ctx.storage)?;
+
+    ensure_trading_enabled(&param)?;
 
     let mut state = STATE.load(ctx.storage)?;
 

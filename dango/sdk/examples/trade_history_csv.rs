@@ -66,12 +66,15 @@ async fn main() -> Result<()> {
             },
             |data| {
                 let pi = data.perps_events.page_info;
-                (data.perps_events.nodes, PageInfo {
-                    start_cursor: pi.start_cursor,
-                    end_cursor: pi.end_cursor,
-                    has_next_page: pi.has_next_page,
-                    has_previous_page: pi.has_previous_page,
-                })
+                (
+                    data.perps_events.nodes,
+                    PageInfo {
+                        start_cursor: pi.start_cursor,
+                        end_cursor: pi.end_cursor,
+                        has_next_page: pi.has_next_page,
+                        has_previous_page: pi.has_previous_page,
+                    },
+                )
             },
         )
         .await?;

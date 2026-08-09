@@ -73,6 +73,9 @@ sops-edit-perps-bot-secrets:
 sops-edit-dango-assistant-secrets:
   sops edit group_vars/dango-assistant/vault.sops.json
 
+sops-edit-archive-secrets:
+  sops edit group_vars/archive/vault.sops.json
+
 sops-edit-ovh1-host-secrets:
   sops edit host_vars/100.96.253.40/vault.sops.json
 
@@ -235,6 +238,66 @@ drop-db-referral-dashboard network server:
       2>&1 | tee {{justfile_directory()}}/logs/$(date -u +%Y%m%d%H%M%S)-drop-db-referral-dashboard.log
 
 
+# ---------------------------- Archive -----------------------------
+
+deploy-archive-mainnet tag="latest":
+  just deploy-archive mainnet {{tag}}
+
+deploy-archive-testnet tag="latest":
+  just deploy-archive testnet {{tag}}
+
+# Deploy a network's archive instance(s), as configured in the host_vars
+# (`archive_instances`) of the hosts in the [archive-<network>] inventory
+# group.
+# Usage: just deploy-archive mainnet
+#        just deploy-archive testnet v1.2.3
+deploy-archive network tag="latest":
+  mkdir -p {{justfile_directory()}}/logs \
+    && uv run ansible-playbook archive.yml \
+      -e archive_tag={{tag}} \
+      --limit archive-{{network}} \
+      2>&1 | tee {{justfile_directory()}}/logs/$(date -u +%Y%m%d%H%M%S)-deploy-archive.log
+
+# Bootstrap public exposure for an archive network. Run this the first time a
+# host is exposed publicly, or after changing Traefik/Cloudflare routing. Normal
+# image deploys should use `deploy-archive`.
+setup-archive-public network tag="latest":
+  mkdir -p {{justfile_directory()}}/logs \
+    && { \
+      uv run ansible-playbook traefik.yml --limit archive-{{network}} \
+      && uv run ansible-playbook archive.yml -e archive_tag={{tag}} --limit archive-{{network}} \
+      && uv run ansible-playbook cloudflared.yml --limit archive-{{network}}; \
+    } 2>&1 | tee {{justfile_directory()}}/logs/$(date -u +%Y%m%d%H%M%S)-setup-archive-public.log
+
+# Reconcile the shared Traefik stack/static config for archive hosts.
+update-archive-traefik network:
+  mkdir -p {{justfile_directory()}}/logs \
+    && uv run ansible-playbook traefik.yml \
+      --limit archive-{{network}} \
+      2>&1 | tee {{justfile_directory()}}/logs/$(date -u +%Y%m%d%H%M%S)-update-archive-traefik.log
+
+# Reconcile Cloudflared, archive DNS records, and archive Cloudflare LB state.
+update-archive-cloudflare network:
+  mkdir -p {{justfile_directory()}}/logs \
+    && uv run ansible-playbook cloudflared.yml \
+      --limit archive-{{network}} \
+      2>&1 | tee {{justfile_directory()}}/logs/$(date -u +%Y%m%d%H%M%S)-update-archive-cloudflare.log
+
+stop-archive network:
+  mkdir -p {{justfile_directory()}}/logs \
+    && uv run ansible-playbook stop-archive.yml \
+      --limit archive-{{network}} \
+      2>&1 | tee {{justfile_directory()}}/logs/$(date -u +%Y%m%d%H%M%S)-stop-archive.log
+
+# Drop and recreate the projection database(s) — full reindex on next deploy;
+# the RocksDB block store is preserved.
+drop-db-archive network:
+  mkdir -p {{justfile_directory()}}/logs \
+    && uv run ansible-playbook drop-db-archive.yml \
+      --limit archive-{{network}} \
+      2>&1 | tee {{justfile_directory()}}/logs/$(date -u +%Y%m%d%H%M%S)-drop-db-archive.log
+
+
 # -------------------------------- Perps Bot ----------------------------------
 
 deploy-perps-bot tag="latest":
@@ -247,6 +310,45 @@ stop-perps-bot:
   mkdir -p "{{justfile_directory()}}/logs" \
     && uv run ansible-playbook stop-perps-bot.yml \
       2>&1 | tee "{{justfile_directory()}}/logs/$(date -u +%Y%m%d%H%M%S)-stop-perps-bot.log"
+
+# ---------------------------- Batch Block Backup -----------------------------
+
+# Deploy the batch-block-backup bot for a network. testnet runs on hetzner2,
+# mainnet on hetzner1 (the full-app node hosts, so the blocks/ dir is on local
+# disk). Pass comma-separated heights as the third argument to rebuild and
+# re-upload their batches once at startup (redeploy without it afterwards, or
+# the rebuild re-runs on every container restart).
+# Usage: just deploy-batch-block-backup testnet
+#        just deploy-batch-block-backup mainnet v1.2.3
+#        just deploy-batch-block-backup testnet latest 200,300
+deploy-batch-block-backup network tag="latest" reupload_heights="":
+  mkdir -p "{{justfile_directory()}}/logs" \
+    && uv run ansible-playbook batch-block-backup.yml \
+      -e '{"batch_block_backup_networks": ["{{network}}"], "batch_block_backup_tag": "{{tag}}", "batch_block_backup_reupload_heights": {"{{network}}": "{{reupload_heights}}"}}' \
+      --limit batch-block-backup-{{network}} \
+      2>&1 | tee "{{justfile_directory()}}/logs/$(date -u +%Y%m%d%H%M%S)-deploy-batch-block-backup.log"
+
+stop-batch-block-backup network:
+  mkdir -p "{{justfile_directory()}}/logs" \
+    && uv run ansible-playbook stop-batch-block-backup.yml \
+      -e '{"batch_block_backup_networks": ["{{network}}"]}' \
+      --limit batch-block-backup-{{network}} \
+      2>&1 | tee "{{justfile_directory()}}/logs/$(date -u +%Y%m%d%H%M%S)-stop-batch-block-backup.log"
+
+# ------------------------------ Block Cleanup ---------------------------------
+
+# One-shot: delete an inclusive block height range from a node's local blocks/
+# dir, then exit. Make sure the range is already archived in the
+# dango-<network>-batches bucket before running! The playbook waits for the bot
+# to finish, prints its logs, and fails if it exited non-zero.
+# Usage: just block-cleanup mainnet hetzner1 1 1000000
+#        just block-cleanup testnet hetzner2 1 500000 latest true   # dry run
+block-cleanup network server start_height end_height tag="latest" dry_run="false":
+  mkdir -p "{{justfile_directory()}}/logs" \
+    && uv run ansible-playbook block-cleanup.yml \
+      -e '{"network": "{{network}}", "block_cleanup_start_height": {{start_height}}, "block_cleanup_end_height": {{end_height}}, "block_cleanup_tag": "{{tag}}", "block_cleanup_dry_run": "{{dry_run}}"}' \
+      --limit {{server}} \
+      2>&1 | tee "{{justfile_directory()}}/logs/$(date -u +%Y%m%d%H%M%S)-block-cleanup.log"
 
 # ----------------------------- Dango Assistant --------------------------------
 
@@ -284,6 +386,41 @@ restart-perp-liquidator network:
       --limit perp-liquidator-{{network}} \
       2>&1 | tee "{{justfile_directory()}}/logs/$(date -u +%Y%m%d%H%M%S)-restart-perp-liquidator.log"
 
+# ---------------------------- Withdrawal approver -----------------------------
+
+# Redeploy only the withdrawal-approver container inside the current
+# deployment: re-render config/.env (key rotation), bump the tag, recreate.
+# The tag is mandatory: the guardian must always run a pinned image.
+# Usage: just deploy-withdrawal-approver testnet <bots-tag>
+deploy-withdrawal-approver network tag:
+  mkdir -p "{{justfile_directory()}}/logs" \
+    && uv run ansible-playbook redeploy-withdrawal-approver.yml \
+      -e dango_network={{network}} \
+      -e withdrawal_approver_tag={{tag}} \
+      --limit withdrawal-approver-{{network}} \
+      2>&1 | tee "{{justfile_directory()}}/logs/$(date -u +%Y%m%d%H%M%S)-deploy-withdrawal-approver.log"
+
+# ------------------------------- Monitor Bot ----------------------------------
+
+# Deploy the monitor bot for a network. All instances run on ovh3 (the
+# monitoring host), separated from the nodes they watch. The Discord webhook
+# it alerts through comes from `monitor_bot_discord_webhook` in the vault.
+# Usage: just deploy-monitor-bot mainnet
+#        just deploy-monitor-bot mainnet v0.28.0
+deploy-monitor-bot network tag="latest":
+  mkdir -p "{{justfile_directory()}}/logs" \
+    && uv run ansible-playbook monitor-bot.yml \
+      -e '{"monitor_bot_networks": ["{{network}}"], "monitor_bot_tag": "{{tag}}"}' \
+      --limit monitor-bot-{{network}} \
+      2>&1 | tee "{{justfile_directory()}}/logs/$(date -u +%Y%m%d%H%M%S)-deploy-monitor-bot.log"
+
+stop-monitor-bot network:
+  mkdir -p "{{justfile_directory()}}/logs" \
+    && uv run ansible-playbook stop-monitor-bot.yml \
+      -e '{"monitor_bot_networks": ["{{network}}"]}' \
+      --limit monitor-bot-{{network}} \
+      2>&1 | tee "{{justfile_directory()}}/logs/$(date -u +%Y%m%d%H%M%S)-stop-monitor-bot.log"
+
 # ---------------------------------- Testnet -----------------------------------
 
 deploy-testnet dango_image_tag bots_image_tag:
@@ -292,9 +429,9 @@ deploy-testnet dango_image_tag bots_image_tag:
       -e '{"traefik_enabled": true, "cometbft_generate_keys": true, "perps_bot_enabled": true, "github_deployments_enabled": false, "expose_ports": false, "delete_postgres_database_at_merge": false, "delete_clickhouse_database_at_merge": false, "deploy_includes_postgres": false, "deploy_includes_clickhouse": false, "chain_id": "dango-testnet-1", "dango_network": "testnet", "system_wide_directories": true, "deploy_env": "production"}' \
       -e dango_image_tag={{dango_image_tag}} \
       -e faucet_bot_tag={{bots_image_tag}} \
-      -e dex_bot_tag={{bots_image_tag}} \
       -e perps_bot_tag={{bots_image_tag}} \
       -e perp_liquidator_tag={{bots_image_tag}} \
+      -e withdrawal_approver_tag={{bots_image_tag}} \
       --limit {{hetzner2}},{{hetzner4}} \
       2>&1 | tee "{{justfile_directory()}}/logs/$(date -u +%Y%m%d%H%M%S)-deploy-testnet.log"
 
@@ -334,6 +471,7 @@ pull-docker-images-testnet dango_image_tag bots_image_tag:
       -e faucet_bot_tag={{bots_image_tag}} \
       -e perps_bot_tag={{bots_image_tag}} \
       -e perp_liquidator_tag={{bots_image_tag}} \
+      -e withdrawal_approver_tag={{bots_image_tag}} \
       --limit {{hetzner2}},{{hetzner4}} \
       2>&1 | tee "{{justfile_directory()}}/logs/$(date -u +%Y%m%d%H%M%S)-pull-docker-images-testnet.log"
 
@@ -348,9 +486,9 @@ deploy-mainnet dango_image_tag bots_image_tag:
       -e '{"traefik_enabled": true, "cometbft_generate_keys": true, "github_deployments_enabled": false, "expose_ports": false, "delete_postgres_database_at_merge": false, "delete_clickhouse_database_at_merge": false, "deploy_includes_postgres": false, "deploy_includes_clickhouse": false, "chain_id": "dango-1", "dango_network": "mainnet", "system_wide_directories": true, "deploy_env": "production"}' \
       -e dango_image_tag={{dango_image_tag}} \
       -e faucet_bot_tag={{bots_image_tag}} \
-      -e dex_bot_tag={{bots_image_tag}} \
       -e perps_bot_tag={{bots_image_tag}} \
       -e perp_liquidator_tag={{bots_image_tag}} \
+      -e withdrawal_approver_tag={{bots_image_tag}} \
       --limit {{hetzner5}},{{hetzner6}},{{hetzner1}},{{hetzner3}} \
       2>&1 | tee "{{justfile_directory()}}/logs/$(date -u +%Y%m%d%H%M%S)-deploy-mainnet.log"
 
@@ -386,6 +524,7 @@ pull-docker-images-mainnet dango_image_tag bots_image_tag:
       -e faucet_bot_tag={{bots_image_tag}} \
       -e perps_bot_tag={{bots_image_tag}} \
       -e perp_liquidator_tag={{bots_image_tag}} \
+      -e withdrawal_approver_tag={{bots_image_tag}} \
       --limit {{hetzner5}},{{hetzner6}},{{hetzner1}},{{hetzner3}} \
       2>&1 | tee "{{justfile_directory()}}/logs/$(date -u +%Y%m%d%H%M%S)-pull-docker-images-mainnet.log"
 
@@ -558,42 +697,6 @@ deploy-clickhouse:
   mkdir -p "{{justfile_directory()}}/logs" \
     && uv run ansible-playbook clickhouse.yml \
       2>&1 | tee "{{justfile_directory()}}/logs/$(date -u +%Y%m%d%H%M%S)-deploy-clickhouse.log"
-
-# -------------------------------- B2 Buckets ----------------------------------
-
-# List all B2 buckets
-b2-list-buckets:
-  mkdir -p "{{justfile_directory()}}/logs" \
-    && uv run ansible-playbook cleanup-b2-buckets.yml \
-      --limit {{ovh1}} \
-      --tags list \
-      2>&1 | tee "{{justfile_directory()}}/logs/$(date -u +%Y%m%d%H%M%S)-b2-list-buckets.log"
-
-# Delete empty B2 buckets (PR and devnet only, requires lifecycle rules)
-b2-cleanup-buckets:
-  mkdir -p "{{justfile_directory()}}/logs" \
-    && uv run ansible-playbook cleanup-b2-buckets.yml \
-      --limit {{ovh1}} \
-      --tags cleanup \
-      2>&1 | tee "{{justfile_directory()}}/logs/$(date -u +%Y%m%d%H%M%S)-b2-cleanup-buckets.log"
-
-# Delete a specific B2 bucket by name (must be empty)
-b2-delete-bucket name:
-  mkdir -p "{{justfile_directory()}}/logs" \
-    && uv run ansible-playbook cleanup-b2-buckets.yml \
-      --limit {{ovh1}} \
-      --tags delete-bucket \
-      -e b2_bucket={{name}} \
-      2>&1 | tee "{{justfile_directory()}}/logs/$(date -u +%Y%m%d%H%M%S)-b2-delete-bucket.log"
-
-# Mark a B2 bucket for deletion (sets lifecycle rules to drain files in ~2 days)
-b2-mark-bucket-deletable name:
-  mkdir -p "{{justfile_directory()}}/logs" \
-    && uv run ansible-playbook cleanup-b2-buckets.yml \
-      --limit {{ovh1}} \
-      --tags mark-bucket-deletable \
-      -e b2_bucket={{name}} \
-      2>&1 | tee "{{justfile_directory()}}/logs/$(date -u +%Y%m%d%H%M%S)-b2-mark-bucket-deletable.log"
 
 # ------------------------------ Database Download ------------------------------
 

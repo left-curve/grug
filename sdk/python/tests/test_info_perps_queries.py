@@ -107,6 +107,7 @@ class TestGlobalQueries:
             "referrer_commission_rates": {"base": "0.000000", "tiers": {}},
             "vault_deposit_cap": None,
             "max_action_batch_size": 5,
+            "trading_enabled": True,
         }
         captured = _capture_request(
             httpserver, {"data": {"queryApp": {"wasm_smart": param_payload}}}

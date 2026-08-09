@@ -1,0 +1,46 @@
+# Example archive config. Copy to `<home>/config/app.toml`
+# (default home: `~/.archive`). Every field is overridable from the
+# environment as `SECTION__FIELD` (`__`-separated), e.g. `POSTGRES__URL` —
+# prefer that for secrets rather than committing them.
+
+# Logging: tracing filter directive and output format (`json` | `plain`).
+log_level  = "info"
+log_format = "json"
+
+[postgres]
+url = "postgres://postgres@localhost/archive"
+# max_connections defaults to 10 when omitted.
+
+[block_source]
+type       = "remote"
+store_path = "data/blocks"          # relative to --home
+live_url   = "http://node:8080"     # node httpd: live full_block tail + sentinel backfill
+
+# Which backfill fetcher to use (only `sentinel` for now; `s3` planned).
+# Defaults to sentinel if this section is omitted.
+[block_source.fetcher]
+type        = "sentinel"            # reuses live_url — no URL of its own
+parallelism = 4                     # concurrent range calls per backfill batch
+
+[httpd]
+enabled = true
+bind    = "0.0.0.0:8080"
+
+# Prometheus /metrics scrape endpoint. Recording is always on; this only
+# controls whether the endpoint is served (separate from the read-API httpd, so
+# metrics stay available even in ingest-only mode). See design/observability.md.
+[metrics]
+enabled = true
+ip      = "0.0.0.0"                  # bind for an external Prometheus to scrape
+port    = 9191
+
+# Optional — activity projection write-time filters (NOT retroactive; changing
+# them needs a re-backfill). Omitted fields use the projection's built-in
+# defaults. `involvement_blacklist` is MERGED with the system contracts the cli
+# reads from the node's app_config, so usually you can leave it empty.
+[activity]
+involvement_blacklist = []          # extra addresses (hex) to exclude from participation
+# Each filter is a whitelist OR a blacklist of event types:
+event_data_filter = { whitelist = ["transfer", "contract_event"] }
+# event_type_filter  = { blacklist = ["guest", "withhold", "authenticate"] }
+# involvement_filter = { whitelist = ["transfer", "contract_event"] }

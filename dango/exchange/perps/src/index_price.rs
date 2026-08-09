@@ -5,7 +5,7 @@ use {
         state::{PAIR_IDS, PAIR_PARAMS, PAIR_STATES},
     },
     dango_oracle::OracleQuerier,
-    dango_order_book::{ASKS, BIDS, PairId, compute_impact_price, may_invert_price},
+    dango_order_book::{ASKS, BIDS, Dimensionless, PairId, compute_impact_price, may_invert_price},
     dango_primitives::{Order as IterationOrder, Storage, Timestamp},
     dango_pyth_types::MarketSession,
     dango_types::{
@@ -73,6 +73,11 @@ fn process_index_price_for_pair(
             if p.market_session == MarketSession::Regular
                 && p.timestamp >= current_time - MAX_ORACLE_STALENESS =>
         {
+            // Fresh regular-session oracle: snap the mark to it and record it
+            // as the anchor for the price band and the closed-session drift
+            // bound below.
+            pair_state.oracle_price = p.humanized_price;
+            pair_state.last_oracle_time = p.timestamp;
             p.humanized_price
         },
         // When oracle is not available, use EWMA driven by the order book's
@@ -120,7 +125,28 @@ fn process_index_price_for_pair(
 
             let delta_t = current_time - pair_state.last_index_time;
 
-            compute_ewma_index_price(pair_state.index_price, impact_bid, impact_ask, delta_t)?
+            let ewma =
+                compute_ewma_index_price(pair_state.index_price, impact_bid, impact_ask, delta_t)?;
+
+            // Bound closed-session drift to ±(1 / max_leverage) =
+            // ±`initial_margin_ratio` of the last oracle price, so the book
+            // cannot walk the mark arbitrarily far from the true price while
+            // the market is closed.
+            let imr = pair_param.initial_margin_ratio;
+            let lower = pair_state
+                .oracle_price
+                .checked_mul(Dimensionless::ONE.checked_sub(imr)?)?;
+            let upper = pair_state
+                .oracle_price
+                .checked_mul(Dimensionless::ONE.checked_add(imr)?)?;
+
+            if ewma < lower {
+                lower
+            } else if ewma > upper {
+                upper
+            } else {
+                ewma
+            }
         },
     };
 
@@ -138,7 +164,7 @@ mod tests {
         super::*,
         anyhow::anyhow,
         dango_math::Uint64,
-        dango_order_book::{LimitOrder, OrderKey, Quantity, UsdPrice, UsdValue},
+        dango_order_book::{Dimensionless, LimitOrder, OrderKey, Quantity, UsdPrice, UsdValue},
         dango_primitives::{Addr, Duration, MockStorage},
     };
 
@@ -152,6 +178,10 @@ mod tests {
     fn default_pair_param() -> PairParam {
         PairParam {
             impact_size: UsdValue::new_int(10_000),
+            // Wide bound so the closed-session drift clamp stays inert for these
+            // EWMA-mechanics tests; the clamp is covered by dedicated cases in
+            // the `e*` group below.
+            initial_margin_ratio: Dimensionless::new_permille(500),
             ..Default::default()
         }
     }
@@ -165,16 +195,20 @@ mod tests {
     ) {
         let stored_price = may_invert_price(UsdPrice::new_int(price), true);
         let key: OrderKey = (pair_id.clone(), stored_price, Uint64::new(order_id));
-        BIDS.save(storage, key, &LimitOrder {
-            user: MAKER,
-            size: Quantity::new_int(size),
-            reduce_only: false,
-            reserved_margin: UsdValue::ZERO,
-            created_at: Timestamp::ZERO,
-            tp: None,
-            sl: None,
-            client_order_id: None,
-        })
+        BIDS.save(
+            storage,
+            key,
+            &LimitOrder {
+                user: MAKER,
+                size: Quantity::new_int(size),
+                reduce_only: false,
+                reserved_margin: UsdValue::ZERO,
+                created_at: Timestamp::ZERO,
+                tp: None,
+                sl: None,
+                client_order_id: None,
+            },
+        )
         .unwrap();
     }
 
@@ -190,16 +224,20 @@ mod tests {
             UsdPrice::new_int(price),
             Uint64::new(order_id),
         );
-        ASKS.save(storage, key, &LimitOrder {
-            user: MAKER,
-            size: Quantity::new_int(size),
-            reduce_only: false,
-            reserved_margin: UsdValue::ZERO,
-            created_at: Timestamp::ZERO,
-            tp: None,
-            sl: None,
-            client_order_id: None,
-        })
+        ASKS.save(
+            storage,
+            key,
+            &LimitOrder {
+                user: MAKER,
+                size: Quantity::new_int(size),
+                reduce_only: false,
+                reserved_margin: UsdValue::ZERO,
+                created_at: Timestamp::ZERO,
+                tp: None,
+                sl: None,
+                client_order_id: None,
+            },
+        )
         .unwrap();
     }
 
@@ -214,6 +252,7 @@ mod tests {
         let pair_id = btc_pair_id();
         let mut pair_state = PairState {
             index_price: UsdPrice::new_int(100),
+            oracle_price: UsdPrice::new_int(100),
             last_index_time: T - Duration::from_seconds(3),
             ..Default::default()
         };
@@ -247,6 +286,7 @@ mod tests {
         let pair_id = btc_pair_id();
         let mut pair_state = PairState {
             index_price: UsdPrice::new_int(100),
+            oracle_price: UsdPrice::new_int(100),
             last_index_time: T - Duration::from_seconds(3),
             ..Default::default()
         };
@@ -279,6 +319,7 @@ mod tests {
         let pair_id = btc_pair_id();
         let mut pair_state = PairState {
             index_price: UsdPrice::new_int(100),
+            oracle_price: UsdPrice::new_int(100),
             last_index_time: T - Duration::from_seconds(3),
             ..Default::default()
         };
@@ -312,6 +353,7 @@ mod tests {
         let pair_id = btc_pair_id();
         let mut pair_state = PairState {
             index_price: UsdPrice::new_int(100),
+            oracle_price: UsdPrice::new_int(100),
             last_index_time: T - Duration::from_seconds(3),
             ..Default::default()
         };
@@ -340,6 +382,7 @@ mod tests {
         let pair_id = btc_pair_id();
         let mut pair_state = PairState {
             index_price: UsdPrice::new_int(100),
+            oracle_price: UsdPrice::new_int(100),
             last_index_time: T - Duration::from_seconds(3),
             ..Default::default()
         };
@@ -368,6 +411,7 @@ mod tests {
         let pair_id = btc_pair_id();
         let mut pair_state = PairState {
             index_price: UsdPrice::new_int(110),
+            oracle_price: UsdPrice::new_int(110),
             last_index_time: T - Duration::from_seconds(3),
             ..Default::default()
         };
@@ -412,6 +456,7 @@ mod tests {
 
         let mut pair_state = PairState {
             index_price: UsdPrice::new_int(103),
+            oracle_price: UsdPrice::new_int(103),
             last_index_time: T - Duration::from_seconds(3),
             ..Default::default()
         };
@@ -442,6 +487,7 @@ mod tests {
 
         let mut pair_state = PairState {
             index_price: UsdPrice::new_int(95),
+            oracle_price: UsdPrice::new_int(95),
             last_index_time: T - Duration::from_seconds(3),
             ..Default::default()
         };
@@ -474,6 +520,7 @@ mod tests {
 
         let mut pair_state = PairState {
             index_price: UsdPrice::new_int(112),
+            oracle_price: UsdPrice::new_int(112),
             last_index_time: T - Duration::from_seconds(3),
             ..Default::default()
         };
@@ -508,6 +555,7 @@ mod tests {
 
         let mut pair_state = PairState {
             index_price: UsdPrice::new_int(112),
+            oracle_price: UsdPrice::new_int(112),
             last_index_time: T - Duration::from_seconds(3),
             ..Default::default()
         };
@@ -542,6 +590,7 @@ mod tests {
 
         let mut pair_state = PairState {
             index_price: UsdPrice::new_int(95),
+            oracle_price: UsdPrice::new_int(95),
             last_index_time: T - Duration::from_seconds(3),
             ..Default::default()
         };
@@ -574,6 +623,7 @@ mod tests {
 
         let mut pair_state = PairState {
             index_price: UsdPrice::new_int(100),
+            oracle_price: UsdPrice::new_int(100),
             last_index_time: T - Duration::from_seconds(3),
             ..Default::default()
         };
@@ -600,6 +650,7 @@ mod tests {
 
         let mut pair_state = PairState {
             index_price: UsdPrice::new_int(100),
+            oracle_price: UsdPrice::new_int(100),
             last_index_time: T - Duration::from_seconds(3),
             ..Default::default()
         };
@@ -740,6 +791,7 @@ mod tests {
 
         let mut pair_state = PairState {
             index_price: UsdPrice::new_int(100),
+            oracle_price: UsdPrice::new_int(100),
             last_index_time: T,
             ..Default::default()
         };
@@ -785,5 +837,155 @@ mod tests {
         //   tick 3: raw(100_049_866)      tick 4: raw(100_066_432)
         //   tick 5: raw(100_082_971)
         assert_eq!(pair_state.index_price, UsdPrice::new_raw(100_082_971));
+    }
+
+    // ---- Drift clamp (discovery bound) ----
+
+    /// A pair param whose `initial_margin_ratio` (= 1 / max_leverage) is 5%, so
+    /// the closed-session drift bound is ±5% of the oracle anchor.
+    fn clamped_pair_param() -> PairParam {
+        PairParam {
+            impact_size: UsdValue::new_int(10_000),
+            initial_margin_ratio: Dimensionless::new_permille(50),
+            ..Default::default()
+        }
+    }
+
+    /// A far bid plus a long time delta would push the EWMA well above the
+    /// oracle, but the drift is capped at oracle × (1 + imr) = 105.
+    #[test]
+    fn e1_drift_clamped_to_upper_bound() {
+        let mut storage = MockStorage::new();
+        let pair_id = btc_pair_id();
+
+        save_bid(&mut storage, &pair_id, 1, 200, 200);
+        save_ask(&mut storage, &pair_id, 2, 205, -200);
+
+        let mut pair_state = PairState {
+            index_price: UsdPrice::new_int(100),
+            oracle_price: UsdPrice::new_int(100),
+            last_index_time: T - Duration::from_seconds(3600),
+            ..Default::default()
+        };
+
+        process_index_price_for_pair(
+            &storage,
+            T,
+            &pair_id,
+            &clamped_pair_param(),
+            &mut pair_state,
+            other_price(),
+        )
+        .unwrap();
+
+        // Unclamped EWMA would be ~109.52; the +5% bound caps it at 105.
+        assert_eq!(pair_state.index_price, UsdPrice::new_int(105));
+    }
+
+    /// A far ask plus a long time delta would push the EWMA well below the
+    /// oracle, but the drift is capped at oracle × (1 - imr) = 95.
+    #[test]
+    fn e2_drift_clamped_to_lower_bound() {
+        let mut storage = MockStorage::new();
+        let pair_id = btc_pair_id();
+
+        // Ask only: bid side is empty, so IPD is purely the downward pull.
+        save_ask(&mut storage, &pair_id, 2, 10, -2000);
+
+        let mut pair_state = PairState {
+            index_price: UsdPrice::new_int(100),
+            oracle_price: UsdPrice::new_int(100),
+            last_index_time: T - Duration::from_seconds(3600),
+            ..Default::default()
+        };
+
+        process_index_price_for_pair(
+            &storage,
+            T,
+            &pair_id,
+            &clamped_pair_param(),
+            &mut pair_state,
+            other_price(),
+        )
+        .unwrap();
+
+        // Unclamped EWMA would be ~91.44; the -5% bound floors it at 95.
+        assert_eq!(pair_state.index_price, UsdPrice::new_int(95));
+    }
+
+    /// A small drift that stays inside the ±5% corridor is not clamped — the
+    /// EWMA value passes through unchanged.
+    #[test]
+    fn e3_drift_within_bound_not_clamped() {
+        let mut storage = MockStorage::new();
+        let pair_id = btc_pair_id();
+
+        save_bid(&mut storage, &pair_id, 1, 102, 200);
+        save_ask(&mut storage, &pair_id, 2, 105, -200);
+
+        let mut pair_state = PairState {
+            index_price: UsdPrice::new_int(100),
+            oracle_price: UsdPrice::new_int(100),
+            last_index_time: T - Duration::from_seconds(3),
+            ..Default::default()
+        };
+
+        process_index_price_for_pair(
+            &storage,
+            T,
+            &pair_id,
+            &clamped_pair_param(),
+            &mut pair_state,
+            other_price(),
+        )
+        .unwrap();
+
+        // Same value as the unclamped EWMA (dt = 3s, IPD = 2): 100.003330.
+        assert_eq!(pair_state.index_price, UsdPrice::new_raw(100_003_330));
+    }
+
+    /// The bound anchors to the last regular-session oracle price, not to the
+    /// drifting index. No matter how many closed-session ticks an aggressive
+    /// book pushes, the mark can never walk past +5% of the anchor.
+    #[test]
+    fn e4_bound_anchors_to_last_regular_price_not_drifting_index() {
+        let mut storage = MockStorage::new();
+        let pair_id = btc_pair_id();
+        let pair_param = clamped_pair_param();
+
+        save_bid(&mut storage, &pair_id, 1, 200, 2000);
+        save_ask(&mut storage, &pair_id, 2, 205, -2000);
+
+        let mut pair_state = PairState {
+            index_price: UsdPrice::new_int(100),
+            oracle_price: UsdPrice::new_int(100),
+            last_index_time: T,
+            ..Default::default()
+        };
+
+        let mut t = T;
+        for _ in 0..50 {
+            t = t + Duration::from_seconds(180);
+            let price = Ok(Price::new(UsdPrice::new_int(999), t, MarketSession::Other));
+            process_index_price_for_pair(
+                &storage,
+                t,
+                &pair_id,
+                &pair_param,
+                &mut pair_state,
+                price,
+            )
+            .unwrap();
+
+            assert!(
+                pair_state.index_price <= UsdPrice::new_int(105),
+                "closed-session mark must never exceed +5% of the anchor"
+            );
+            // The anchor itself never moves during the closure.
+            assert_eq!(pair_state.oracle_price, UsdPrice::new_int(100));
+        }
+
+        // Pinned at the bound; the geometric walk is gone.
+        assert_eq!(pair_state.index_price, UsdPrice::new_int(105));
     }
 }

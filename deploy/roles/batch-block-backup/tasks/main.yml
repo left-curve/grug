@@ -1,0 +1,6 @@
+---
+- name: Deploy batch-block-backup instances
+  include_tasks: deploy-instance.yml
+  loop: "{{ batch_block_backup_networks }}"
+  loop_control:
+    loop_var: network

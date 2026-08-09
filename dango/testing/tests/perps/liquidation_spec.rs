@@ -186,10 +186,13 @@ async fn seed_prices(
     };
 
     if let Some(btc_price) = btc_price {
-        entries.insert(btc_pair_id(), OracleTestEntry {
-            pyth_id: 3,
-            humanized_price: UsdPrice::new_int(btc_price),
-        });
+        entries.insert(
+            btc_pair_id(),
+            OracleTestEntry {
+                pyth_id: 3,
+                humanized_price: UsdPrice::new_int(btc_price),
+            },
+        );
     }
 
     suite.seed_oracle_prices(&mut accounts.owner, entries).await;
@@ -407,6 +410,14 @@ async fn run_single(case: SingleCase) {
     assert_eq!(liquidated.len(), 1, "exactly one Liquidated event");
     assert_eq!(liquidated[0].user, accounts.user1.address());
 
+    // The event reports Alice's position size after this pair's liquidation —
+    // the same value the state query asserts below, whether the close was
+    // partial (book and/or ADL) or full.
+    assert_eq!(
+        liquidated[0].remaining_position_size,
+        Some(Quantity::new_int(case.alice_pos))
+    );
+
     match &case.adl {
         Some(adl) => {
             // Alice's ADL closes against her position: negative for a long.
@@ -437,6 +448,14 @@ async fn run_single(case: SingleCase) {
             assert_eq!(
                 deleveraged[0].realized_pnl,
                 UsdValue::new_raw(-alice_adl_pnl)
+            );
+
+            // The event reports Bob's position size after the ADL fill —
+            // non-zero when his position was only partially consumed, and
+            // the same value the state query asserts below.
+            assert_eq!(
+                deleveraged[0].remaining_position_size,
+                Some(Quantity::new_int(case.bob_pos))
             );
         },
         None => {
@@ -647,6 +666,15 @@ async fn run_double(case: DoubleCase) {
         UsdValue::new_raw(alice_btc_pnl)
     );
 
+    // Each per-pair Liquidated event reports its own pair's resulting size:
+    // Alice's 1-BTC position less the BTC ADL leg.
+    assert_eq!(
+        liquidated[0].remaining_position_size,
+        Some(Quantity::new_raw(
+            (1_000_000 - case.btc_adl.size_raw) * sign
+        ))
+    );
+
     if let Some(eth_adl) = &case.eth_adl {
         assert_eq!(liquidated[1].pair_id, eth);
         assert_eq!(
@@ -656,6 +684,11 @@ async fn run_double(case: DoubleCase) {
         assert_eq!(
             liquidated[1].adl_price,
             Some(UsdPrice::new_int(eth_adl.price))
+        );
+        // Alice's 10-ETH position less the ETH ADL leg.
+        assert_eq!(
+            liquidated[1].remaining_position_size,
+            Some(Quantity::new_raw((10_000_000 - eth_adl.size_raw) * sign))
         );
     }
 
@@ -678,6 +711,14 @@ async fn run_double(case: DoubleCase) {
         UsdValue::new_raw(-alice_btc_pnl)
     );
 
+    // Bob's post-ADL BTC size mirrors Alice's remainder on the short side.
+    assert_eq!(
+        deleveraged[0].remaining_position_size,
+        Some(Quantity::new_raw(
+            -(1_000_000 - case.btc_adl.size_raw) * sign
+        ))
+    );
+
     if let Some(eth_adl) = &case.eth_adl {
         let alice_eth_pnl = eth_adl.size_raw * (eth_adl.price - ENTRY_ETH) * sign;
         assert_eq!(deleveraged[1].user, accounts.user2.address());
@@ -686,6 +727,11 @@ async fn run_double(case: DoubleCase) {
         assert_eq!(
             deleveraged[1].realized_pnl,
             UsdValue::new_raw(-alice_eth_pnl)
+        );
+        // Bob's post-ADL ETH size mirrors Alice's remainder on the short side.
+        assert_eq!(
+            deleveraged[1].remaining_position_size,
+            Some(Quantity::new_raw(-(10_000_000 - eth_adl.size_raw) * sign))
         );
     }
 

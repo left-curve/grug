@@ -26,4 +26,8 @@ ingress:
   - hostname: points-{{ dango_network }}.{{ dango_domain }}
     service: http://traefik
 {% endfor %}
+{% for instance in archive_public_instances | default([]) %}
+  - hostname: api-archive-{{ instance.name }}-{{ hostname }}.{{ dango_domain }}
+    service: http://traefik
+{% endfor %}
   - service: http_status:404

@@ -103,10 +103,13 @@ async fn pyth_lazer() {
 
     // Query the trusted signers
     let trusted_signers = suite
-        .query_wasm_smart(oracle, QueryTrustedSignersRequest {
-            limit: None,
-            start_after: None,
-        })
+        .query_wasm_smart(
+            oracle,
+            QueryTrustedSignersRequest {
+                limit: None,
+                start_after: None,
+            },
+        )
         .unwrap();
     assert_eq!(trusted_signers.len(), 1);
 
@@ -152,9 +155,12 @@ async fn pyth_lazer() {
 
     // Query the BTC price
     let price = suite
-        .query_wasm_smart(oracle, QueryPriceRequest {
-            denom: perp_btc::DENOM.clone(),
-        })
+        .query_wasm_smart(
+            oracle,
+            QueryPriceRequest {
+                denom: perp_btc::DENOM.clone(),
+            },
+        )
         .unwrap();
 
     assert_eq!(
@@ -168,9 +174,12 @@ async fn pyth_lazer() {
 
     // Query the ETH price
     let price = suite
-        .query_wasm_smart(oracle, QueryPriceRequest {
-            denom: eth::DENOM.clone(),
-        })
+        .query_wasm_smart(
+            oracle,
+            QueryPriceRequest {
+                denom: eth::DENOM.clone(),
+            },
+        )
         .unwrap();
 
     assert_eq!(
@@ -226,9 +235,12 @@ async fn remove_price_sources() {
 
     // The price source should be unaffected by the failed removal.
     suite
-        .query_wasm_smart(oracle, QueryPriceSourceRequest {
-            denom: test_denom.clone(),
-        })
+        .query_wasm_smart(
+            oracle,
+            QueryPriceSourceRequest {
+                denom: test_denom.clone(),
+            },
+        )
         .should_succeed();
 
     // Remove two price sources as the owner: one registered earlier in this
@@ -250,16 +262,22 @@ async fn remove_price_sources() {
     // the enumeration.
     for denom in [test_denom.clone(), eth::DENOM.clone()] {
         suite
-            .query_wasm_smart(oracle, QueryPriceSourceRequest {
-                denom: denom.clone(),
-            })
+            .query_wasm_smart(
+                oracle,
+                QueryPriceSourceRequest {
+                    denom: denom.clone(),
+                },
+            )
             .should_fail_with_error("data not found");
 
         suite
-            .query_wasm_smart(oracle, QueryPriceSourcesRequest {
-                start_after: None,
-                limit: Some(u32::MAX),
-            })
+            .query_wasm_smart(
+                oracle,
+                QueryPriceSourcesRequest {
+                    start_after: None,
+                    limit: Some(u32::MAX),
+                },
+            )
             .should_succeed_and(|sources| !sources.contains_key(&denom));
     }
 

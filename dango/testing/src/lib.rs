@@ -4,6 +4,7 @@ mod balance_tracker;
 mod client;
 mod constants;
 mod crypto;
+mod gateway;
 mod genesis;
 mod httpd;
 mod hyperlane;

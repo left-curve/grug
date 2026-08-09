@@ -1,0 +1,23 @@
+---
+- hosts: monitor-bot
+  become: true
+  become_user: "{{ deploy_user }}"
+  remote_user: deploy
+  collections:
+    - community.docker
+  pre_tasks:
+    - name: Get deploy user info
+      getent:
+        database: passwd
+        key: "{{ deploy_user }}"
+    - name: Set deploy_home fact
+      set_fact:
+        deploy_home: "{{ ansible_facts.getent_passwd[deploy_user][4] }}"
+  tasks:
+    - name: Stop monitor-bot instances
+      include_role:
+        name: monitor-bot
+        tasks_from: stop-instance
+      loop: "{{ monitor_bot_networks }}"
+      loop_control:
+        loop_var: network

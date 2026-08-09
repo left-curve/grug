@@ -338,6 +338,39 @@ where
     Ok(serde_json::from_slice(&text_response)?)
 }
 
+pub async fn call_api_post<R, B>(
+    app: App<
+        impl ServiceFactory<
+            ServiceRequest,
+            Response = ServiceResponse<impl MessageBody>,
+            Config = (),
+            InitError = (),
+            Error = actix_web::Error,
+        > + 'static,
+    >,
+    uri: &str,
+    body: &B,
+) -> anyhow::Result<R>
+where
+    R: DeserializeOwned,
+    B: Serialize,
+{
+    let app = actix_web::test::init_service(app).await;
+
+    let request = actix_web::test::TestRequest::post()
+        .uri(uri)
+        .set_json(body)
+        .to_request();
+
+    let res = try_call_service(&app, request)
+        .await
+        .map_err(|err| anyhow!("failed to call service: {err:?}"))?;
+
+    let text_response = read_body(res).await;
+
+    Ok(serde_json::from_slice(&text_response)?)
+}
+
 pub async fn call_api_with_headers<R>(
     app: App<
         impl ServiceFactory<

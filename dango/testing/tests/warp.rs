@@ -75,18 +75,18 @@ async fn sending_remote() {
         .balances()
         .record_many([&accounts.user1.address(), &accounts.owner.address()]);
 
-    // User1 sends USDC to Ethereum.
+    // User1 sends USDC to Ethereum. The withdrawal request is approved by
+    // the owner in a follow-up transaction.
     suite
-        .execute(
+        .transfer_remote(
             &mut accounts.user1,
+            &mut accounts.owner,
             contracts.gateway,
-            &gateway::ExecuteMsg::TransferRemote {
-                remote: Remote::Warp {
-                    domain: mock_ethereum::DOMAIN,
-                    contract: mock_ethereum::USDC_WARP,
-                },
-                recipient: RECIPIENT,
+            Remote::Warp {
+                domain: mock_ethereum::DOMAIN,
+                contract: mock_ethereum::USDC_WARP,
             },
+            RECIPIENT,
             coins! { usdc::DENOM.clone() => SEND_AMOUNT },
         )
         .await
@@ -117,14 +117,20 @@ async fn sending_remote() {
         });
 
     // Sender should have been deducted balance.
-    suite.balances().should_change(&accounts.user1, btree_map! {
-        usdc::DENOM.clone() => BalanceChange::Decreased(SEND_AMOUNT),
-    });
+    suite.balances().should_change(
+        &accounts.user1,
+        btree_map! {
+            usdc::DENOM.clone() => BalanceChange::Decreased(SEND_AMOUNT),
+        },
+    );
 
     // The chain owner should have received the fee.
-    suite.balances().should_change(&accounts.owner, btree_map! {
-        usdc::DENOM.clone() => BalanceChange::Increased(ETHEREUM_USDC_WITHDRAWAL_FEE),
-    });
+    suite.balances().should_change(
+        &accounts.owner,
+        btree_map! {
+            usdc::DENOM.clone() => BalanceChange::Increased(ETHEREUM_USDC_WITHDRAWAL_FEE),
+        },
+    );
 
     // Gateway contract should not hold any of the synth token (should be burned).
     suite
@@ -147,7 +153,8 @@ async fn sending_remote() {
         .await
         .expect("Can't fetch blocks");
 
-    assert_that!(blocks).has_length(1);
+    // Two blocks: one for the withdrawal request, one for the approval.
+    assert_that!(blocks).has_length(2);
 
     let transfers = dango_indexer_sql::entity::transfers::Entity::find()
         .all(&context.db)
@@ -225,15 +232,15 @@ async fn sending_remote_insufficient_reserve() {
     const SEND_AMOUNT_AFTER_FEE: u128 = SEND_AMOUNT - ARBITRUM_USDC_WITHDRAWAL_FEE;
 
     // Right now, the entire reserve of USDC is from Ethereum. User1 attempts to
-    // withdraw to Arbitrum. Should fail.
+    // withdraw to Arbitrum. The reserve is checked when the request is
+    // approved, so the approval should fail.
     suite
-        .execute(
+        .transfer_remote(
             &mut accounts.user1,
+            &mut accounts.owner,
             contracts.gateway,
-            &gateway::ExecuteMsg::TransferRemote {
-                remote: ARBITRUM_USDC_REMOTE,
-                recipient: MOCK_ARBITRUM_RECIPIENT,
-            },
+            ARBITRUM_USDC_REMOTE,
+            MOCK_ARBITRUM_RECIPIENT,
             coins! { usdc::DENOM.clone() => SEND_AMOUNT },
         )
         .await
@@ -256,13 +263,12 @@ async fn sending_remote_insufficient_reserve() {
 
     // User1 tries to withdraw again. Should succeed.
     suite
-        .execute(
+        .transfer_remote(
             &mut accounts.user1,
+            &mut accounts.owner,
             contracts.gateway,
-            &gateway::ExecuteMsg::TransferRemote {
-                remote: ARBITRUM_USDC_REMOTE,
-                recipient: MOCK_ARBITRUM_RECIPIENT,
-            },
+            ARBITRUM_USDC_REMOTE,
+            MOCK_ARBITRUM_RECIPIENT,
             coins! { usdc::DENOM.clone() => SEND_AMOUNT },
         )
         .await

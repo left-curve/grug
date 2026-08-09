@@ -1,0 +1,39 @@
+---
+- name: Initialize normalized archive instance lists
+  set_fact:
+    archive_public_instances: []
+    archive_lb_instances: []
+
+- name: Validate archive instance Cloudflare fields
+  assert:
+    that:
+      - archive_instance.name is defined
+      - archive_instance.cloudflare is not defined or archive_instance.cloudflare.enabled is defined
+      - archive_instance.cloudflare is not defined or archive_instance.cloudflare.load_balancer is defined
+      - archive_instance.cloudflare is not defined or archive_instance.cloudflare.load_balancer is not defined or not archive_instance.cloudflare.load_balancer or archive_instance.cloudflare.enabled
+    fail_msg: >-
+      archive_instances need name; if cloudflare is present it must include
+      enabled and load_balancer. load_balancer requires cloudflare.enabled.
+  loop: "{{ archive_instances | default([]) }}"
+  loop_control:
+    loop_var: archive_instance
+
+- name: Collect public archive instances
+  set_fact:
+    archive_public_instances: "{{ archive_public_instances + [archive_instance] }}"
+  loop: "{{ archive_instances | default([]) }}"
+  loop_control:
+    loop_var: archive_instance
+    label: "{{ archive_instance.name }}"
+  when:
+    - archive_instance.cloudflare is defined
+    - archive_instance.cloudflare.enabled
+
+- name: Collect load-balanced archive instances
+  set_fact:
+    archive_lb_instances: "{{ archive_lb_instances + [archive_instance] }}"
+  loop: "{{ archive_public_instances }}"
+  loop_control:
+    loop_var: archive_instance
+    label: "{{ archive_instance.name }}"
+  when: archive_instance.cloudflare.load_balancer

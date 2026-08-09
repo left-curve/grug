@@ -1,0 +1,34 @@
+[package]
+authors       = { workspace = true }
+categories    = { workspace = true }
+documentation = { workspace = true }
+edition       = { workspace = true }
+license       = { workspace = true }
+name          = "dango-archive-app"
+repository    = { workspace = true }
+rust-version  = { workspace = true }
+version       = { workspace = true }
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+default = ["metrics", "tracing"]
+metrics = ["dep:metrics"]
+tracing = ["dep:tracing"]
+
+[dependencies]
+anyhow                     = { workspace = true }
+async-trait                = { workspace = true }
+chrono                     = { workspace = true }
+clickhouse                 = { workspace = true }
+dango-archive-block-source = { workspace = true }
+dango-archive-httpd        = { workspace = true }
+dango-archive-projection   = { workspace = true }
+dango-archive-types        = { workspace = true }
+futures                    = { workspace = true }
+metrics                    = { workspace = true, optional = true }
+sea-orm                    = { workspace = true }
+sea-orm-migration          = { workspace = true }
+tokio                      = { workspace = true }
+tracing                    = { workspace = true, optional = true }

@@ -1,0 +1,123 @@
+---
+- name: Initialize archive Cloudflare LB networks
+  run_once: true
+  become: false
+  delegate_to: localhost
+  set_fact:
+    archive_cf_lb_hosts: "{{ ansible_play_hosts_all }}"
+    archive_cf_lb_networks: []
+
+- name: Collect archive Cloudflare LB networks
+  include_tasks: cloudflare_archive_collect_networks.yml
+  loop: "{{ archive_cf_lb_hosts }}"
+  loop_control:
+    loop_var: archive_host
+    label: "{{ archive_host }}"
+
+- name: Get all monitors for archive LBs
+  run_once: true
+  become: false
+  delegate_to: localhost
+  uri:
+    url: "https://api.cloudflare.com/client/v4/accounts/{{ cloudflare_account_id }}/load_balancers/monitors"
+    method: GET
+    headers: { Authorization: "Bearer {{ cloudflare_api_token }}" }
+  register: cf_monitors
+  when: archive_cf_lb_networks | length > 0
+
+- name: Ensure archive Cloudflare monitor
+  include_tasks: cloudflare_monitor.yml
+  vars:
+    mon: { name: "api-archive", path: "/up", expect: "200" }
+  when: archive_cf_lb_networks | length > 0
+
+- name: Refresh monitors after archive monitor creation
+  run_once: true
+  become: false
+  delegate_to: localhost
+  uri:
+    url: "https://api.cloudflare.com/client/v4/accounts/{{ cloudflare_account_id }}/load_balancers/monitors"
+    method: GET
+    headers: { Authorization: "Bearer {{ cloudflare_api_token }}" }
+  register: cf_monitors
+  when: archive_cf_lb_networks | length > 0
+
+- name: Build archive monitor id map by name
+  run_once: true
+  become: false
+  delegate_to: localhost
+  set_fact:
+    monitor_id_map: "{{ dict(cf_monitors.json.result | map(attribute='description') | zip(cf_monitors.json.result | map(attribute='id'))) }}"
+  when: archive_cf_lb_networks | length > 0
+
+- name: Get all pools for archive LBs
+  run_once: true
+  become: false
+  delegate_to: localhost
+  uri:
+    url: "https://api.cloudflare.com/client/v4/accounts/{{ cloudflare_account_id }}/load_balancers/pools"
+    method: GET
+    headers: { Authorization: "Bearer {{ cloudflare_api_token }}" }
+  register: cf_pools
+  when: archive_cf_lb_networks | length > 0
+
+- name: Create archive pools
+  include_tasks: cloudflare_archive_pool.yml
+  loop: "{{ archive_cf_lb_networks }}"
+  loop_control:
+    loop_var: archive_network
+  when: archive_cf_lb_networks | length > 0
+
+- name: Refresh pools after archive pool creation
+  run_once: true
+  become: false
+  delegate_to: localhost
+  uri:
+    url: "https://api.cloudflare.com/client/v4/accounts/{{ cloudflare_account_id }}/load_balancers/pools"
+    method: GET
+    headers: { Authorization: "Bearer {{ cloudflare_api_token }}" }
+  register: cf_pools
+  when: archive_cf_lb_networks | length > 0
+
+- name: Ensure Cloudflare zone id for archive LBs
+  run_once: true
+  become: false
+  delegate_to: localhost
+  when:
+    - archive_cf_lb_networks | length > 0
+    - cloudflare_zone_id is not defined
+  block:
+    - name: Lookup Cloudflare zone by name
+      uri:
+        url: "https://api.cloudflare.com/client/v4/zones?name={{ dango_domain }}"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ cloudflare_api_token }}"
+          Content-Type: "application/json"
+      register: zone_info
+
+    - name: Set Cloudflare zone id
+      set_fact:
+        cloudflare_zone_id: "{{ zone_info.json.result[0].id }}"
+
+- name: Get all load balancers for archive LBs
+  run_once: true
+  become: false
+  delegate_to: localhost
+  uri:
+    url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare_zone_id }}/load_balancers"
+    method: GET
+    headers: { Authorization: "Bearer {{ cloudflare_api_token }}" }
+  register: cf_load_balancers
+  when: archive_cf_lb_networks | length > 0
+
+- name: Create archive LBs
+  vars:
+    svcnet:
+      - api-archive
+      - "{{ archive_network }}"
+  include_tasks: cloudflare_zone_lb.yml
+  loop: "{{ archive_cf_lb_networks }}"
+  loop_control:
+    loop_var: archive_network
+  when: archive_cf_lb_networks | length > 0

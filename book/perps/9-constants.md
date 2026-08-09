@@ -4,12 +4,18 @@ This page collects the constants of Dango's mainnet and testnet deployments: API
 
 ## Endpoints
 
-| Network | HTTP                                     | WebSocket                              |
-| ------- | ---------------------------------------- | -------------------------------------- |
-| Mainnet | `https://api-mainnet.dango.zone/graphql` | `wss://api-mainnet.dango.zone/graphql` |
-| Testnet | `https://api-testnet.dango.zone/graphql` | `wss://api-testnet.dango.zone/graphql` |
+Each network runs two API servers: the **Live API** (consensus node — latest chain state, transaction broadcasting, real-time WebSocket) and the **Archive API** (archive node — structured historical data). See [the API reference](../perps/8-api.md) for which server serves what. Each server's interactive documentation (Swagger UI) is at `/docs/`, with the raw OpenAPI spec at `/openapi.json`.
 
-The testnet **faucet** is served separately at `https://faucet-testnet.dango.zone/mint` (see [§3.1.1 of the API reference](../perps/8-api.md#311-funding-a-new-account-via-the-faucet-testnet)). There is no faucet on mainnet.
+| API     | Network | HTTP                                     | WebSocket                         |
+| ------- | ------- | ---------------------------------------- | --------------------------------- |
+| Live    | Mainnet | `https://api-mainnet.dango.zone`         | `wss://api-mainnet.dango.zone/ws` |
+| Live    | Testnet | `https://api-testnet.dango.zone`         | `wss://api-testnet.dango.zone/ws` |
+| Archive | Mainnet | `https://api-archive-mainnet.dango.zone` | —                                 |
+| Archive | Testnet | `https://api-archive-testnet.dango.zone` | —                                 |
+
+The GraphQL endpoint previously served at `…/graphql` on the same hosts is **deprecated** (see the [API reference](../perps/8-api.md)); prefer the REST + WebSocket surface above.
+
+The testnet **faucet** is served separately at `https://faucet-testnet.dango.zone/mint` (see [the API reference](../perps/8-api.md#47-account-and-key-messages)). There is no faucet on mainnet.
 
 ## Chain IDs
 

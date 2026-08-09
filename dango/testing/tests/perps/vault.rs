@@ -72,9 +72,12 @@ async fn vault_lp_lifecycle() {
         .should_succeed();
 
     let lp_state = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
 
@@ -87,9 +90,12 @@ async fn vault_lp_lifecycle() {
     let total_shares = lp_state.vault_shares;
 
     let vault_state = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: contracts.perps,
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: contracts.perps,
+            },
+        )
         .should_succeed()
         .unwrap();
 
@@ -156,9 +162,12 @@ async fn vault_lp_lifecycle() {
 
     // Vault should have orders on the book.
     let vault_orders: BTreeMap<OrderId, QueryOrdersByUserResponseItem> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryOrdersByUserRequest {
-            user: contracts.perps,
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryOrdersByUserRequest {
+                user: contracts.perps,
+            },
+        )
         .should_succeed();
 
     let vault_bids: Vec<_> = vault_orders
@@ -219,9 +228,12 @@ async fn vault_lp_lifecycle() {
 
     // Vault should now have a long position.
     let vault_state = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: contracts.perps,
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: contracts.perps,
+            },
+        )
         .should_succeed()
         .unwrap();
     let vault_pos = vault_state
@@ -292,9 +304,12 @@ async fn vault_lp_lifecycle() {
 
     // Vault should have realized PnL → margin increased above pre-trade level.
     let vault_state = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: contracts.perps,
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: contracts.perps,
+            },
+        )
         .should_succeed()
         .unwrap();
 
@@ -322,9 +337,12 @@ async fn vault_lp_lifecycle() {
         .should_succeed();
 
     let lp_state = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
     let unlock1_amount = lp_state.unlocks.back().unwrap().amount_to_release;
@@ -355,9 +373,12 @@ async fn vault_lp_lifecycle() {
         .should_succeed();
 
     let lp_state = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
 
@@ -380,9 +401,12 @@ async fn vault_lp_lifecycle() {
     // -------------------------------------------------------------------------
 
     let lp_state = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
 
@@ -432,16 +456,19 @@ async fn oracle_triggers_on_oracle_update() {
     // -------------------------------------------------------------------------
 
     suite
-        .seed_oracle_prices(&mut accounts.owner, btree_map! {
-            usdc::DENOM.clone() => OracleTestEntry {
-                pyth_id: 1,
-                humanized_price: UsdPrice::new_int(1),
+        .seed_oracle_prices(
+            &mut accounts.owner,
+            btree_map! {
+                usdc::DENOM.clone() => OracleTestEntry {
+                    pyth_id: 1,
+                    humanized_price: UsdPrice::new_int(1),
+                },
+                pair.clone() => OracleTestEntry {
+                    pyth_id: 2,
+                    humanized_price: UsdPrice::new_int(1),
+                },
             },
-            pair.clone() => OracleTestEntry {
-                pyth_id: 2,
-                humanized_price: UsdPrice::new_int(1),
-            },
-        })
+        )
         .await;
 
     // -------------------------------------------------------------------------
@@ -500,9 +527,12 @@ async fn oracle_triggers_on_oracle_update() {
 
     // Vault should have no orders before any price is fed.
     let vault_orders_0: BTreeMap<OrderId, QueryOrdersByUserResponseItem> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryOrdersByUserRequest {
-            user: contracts.perps,
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryOrdersByUserRequest {
+                user: contracts.perps,
+            },
+        )
         .should_succeed();
 
     assert!(
@@ -527,9 +557,12 @@ async fn oracle_triggers_on_oracle_update() {
 
     // Oracle price should be set for the perps pair.
     let price1 = suite
-        .query_wasm_smart(contracts.oracle, QueryPriceRequest {
-            denom: pair.clone(),
-        })
+        .query_wasm_smart(
+            contracts.oracle,
+            QueryPriceRequest {
+                denom: pair.clone(),
+            },
+        )
         .unwrap();
 
     assert!(
@@ -539,9 +572,12 @@ async fn oracle_triggers_on_oracle_update() {
 
     // Vault should have orders on the book (placed by OnOracleUpdate).
     let vault_orders_1: BTreeMap<OrderId, QueryOrdersByUserResponseItem> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryOrdersByUserRequest {
-            user: contracts.perps,
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryOrdersByUserRequest {
+                user: contracts.perps,
+            },
+        )
         .should_succeed();
 
     let vo1_bids: Vec<_> = vault_orders_1
@@ -616,9 +652,12 @@ async fn oracle_triggers_on_oracle_update() {
 
     // Oracle price should have been updated (new timestamp or value).
     let price2 = suite
-        .query_wasm_smart(contracts.oracle, QueryPriceRequest {
-            denom: pair.clone(),
-        })
+        .query_wasm_smart(
+            contracts.oracle,
+            QueryPriceRequest {
+                denom: pair.clone(),
+            },
+        )
         .unwrap();
 
     assert!(
@@ -630,9 +669,12 @@ async fn oracle_triggers_on_oracle_update() {
     // we tried, it would fail on the corrupted storage. Compare order IDs to
     // prove these are the exact same orders, not new ones at the same price.
     let vault_orders_2: BTreeMap<OrderId, QueryOrdersByUserResponseItem> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryOrdersByUserRequest {
-            user: contracts.perps,
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryOrdersByUserRequest {
+                user: contracts.perps,
+            },
+        )
         .should_succeed();
 
     assert!(
@@ -715,9 +757,12 @@ async fn vault_overcommits_margin_after_position_and_price_drop() {
         .should_succeed();
 
     let vault_state = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: contracts.perps,
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: contracts.perps,
+            },
+        )
         .should_succeed()
         .unwrap();
 
@@ -781,9 +826,12 @@ async fn vault_overcommits_margin_after_position_and_price_drop() {
         .should_succeed();
 
     let vault_orders: BTreeMap<OrderId, QueryOrdersByUserResponseItem> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryOrdersByUserRequest {
-            user: contracts.perps,
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryOrdersByUserRequest {
+                user: contracts.perps,
+            },
+        )
         .should_succeed();
 
     let vault_bid = vault_orders
@@ -831,9 +879,12 @@ async fn vault_overcommits_margin_after_position_and_price_drop() {
 
     // Verify vault has a long position.
     let vault_state = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: contracts.perps,
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: contracts.perps,
+            },
+        )
         .should_succeed()
         .unwrap();
 
@@ -857,16 +908,19 @@ async fn vault_overcommits_margin_after_position_and_price_drop() {
 
     // Sanity check: vault should be healthy at this point.
     let vault_ext: perps::UserStateExtended = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateExtendedRequest {
-            user: contracts.perps,
-            include_equity: true,
-            include_available_margin: true,
-            include_maintenance_margin: false,
-            include_unrealized_pnl: false,
-            include_unrealized_funding: false,
-            include_liquidation_price: false,
-            include_all: false,
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateExtendedRequest {
+                user: contracts.perps,
+                include_equity: true,
+                include_available_margin: true,
+                include_maintenance_margin: false,
+                include_unrealized_pnl: false,
+                include_unrealized_funding: false,
+                include_liquidation_price: false,
+                include_all: false,
+            },
+        )
         .should_succeed();
 
     let equity_before = vault_ext.equity.unwrap();
@@ -929,9 +983,12 @@ async fn vault_overcommits_margin_after_position_and_price_drop() {
     //     .expect("vault should have a bid");
     // let round2_bid_size = vault_bid.size;
     let vault_orders: BTreeMap<OrderId, QueryOrdersByUserResponseItem> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryOrdersByUserRequest {
-            user: contracts.perps,
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryOrdersByUserRequest {
+                user: contracts.perps,
+            },
+        )
         .should_succeed();
 
     assert!(
@@ -978,16 +1035,19 @@ async fn vault_overcommits_margin_after_position_and_price_drop() {
     // -------------------------------------------------------------------------
 
     let vault_ext: perps::UserStateExtended = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateExtendedRequest {
-            user: contracts.perps,
-            include_equity: true,
-            include_available_margin: false,
-            include_maintenance_margin: false,
-            include_unrealized_pnl: false,
-            include_unrealized_funding: false,
-            include_liquidation_price: false,
-            include_all: false,
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateExtendedRequest {
+                user: contracts.perps,
+                include_equity: true,
+                include_available_margin: false,
+                include_maintenance_margin: false,
+                include_unrealized_pnl: false,
+                include_unrealized_funding: false,
+                include_liquidation_price: false,
+                include_all: false,
+            },
+        )
         .should_succeed();
 
     let equity = vault_ext.equity.unwrap();

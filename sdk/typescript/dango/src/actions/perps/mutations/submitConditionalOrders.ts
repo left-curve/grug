@@ -3,7 +3,7 @@ import { execute } from "#actions/app/mutations/execute.js";
 
 import type { Address } from "@left-curve/types";
 import type { SignAndBroadcastTxReturnType } from "#actions/app/mutations/signAndBroadcastTx.js";
-import type { Client, Signer, TriggerDirection, TypedDataParameter } from "@left-curve/types";
+import type { Client, Signer, TriggerDirection } from "@left-curve/types";
 
 export type SubmitConditionalOrderInput = {
   pairId: string;
@@ -47,25 +47,8 @@ export async function submitConditionalOrders(
       },
     };
 
-    const submitConditionalOrderFields = [
-      { name: "pair_id", type: "string" },
-      ...(size !== undefined ? [{ name: "size", type: "string" }] : []),
-      { name: "trigger_price", type: "string" },
-      { name: "trigger_direction", type: "string" },
-      { name: "max_slippage", type: "string" },
-    ];
-
-    const typedData: TypedDataParameter = {
-      type: [{ name: "trade", type: "Trade" }],
-      extraTypes: {
-        Trade: [{ name: "submit_conditional_order", type: "SubmitConditionalOrder" }],
-        SubmitConditionalOrder: submitConditionalOrderFields,
-      },
-    };
-
     return {
       msg,
-      typedData,
       contract: addresses.perps,
     };
   });

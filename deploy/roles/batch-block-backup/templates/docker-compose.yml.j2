@@ -1,0 +1,27 @@
+# Explicit project name so this stack doesn't collide with other bots that
+# share a "<bot>/{{ network }}" directory layout (Compose otherwise derives the
+# project name from the parent dir, "{{ network }}", and treats their
+# containers as orphans of each other).
+name: batch-block-backup-{{ network }}
+
+services:
+  batch-block-backup:
+    image: {{ batch_block_backup_image }}:{{ batch_block_backup_tag }}
+    pull_policy: always
+    container_name: batch-block-backup-{{ network }}
+    restart: always
+    labels:
+      dango_network: "{{ network }}"
+      service_name: "batch_block_backup"
+    env_file:
+      - .env
+    volumes:
+      - {{ batch_block_backup_resolved_blocks_dir }}:/data/blocks:ro
+    ports:
+      - "{{ tailscale_ip }}:{{ batch_block_backup_http_port }}:8083"
+    networks:
+      - traefik
+
+networks:
+  traefik:
+    external: true

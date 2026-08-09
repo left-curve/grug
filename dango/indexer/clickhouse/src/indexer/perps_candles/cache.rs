@@ -175,26 +175,23 @@ impl PerpsCandleCache {
                 .unwrap_or(candles.len());
 
             let Some(pair_price) = pair_price else {
-                if let Some(previous_candle) = insert_pos
+                let previous_candle = insert_pos
                     .checked_sub(1)
                     .and_then(|idx| candles.get(idx))
-                    .cloned()
-                {
-                    let candle = PerpsCandle::new_with_previous_candle(
-                        &previous_candle,
-                        interval,
-                        time_start,
-                        block_height,
-                    );
+                    .cloned()?;
 
-                    candles.insert(insert_pos, candle.clone());
+                let candle = PerpsCandle::new_with_previous_candle(
+                    &previous_candle,
+                    interval,
+                    time_start,
+                    block_height,
+                );
 
-                    self.completed_candles.replace(previous_candle);
+                candles.insert(insert_pos, candle.clone());
 
-                    return Some(candle);
-                } else {
-                    return None;
-                }
+                self.completed_candles.replace(previous_candle);
+
+                return Some(candle);
             };
 
             let mut candle =

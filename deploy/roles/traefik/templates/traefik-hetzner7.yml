@@ -1,0 +1,141 @@
+api:
+  dashboard: true
+  insecure: true
+
+# using static certs
+# certificatesResolvers:
+#   letsencrypt:
+#     acme:
+#       email: letsencrypt-dango@pen.so
+#       storage: /letsencrypt/acme.json
+#       httpChallenge:
+#         entryPoint: web
+
+ping: true
+
+providers:
+  docker:
+    exposedByDefault: false
+  file:
+    directory: /config
+    watch: true
+
+serversTransport:
+  maxIdleConnsPerHost: 4096
+  forwardingTimeouts:
+    dialTimeout: 10s
+    responseHeaderTimeout: 60s
+
+entryPoints:
+  # Public (all interfaces)
+  web:
+    address: :80
+    reusePort: true
+    transport:
+      lifeCycle:
+        requestAcceptGraceTimeout: 0s
+      respondingTimeouts:
+        readTimeout: 60s
+    forwardedHeaders:
+      trustedIPs:
+{% for cidr in cloudflare_ips %}
+        - {{ cidr }}
+{% endfor %}
+        - 127.0.0.1/32
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+        - fc00::/7
+  websecure:
+    address: :443
+    reusePort: true
+    transport:
+      lifeCycle:
+        requestAcceptGraceTimeout: 0s
+      respondingTimeouts:
+        readTimeout: 60s
+    forwardedHeaders:
+      trustedIPs:
+{% for cidr in cloudflare_ips %}
+        - {{ cidr }}
+{% endfor %}
+        - 127.0.0.1/32
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+        - fc00::/7
+  devnet-dango:
+    address: ":{{ traefik.devnet.ports.dango_port }}"
+  devnet-faucet_bot:
+    address: ":{{ traefik.devnet.ports.faucet_port }}"
+  devnet-graphiql:
+    address: ":{{ traefik.devnet.ports.graphiql_port }}"
+  testnet-dango:
+    address: ":{{ traefik.testnet.ports.dango_port }}"
+  testnet-faucet_bot:
+    address: ":{{ traefik.testnet.ports.faucet_port }}"
+  testnet-graphiql:
+    address: ":{{ traefik.testnet.ports.graphiql_port }}"
+  mainnet-dango:
+    address: ":{{ traefik.mainnet.ports.dango_port }}"
+  mainnet-faucet_bot:
+    address: ":{{ traefik.mainnet.ports.faucet_port }}"
+  mainnet-graphiql:
+    address: ":{{ traefik.mainnet.ports.graphiql_port }}"
+
+  # Tailscale/VPN only
+  traefik:
+    address: :8888
+  devnet-dango-metrics:
+    address: :8083
+  devnet-db-metrics:
+    address: :8084
+  devnet-clickhouse-metrics:
+    address: :8085
+  devnet-cometbft_rpc:
+    address: :26657
+  devnet-cometbft_metrics:
+    address: :26660
+  testnet-dango-metrics:
+    address: :8053
+  testnet-db-metrics:
+    address: :8054
+  testnet-clickhouse-metrics:
+    address: :8055
+  testnet-cometbft_rpc:
+    address: :36657
+  testnet-cometbft_metrics:
+    address: :36660
+  mainnet-dango-metrics:
+    address: :8033
+  mainnet-db-metrics:
+    address: :8034
+  mainnet-clickhouse-metrics:
+    address: :8035
+  mainnet-cometbft_rpc:
+    address: :46657
+  mainnet-cometbft_metrics:
+    address: :46660
+
+metrics:
+  prometheus: {}
+
+log:
+  level: INFO
+  format: json
+
+accessLog:
+  format: json
+  fields:
+    names:
+      RouterName: keep
+      ServiceName: keep
+    headers:
+      defaultMode: drop
+      names:
+        CF-Connecting-IP: keep
+        X-Forwarded-For: keep
+        Forwarded: keep
+        True-Client-IP: keep
+        X-Real-IP: keep
+        Cf-Ray: keep

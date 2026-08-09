@@ -1,5 +1,5 @@
 use {
-    crate::USER_STATES,
+    crate::{USER_STATES, state::PARAM, trade::ensure_trading_enabled},
     anyhow::ensure,
     dango_math::IsZero,
     dango_order_book::Quantity,
@@ -12,6 +12,8 @@ use {
 /// The deposited tokens are converted to USD at a fixed 1:1 rate and credited
 /// to `user_state.margin`. Tokens stay in the perps contract's bank balance.
 pub fn deposit(mut ctx: MutableCtx, to: Option<Addr>) -> anyhow::Result<Response> {
+    ensure_trading_enabled(&PARAM.load(ctx.storage)?)?;
+
     // ----------------------- 1. Extract deposit amount -----------------------
 
     let deposit_amount = ctx.funds.take(settlement_currency::DENOM.clone()).amount;
@@ -65,6 +67,7 @@ mod tests {
         dango_math::Uint128,
         dango_order_book::UsdValue,
         dango_primitives::{Addr, Coins, MockContext, ResultExt},
+        dango_types::perps::Param,
     };
 
     const SENDER: Addr = Addr::mock(1);
@@ -84,6 +87,9 @@ mod tests {
         let mut ctx = MockContext::new()
             .with_sender(SENDER)
             .with_funds(usdc_coins(1_000));
+
+        // Deposits are gated on `trading_enabled`, so the param must exist.
+        PARAM.save(&mut ctx.storage, &Param::default()).unwrap();
 
         deposit(ctx.as_mutable(), Some(RECIPIENT)).should_succeed();
 

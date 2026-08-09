@@ -1,15 +1,5 @@
 import { encodeBase64, encodeUtf8 } from "@left-curve/encoding";
-import type {
-  Address,
-  Client,
-  Funds,
-  Hex,
-  Json,
-  Signer,
-  TxMessageType,
-  TypedDataParameter,
-} from "@left-curve/types";
-import { getCoinsTypedData } from "@left-curve/utils";
+import type { Address, Client, Funds, Hex, Json, Signer } from "@left-curve/types";
 import { computeAddress } from "#account/address.js";
 import { type SignAndBroadcastTxReturnType, signAndBroadcastTx } from "./signAndBroadcastTx.js";
 
@@ -21,7 +11,6 @@ export type InstantiateParameters = {
   funds?: Funds;
   admin?: Address;
   gasLimit?: number;
-  typedData?: TypedDataParameter;
 };
 
 export type InstantiateReturnType = Promise<[string, Awaited<SignAndBroadcastTxReturnType>]>;
@@ -46,29 +35,10 @@ export async function instantiate(
     },
   };
 
-  const { extraTypes = {}, type = [] } = parameters.typedData || {};
-
-  const typedData: TypedDataParameter<TxMessageType> = {
-    type: [{ name: "instantiate", type: "Instantiate" }],
-    extraTypes: {
-      Instantiate: [
-        { name: "code_hash", type: "string" },
-        { name: "salt", type: "string" },
-        { name: "admin", type: "address" },
-        { name: "funds", type: "Funds" },
-        { name: "msg", type: "InstantiateMessage" },
-      ],
-      Funds: [...getCoinsTypedData(funds)],
-      InstantiateMessage: type,
-      ...extraTypes,
-    },
-  };
-
   const txHash = await signAndBroadcastTx(client, {
     sender,
     messages: [instantiateMsg],
     gasLimit,
-    typedData,
   });
 
   return [address, txHash];

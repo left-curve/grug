@@ -51,7 +51,7 @@ async fn referral_during_user_register() {
     let user = TestAccount::new_random().predict_address(
         contracts.account_factory,
         3,
-        codes.account.to_bytes().hash256(),
+        codes.account.to_bytes().sha2_256(),
         true,
     );
 
@@ -94,9 +94,12 @@ async fn referral_during_user_register() {
     // The new user's referrer should be User1 (index 1).
     assert_eq!(
         suite
-            .query_wasm_smart(contracts.perps, perps::QueryReferrerRequest {
-                referee: user_index,
-            },)
+            .query_wasm_smart(
+                contracts.perps,
+                perps::QueryReferrerRequest {
+                    referee: user_index,
+                },
+            )
             .should_succeed(),
         Some(1),
     );
@@ -602,9 +605,12 @@ async fn referral_active_flag() {
 
     // Record initial margins.
     let user1_margin_before = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .map(|s: perps::UserState| s.margin)
         .unwrap();
@@ -622,9 +628,12 @@ async fn referral_active_flag() {
 
     // User1 (referrer) should NOT have received any commission.
     let user1_margin_after = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .map(|s: perps::UserState| s.margin)
         .unwrap();
@@ -660,9 +669,12 @@ async fn referral_active_flag() {
 
     // User1 (referrer) should now have received a commission.
     let user1_margin_final: UsdValue = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .map(|s: perps::UserState| s.margin)
         .unwrap();
@@ -854,14 +866,17 @@ async fn referrer_stats() {
 
     // Query stats sorted by volume descending.
     let stats: Vec<(Referee, perps::RefereeStats)> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryReferrerToRefereeStatsRequest {
-            referrer: 1,
-            order_by: ReferrerStatsOrderBy {
-                order: IterationOrder::Descending,
-                limit: None,
-                index: ReferrerStatsOrderIndex::Volume { start_after: None },
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryReferrerToRefereeStatsRequest {
+                referrer: 1,
+                order_by: ReferrerStatsOrderBy {
+                    order: IterationOrder::Descending,
+                    limit: None,
+                    index: ReferrerStatsOrderIndex::Volume { start_after: None },
+                },
             },
-        })
+        )
         .should_succeed();
 
     assert_eq!(stats.len(), 2);
@@ -871,14 +886,17 @@ async fn referrer_stats() {
 
     // Query ascending.
     let stats: Vec<(Referee, perps::RefereeStats)> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryReferrerToRefereeStatsRequest {
-            referrer: 1,
-            order_by: ReferrerStatsOrderBy {
-                order: IterationOrder::Ascending,
-                limit: None,
-                index: ReferrerStatsOrderIndex::Volume { start_after: None },
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryReferrerToRefereeStatsRequest {
+                referrer: 1,
+                order_by: ReferrerStatsOrderBy {
+                    order: IterationOrder::Ascending,
+                    limit: None,
+                    index: ReferrerStatsOrderIndex::Volume { start_after: None },
+                },
             },
-        })
+        )
         .should_succeed();
 
     assert_eq!(stats[0].0, 2);
@@ -889,16 +907,19 @@ async fn referrer_stats() {
 
     // start_after: skip user3's volume in descending order → only user2 remains.
     let stats: Vec<(Referee, perps::RefereeStats)> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryReferrerToRefereeStatsRequest {
-            referrer: 1,
-            order_by: ReferrerStatsOrderBy {
-                order: IterationOrder::Descending,
-                limit: None,
-                index: ReferrerStatsOrderIndex::Volume {
-                    start_after: Some(user3_volume),
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryReferrerToRefereeStatsRequest {
+                referrer: 1,
+                order_by: ReferrerStatsOrderBy {
+                    order: IterationOrder::Descending,
+                    limit: None,
+                    index: ReferrerStatsOrderIndex::Volume {
+                        start_after: Some(user3_volume),
+                    },
                 },
             },
-        })
+        )
         .should_succeed();
 
     assert_eq!(stats.len(), 1);
@@ -907,14 +928,17 @@ async fn referrer_stats() {
 
     // limit: only return 1 result in descending order → user3 (highest volume).
     let stats: Vec<(Referee, perps::RefereeStats)> = suite
-        .query_wasm_smart(contracts.perps, perps::QueryReferrerToRefereeStatsRequest {
-            referrer: 1,
-            order_by: ReferrerStatsOrderBy {
-                order: IterationOrder::Descending,
-                limit: Some(1),
-                index: ReferrerStatsOrderIndex::Volume { start_after: None },
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryReferrerToRefereeStatsRequest {
+                referrer: 1,
+                order_by: ReferrerStatsOrderBy {
+                    order: IterationOrder::Descending,
+                    limit: Some(1),
+                    index: ReferrerStatsOrderIndex::Volume { start_after: None },
+                },
             },
-        })
+        )
         .should_succeed();
 
     assert_eq!(stats.len(), 1);
@@ -1027,9 +1051,10 @@ async fn commission_rate_margins() {
     .iter()
     .map(|addr| {
         suite
-            .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-                user: *addr,
-            })
+            .query_wasm_smart(
+                contracts.perps,
+                perps::QueryUserStateRequest { user: *addr },
+            )
             .should_succeed()
             .map(|s: perps::UserState| s.margin)
             .unwrap_or(UsdValue::ZERO)
@@ -1061,9 +1086,10 @@ async fn commission_rate_margins() {
     .iter()
     .map(|addr| {
         suite
-            .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-                user: *addr,
-            })
+            .query_wasm_smart(
+                contracts.perps,
+                perps::QueryUserStateRequest { user: *addr },
+            )
             .should_succeed()
             .map(|s: perps::UserState| s.margin)
             .unwrap_or(UsdValue::ZERO)
@@ -1493,9 +1519,10 @@ async fn negative_maker_fee_does_not_debit_referrers() {
         .iter()
         .map(|addr| {
             suite
-                .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-                    user: *addr,
-                })
+                .query_wasm_smart(
+                    contracts.perps,
+                    perps::QueryUserStateRequest { user: *addr },
+                )
                 .should_succeed()
                 .map(|s: perps::UserState| s.margin)
                 .unwrap_or(UsdValue::ZERO)
@@ -1527,9 +1554,10 @@ async fn negative_maker_fee_does_not_debit_referrers() {
         .iter()
         .map(|addr| {
             suite
-                .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-                    user: *addr,
-                })
+                .query_wasm_smart(
+                    contracts.perps,
+                    perps::QueryUserStateRequest { user: *addr },
+                )
                 .should_succeed()
                 .map(|s: perps::UserState| s.margin)
                 .unwrap_or(UsdValue::ZERO)
@@ -2156,11 +2184,10 @@ async fn cr_100_indirect_referrer_taker() {
         UsdValue::ZERO,
         "vault keeps nothing — entire vault_fee distributed to A and B",
     );
-    assert_eq!(trader_event.commissions, vec![
-        UsdValue::ZERO,
-        expected_b,
-        expected_a
-    ]);
+    assert_eq!(
+        trader_event.commissions,
+        vec![UsdValue::ZERO, expected_b, expected_a]
+    );
 }
 
 /// Direct chain A → trader. A.cr = 100%, A.sr = 0. Trader is the maker on a
@@ -2703,16 +2730,19 @@ async fn register_oracle_prices(
     eth_price: u128,
 ) {
     suite
-        .seed_oracle_prices(&mut accounts.owner, btree_map! {
-            usdc::DENOM.clone() => OracleTestEntry {
-                pyth_id: 1,
-                humanized_price: UsdPrice::new_int(1),
+        .seed_oracle_prices(
+            &mut accounts.owner,
+            btree_map! {
+                usdc::DENOM.clone() => OracleTestEntry {
+                    pyth_id: 1,
+                    humanized_price: UsdPrice::new_int(1),
+                },
+                pair_id() => OracleTestEntry {
+                    pyth_id: 2,
+                    humanized_price: UsdPrice::new_int(eth_price as i128),
+                },
             },
-            pair_id() => OracleTestEntry {
-                pyth_id: 2,
-                humanized_price: UsdPrice::new_int(eth_price as i128),
-            },
-        })
+        )
         .await;
 }
 

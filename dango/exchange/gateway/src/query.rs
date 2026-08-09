@@ -1,12 +1,16 @@
 use {
-    crate::{PERSONAL_QUOTAS, RESERVES, REVERSE_ROUTES, ROUTES, WITHDRAWAL_FEES, rate_limit},
+    crate::{
+        FROZEN_WITHDRAWAL_REQUESTS, PERSONAL_QUOTAS, RESERVES, REVERSE_ROUTES, ROUTES,
+        WITHDRAWAL_FEES, WITHDRAWAL_GUARDIAN, WITHDRAWAL_REQUESTS, rate_limit,
+    },
     dango_math::Uint128,
     dango_primitives::{
         Addr, Bound, DEFAULT_PAGE_LIMIT, Denom, ImmutableCtx, Json, JsonSerExt, Order, StdResult,
     },
     dango_types::gateway::{
         PersonalQuota, QueryMsg, QueryPersonalQuotasResponseItem, QueryReservesResponseItem,
-        QueryRoutesResponseItem, QueryWithdrawalFeesResponseItem, Remote,
+        QueryRoutesResponseItem, QueryWithdrawalFeesResponseItem,
+        QueryWithdrawalRequestsResponseItem, Remote, WithdrawalRequest,
     },
 };
 
@@ -46,6 +50,22 @@ pub fn query(ctx: ImmutableCtx, msg: QueryMsg) -> StdResult<Json> {
         },
         QueryMsg::PersonalQuotas { start_after, limit } => {
             let res = query_personal_quotas(ctx, start_after, limit)?;
+            res.to_json_value()
+        },
+        QueryMsg::Guardian {} => {
+            let res = query_withdrawal_guardian(ctx)?;
+            res.to_json_value()
+        },
+        QueryMsg::WithdrawalRequest { id } => {
+            let res = query_withdrawal_request(ctx, id)?;
+            res.to_json_value()
+        },
+        QueryMsg::WithdrawalRequests { start_after, limit } => {
+            let res = query_withdrawal_requests(ctx, start_after, limit)?;
+            res.to_json_value()
+        },
+        QueryMsg::FrozenWithdrawalRequests { start_after, limit } => {
+            let res = query_frozen_withdrawal_requests(ctx, start_after, limit)?;
             res.to_json_value()
         },
         QueryMsg::RateLimits {} => {
@@ -138,6 +158,54 @@ fn query_withdrawal_fees(
         .map(|res| {
             let ((denom, remote), fee) = res?;
             Ok(QueryWithdrawalFeesResponseItem { denom, remote, fee })
+        })
+        .take(limit)
+        .collect()
+}
+
+fn query_withdrawal_guardian(ctx: ImmutableCtx) -> StdResult<Option<Addr>> {
+    WITHDRAWAL_GUARDIAN.may_load(ctx.storage)
+}
+
+fn query_withdrawal_request(ctx: ImmutableCtx, id: u64) -> StdResult<Option<WithdrawalRequest>> {
+    if let Some(request) = WITHDRAWAL_REQUESTS.may_load(ctx.storage, id)? {
+        return Ok(Some(request));
+    }
+
+    FROZEN_WITHDRAWAL_REQUESTS.may_load(ctx.storage, id)
+}
+
+fn query_withdrawal_requests(
+    ctx: ImmutableCtx,
+    start_after: Option<u64>,
+    limit: Option<u32>,
+) -> StdResult<Vec<QueryWithdrawalRequestsResponseItem>> {
+    let start = start_after.map(Bound::Exclusive);
+    let limit = limit.unwrap_or(DEFAULT_PAGE_LIMIT) as usize;
+
+    WITHDRAWAL_REQUESTS
+        .range(ctx.storage, start, None, Order::Ascending)
+        .map(|res| {
+            let (id, request) = res?;
+            Ok(QueryWithdrawalRequestsResponseItem { id, request })
+        })
+        .take(limit)
+        .collect()
+}
+
+fn query_frozen_withdrawal_requests(
+    ctx: ImmutableCtx,
+    start_after: Option<u64>,
+    limit: Option<u32>,
+) -> StdResult<Vec<QueryWithdrawalRequestsResponseItem>> {
+    let start = start_after.map(Bound::Exclusive);
+    let limit = limit.unwrap_or(DEFAULT_PAGE_LIMIT) as usize;
+
+    FROZEN_WITHDRAWAL_REQUESTS
+        .range(ctx.storage, start, None, Order::Ascending)
+        .map(|res| {
+            let (id, request) = res?;
+            Ok(QueryWithdrawalRequestsResponseItem { id, request })
         })
         .take(limit)
         .collect()

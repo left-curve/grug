@@ -15,13 +15,16 @@ pub const BALANCES: Map<(&Addr, &Denom), Uint128> = Map::new("balance");
 
 // (sender, recipient) -> coins
 pub const ORPHANED_TRANSFERS: IndexedMap<(Addr, Addr), Coins, OrphanedTransferIndexes> =
-    IndexedMap::new("orphaned_transfer", OrphanedTransferIndexes {
-        recipient: MultiIndex::new(
-            |(_, recipient), _| *recipient,
-            "orphaned_transfer",
-            "orphaned_transfer__recipient",
-        ),
-    });
+    IndexedMap::new(
+        "orphaned_transfer",
+        OrphanedTransferIndexes {
+            recipient: MultiIndex::new(
+                |(_, recipient), _| *recipient,
+                "orphaned_transfer",
+                "orphaned_transfer__recipient",
+            ),
+        },
+    );
 
 #[dango_storage::index_list((Addr, Addr), Coins)]
 pub struct OrphanedTransferIndexes<'a> {

@@ -35,7 +35,7 @@ pub struct Tx {
 
 impl Tx {
     pub fn tx_hash(&self) -> StdResult<Hash256> {
-        Ok(self.to_json_vec()?.hash256())
+        Ok(self.to_json_vec()?.sha2_256())
     }
 }
 
@@ -136,7 +136,7 @@ impl Message {
         T: Serialize,
     {
         Ok(MsgConfigure {
-            new_cfg,
+            new_cfg: new_cfg.map(|cfg| cfg.to_json_value()).transpose()?,
             new_app_cfg: new_app_cfg.map(|t| t.to_json_value()).transpose()?,
         }
         .into())
@@ -249,7 +249,20 @@ impl Message {
 #[skip_serializing_none]
 #[derive(Serialize, Deserialize, BorshSerialize, BorshDeserialize, Debug, Clone, PartialEq, Eq)]
 pub struct MsgConfigure {
-    pub new_cfg: Option<Config>,
+    /// The new chain-level config, as a raw JSON value. Parsed into a
+    /// [`Config`] at execution time.
+    ///
+    /// This field is deliberately _not_ typed as `Config`. The `Config` schema
+    /// evolves over time (e.g. commit `c5cdf66c9` replaced the `taxman` field
+    /// with the gas fields), while `MsgConfigure`s live forever inside
+    /// serialized historical blocks — in the indexer's cached block files and
+    /// in tx JSONs. If this field were typed, every `Config` schema change
+    /// would make each historical block that contains a config update
+    /// impossible to deserialize. As a raw JSON value, such blocks survive
+    /// schema changes, and additionally preserve the config update's original
+    /// content faithfully.
+    pub new_cfg: Option<Json>,
+
     pub new_app_cfg: Option<Json>,
 }
 

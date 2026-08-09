@@ -343,8 +343,6 @@ Gas costs (`dango/core/app/src/gas/costs.rs`):
 | `db_next` (per iteration) | 18                           |
 | `secp256k1_verify`        | 770,000                      |
 | `secp256r1_verify`        | 1,880,000                    |
-| `ed25519_verify`          | 410,000                      |
-| `ed25519_batch_verify`    | 1,340,000 + 188,000/sig      |
 | Hash functions            | 0 base + 5--28/byte (varies) |
 | Wasmer operation          | 1 gas/op                     |
 
@@ -429,10 +427,8 @@ Wasmer op).
 host-provided functions:
 
 - Storage: `db_read`, `db_write`, `db_remove`, `db_scan`, `db_next`
-- Crypto: `secp256k1_verify`, `secp256r1_verify`, `ed25519_verify`,
-  `ed25519_batch_verify`, `secp256k1_pubkey_recover`
-- Hashes: `sha2_256`, `sha2_512`, `sha3_256`, `sha3_512`, `keccak256`,
-  `blake2s_256`, `blake2b_512`, `blake3`
+- Crypto: `secp256k1_verify`, `secp256r1_verify`, `secp256k1_pubkey_recover`
+- Hashes: `sha2_256`, `sha2_512`, `sha3_256`, `sha3_512`, `keccak256`
 - Cross-contract queries: `query_chain`
 - Debug logging: `debug`
 

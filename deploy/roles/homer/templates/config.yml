@@ -446,13 +446,6 @@ services:
   - name: "Other Services"
     icon: "fas fa-network-wired"
     items:
-      - name: "Minio"
-        logo: "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/minio.png"
-        subtitle: "S3 Storage"
-        tag: "storage"
-        url: "http://ovh3:9001"
-        target: "_blank"
-
       - name: "Vaultwarden"
         logo: "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/vaultwarden.png"
         subtitle: "Password Manager"

@@ -1,0 +1,60 @@
+services:
+  traefik:
+    ports:
+      - "80:80"
+      - "443:443"
+      # traefik dashboard
+      - "{{ tailscale_ip }}:8888:8888"
+      - "{{ wireguard_ip }}:8888:8888"
+      # devnet
+      - "8080:8080"
+      - "8082:8082"
+      - "{{ wireguard_ip }}:26657:26657"
+      - "{{ wireguard_ip }}:26660:26660"
+      - "{{ wireguard_ip }}:8083:8083"
+      - "{{ wireguard_ip }}:8084:8084"
+      - "{{ wireguard_ip }}:8085:8085"
+      - "{{ tailscale_ip }}:26657:26657"
+      - "{{ tailscale_ip }}:26660:26660"
+      - "{{ tailscale_ip }}:8083:8083"
+      - "{{ tailscale_ip }}:8084:8084"
+      - "{{ tailscale_ip }}:8085:8085"
+      # testnet
+      - "8050:8050"
+      - "8052:8052"
+      - "{{ wireguard_ip }}:36657:36657"
+      - "{{ wireguard_ip }}:36660:36660"
+      - "{{ wireguard_ip }}:8053:8053"
+      - "{{ wireguard_ip }}:8054:8054"
+      - "{{ wireguard_ip }}:8055:8055"
+      - "{{ tailscale_ip }}:36657:36657"
+      - "{{ tailscale_ip }}:36660:36660"
+      - "{{ tailscale_ip }}:8053:8053"
+      - "{{ tailscale_ip }}:8054:8054"
+      - "{{ tailscale_ip }}:8055:8055"
+      # mainnet
+      - "8030:8030"
+      - "8032:8032"
+      - "{{ wireguard_ip }}:46657:46657"
+      - "{{ wireguard_ip }}:46660:46660"
+      - "{{ wireguard_ip }}:8033:8033"
+      - "{{ wireguard_ip }}:8034:8034"
+      - "{{ wireguard_ip }}:8035:8035"
+      - "{{ tailscale_ip }}:46657:46657"
+      - "{{ tailscale_ip }}:46660:46660"
+      - "{{ tailscale_ip }}:8033:8033"
+      - "{{ tailscale_ip }}:8034:8034"
+      - "{{ tailscale_ip }}:8035:8035"
+    networks:
+      - traefik
+      - monitoring
+      - cloudflare
+
+networks:
+  traefik:
+    driver: bridge
+    name: traefik
+  monitoring:
+    external: true
+  cloudflare:
+    external: true

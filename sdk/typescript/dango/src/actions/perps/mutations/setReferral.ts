@@ -1,7 +1,7 @@
 import { getAppConfig } from "#actions/app/queries/getAppConfig.js";
 import { execute } from "#actions/app/mutations/execute.js";
 
-import type { Address, Client, Signer, TypedDataParameter } from "@left-curve/types";
+import type { Address, Client, Signer } from "@left-curve/types";
 import type { SignAndBroadcastTxReturnType } from "#actions/app/mutations/signAndBroadcastTx.js";
 
 export type SetReferralParameters = {
@@ -29,22 +29,10 @@ export async function setReferral(
     },
   };
 
-  const typedData: TypedDataParameter = {
-    type: [{ name: "referral", type: "Referral" }],
-    extraTypes: {
-      Referral: [{ name: "set_referral", type: "SetReferral" }],
-      SetReferral: [
-        { name: "referrer", type: "uint32" },
-        { name: "referee", type: "uint32" },
-      ],
-    },
-  };
-
   return await execute(client, {
     sender,
     execute: {
       msg,
-      typedData,
       contract: addresses.perps,
     },
   });

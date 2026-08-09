@@ -1,0 +1,20 @@
+---
+# One-shot: delete an inclusive block height range from a node's local
+# blocks/ dir. Always run with --limit <server> (e.g. --limit hetzner1) —
+# the role refuses to run against more than one host.
+- hosts: full-app
+  become: true
+  become_user: "{{ deploy_user }}"
+  remote_user: deploy
+  collections:
+    - community.docker
+  pre_tasks:
+    - name: Get deploy user info
+      getent:
+        database: passwd
+        key: "{{ deploy_user }}"
+    - name: Set deploy_home fact
+      set_fact:
+        deploy_home: "{{ ansible_facts.getent_passwd[deploy_user][4] }}"
+  roles:
+    - block-cleanup

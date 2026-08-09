@@ -215,7 +215,7 @@ impl PythClient {
 
                 // Reset all received data to false for each subscription ID, just to be sure that
                 // everything works fine.
-                for (_, value) in data_per_ids.iter_mut() {
+                for value in data_per_ids.values_mut() {
                     *value = false;
                 }
 

@@ -1,5 +1,12 @@
 [workspace]
 members = [
+  "dango/archive/app",
+  "dango/archive/block-source",
+  "dango/archive/cli",
+  "dango/archive/httpd",
+  "dango/archive/projection",
+  "dango/archive/testing",
+  "dango/archive/types",
   "dango/cli",
   "dango/core/app",
   "dango/core/crypto",
@@ -52,7 +59,6 @@ members = [
   "dango/utils/disk-saver",
   "dango/utils/dyn-event",
   "dango/utils/eth",
-  "dango/utils/identity",
   "dango/utils/temp-rocksdb",
 ]
 resolver = "3"
@@ -80,7 +86,7 @@ actix-test                  = "0.1"
 actix-web                   = "4"
 actix-web-metrics           = "0.4"
 actix-ws                    = "0.4"
-aes-gcm                     = "0.10"
+aes-gcm                     = "0.11"
 alloy                       = "2"
 anyhow                      = "1"
 assert-json-diff            = "2"
@@ -96,8 +102,6 @@ aws-sdk-s3                  = "1"
 axum                        = { version = "0.8", features = ["ws"] }
 bigdecimal                  = "0.4"
 bip32                       = "0.5"
-blake2                      = "0.10"
-blake3                      = "1"
 bnum                        = "0.14"
 borsh                       = "1"
 byteorder                   = "1"
@@ -112,19 +116,18 @@ criterion                   = "0.8"
 csv                         = "1.3"
 data-encoding               = "2"
 dialoguer                   = "0.12"
-digest                      = "0.10" # FIXME: can't bump to 0.11 because RustCrypto requires 0.10
 dotenvy                     = "0.15.7"
 dyn-clone                   = "1"
-ed25519-dalek               = "2"
 elsa                        = "1"
 futures                     = "0.3"
 futures-util                = "0.3"
+getrandom                   = "0.4"
 graphql_client              = "0.16"
 hex                         = "0.4"
 hex-literal                 = "1"
 home                        = "0.5"
 itertools                   = "0.14"
-k256                        = "0.13"
+k256                        = "0.14"
 libc                        = "0.2"
 lzma-rs                     = "0.3"
 metrics                     = "0.24"
@@ -134,19 +137,19 @@ opentelemetry               = "0.32"
 opentelemetry-otlp          = { version = "0.32", features = ["grpc-tonic", "trace"] }
 opentelemetry_sdk           = { version = "0.32", features = ["rt-tokio"] }
 ouroboros                   = "0.18"
-p256                        = "0.13"
+p256                        = "0.14"
 parking_lot                 = { version = "0.12", features = ["arc_lock", "send_guard"] }
 paste                       = "1"
-pbkdf2                      = "0.12"
+pbkdf2                      = "0.13"
 proptest                    = "1"
 prost                       = "0.14"
 pyth-lazer-client           = "25.0.0"
 pyth-lazer-protocol         = "0.40.0"
 quote                       = "1"
-rand                        = "0.8" # FIXME: can't bump to 0.10 because RustCrypto requires 0.8
-reqwest                     = { version = "0.13", features = ["stream"] }
-ripemd                      = "0.1"
-roaring                     = "0.11"
+rand                        = "0.10"
+rangemap                    = "1"
+reqwest                     = { version = "0.13", features = ["gzip", "stream"] }
+ripemd                      = "0.2"
 rocksdb                     = "0.24"
 sea-orm                     = { version = "1", features = ["runtime-tokio-rustls", "sea-orm-internal", "sqlx-postgres", "sqlx-sqlite", "with-bigdecimal", "with-chrono", "with-json", "with-time", "with-uuid"] }
 sea-orm-migration           = { version = "1", features = ["runtime-tokio-rustls", "sqlx-postgres", "sqlx-sqlite", "with-chrono", "with-json", "with-uuid"] }
@@ -155,13 +158,14 @@ sentry-actix                = "0.48"
 serde                       = "1"
 serde_json                  = "1"
 serde_with                  = "3"
-sha2                        = "0.10"
-sha3                        = "0.10"
-signature                   = "2"
+sha2                        = "0.11"
+sha3                        = "0.12"
+signature                   = "3"
 sqlx                        = "0.8" # FIXME: can't bump to 0.9 because sea-orm 1.x requires 0.8
 strum                       = "0.28"
 strum_macros                = "0.28"
 syn                         = "2"
+tar                         = "0.4"
 tempfile                    = "3"
 tendermint                  = "0.40.4"
 tendermint-rpc              = "0.40.4"
@@ -177,13 +181,23 @@ tracing-opentelemetry       = "0.33"
 tracing-subscriber          = { version = "0.3", features = ["env-filter", "fmt", "json"] }
 typenum                     = "1"
 url                         = "2.5.4"
+utoipa                      = "5"
+utoipa-swagger-ui           = { version = "9", features = ["actix-web", "vendored"] }
 uuid                        = { version = "1", features = ["serde", "v4"] }
 wasmer                      = "7"
 wasmer-middlewares          = "7"
+xz2                         = "0.1"
+zstd                        = "0.13"
 # ----------------------------- Local dependencies -----------------------------
 dango-account               = { path = "dango/exchange/account" }
 dango-account-factory       = { path = "dango/exchange/account-factory" }
 dango-app                   = { path = "dango/core/app" }
+dango-archive-app           = { path = "dango/archive/app" }
+dango-archive-block-source  = { path = "dango/archive/block-source" }
+dango-archive-httpd         = { path = "dango/archive/httpd" }
+dango-archive-projection    = { path = "dango/archive/projection" }
+dango-archive-testing       = { path = "dango/archive/testing" }
+dango-archive-types         = { path = "dango/archive/types" }
 dango-auth                  = { path = "dango/exchange/auth" }
 dango-backtrace             = { path = "dango/utils/backtrace" }
 dango-bank                  = { path = "dango/exchange/bank" }
@@ -201,7 +215,6 @@ dango-hyperlane-ism         = { path = "dango/hyperlane/isms/multisig" }
 dango-hyperlane-mailbox     = { path = "dango/hyperlane/mailbox" }
 dango-hyperlane-types       = { path = "dango/hyperlane/types" }
 dango-hyperlane-va          = { path = "dango/hyperlane/va" }
-dango-identity              = { path = "dango/utils/identity" }
 dango-indexer-cache         = { path = "dango/indexer/cache" }
 dango-indexer-clickhouse    = { path = "dango/indexer/clickhouse" }
 dango-indexer-graphql-types = { path = "dango/indexer/graphql-types" }

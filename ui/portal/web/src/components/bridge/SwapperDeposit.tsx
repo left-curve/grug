@@ -17,14 +17,19 @@ import {
 } from "@swapper-finance/deposit-sdk";
 
 import { useCallback, useEffect, useRef } from "react";
-import { DepositFeeBadge } from "./DepositOptions";
 
 import type { Connector } from "@left-curve/store/types";
 
 const SWAPPER_DST_CHAIN_ID = "dango";
 const SWAPPER_DST_TOKEN_ADDR = "usdc";
 const SWAPPER_IFRAME_HEIGHT = "560px";
-const SWAPPER_DEPOSIT_OPTIONS = ["transferCrypto", "depositWithCash", "walletDeposit"] as const;
+const SWAPPER_DEPOSIT_OPTIONS = [
+  "transferCrypto",
+  "depositWithCash",
+  "walletDeposit",
+  "depositFromPerps",
+  "depositFromPolymarket",
+] as const;
 const SWAPPER_CONTAINER_CLASS =
   "h-fit w-full overflow-hidden rounded-xl bg-surface-secondary-rice shadow-account-card";
 const SWAPPER_BASE_COMPONENT_STYLES = {
@@ -54,7 +59,7 @@ const getSwapperStyles = (theme: "light" | "dark"): SwapperStyles => ({
 });
 
 type SwapperDepositProps = {
-  onBack: () => void;
+  onBack?: () => void;
   signerConnector?: Connector;
 };
 
@@ -176,13 +181,14 @@ export const SwapperDeposit = ({ onBack, signerConnector }: SwapperDepositProps)
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-3">
-        <Button variant="link" size="sm" className="m-0 p-0" onClick={onBack}>
-          <IconChevronRight className="h-4 w-4 rotate-180" />
-          {m["bridge.deposit.moreOptions.back"]()}
-        </Button>
-        <DepositFeeBadge />
-      </div>
+      {onBack ? (
+        <div className="flex items-center gap-3">
+          <Button variant="link" size="sm" className="m-0 p-0" onClick={onBack}>
+            <IconChevronRight className="h-4 w-4 rotate-180" />
+            {m["bridge.deposit.moreOptions.back"]()}
+          </Button>
+        </div>
+      ) : null}
 
       {!swapperParameters ? (
         <WarningContainer color="error" description={m["common.failedToLoad"]()} />

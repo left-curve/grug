@@ -1,12 +1,4 @@
-import type {
-  Address,
-  Client,
-  Coins,
-  Signer,
-  TxMessageType,
-  TypedDataParameter,
-} from "@left-curve/types";
-import { getCoinsTypedData } from "@left-curve/utils";
+import type { Address, Client, Coins, Signer } from "@left-curve/types";
 import { type SignAndBroadcastTxReturnType, signAndBroadcastTx } from "./signAndBroadcastTx.js";
 
 export type TransferParameters = {
@@ -23,17 +15,5 @@ export async function transfer(
   const { sender, transfer } = parameters;
   const transferMsg = { transfer };
 
-  const typedData: TypedDataParameter<TxMessageType> = {
-    type: [{ name: "transfer", type: "Transfer" }],
-    extraTypes: Object.entries(transfer).reduce(
-      (acc, [address, coins], i) => {
-        acc.Transfer.push({ name: address, type: `Coin${i}` });
-        // biome-ignore lint/performance/noAccumulatingSpread: This is a dynamic type
-        return Object.assign(acc, { [`Coin${i}`]: getCoinsTypedData(coins) });
-      },
-      Object.assign({ Transfer: [] }),
-    ),
-  };
-
-  return await signAndBroadcastTx(client, { sender, messages: [transferMsg], typedData });
+  return await signAndBroadcastTx(client, { sender, messages: [transferMsg] });
 }

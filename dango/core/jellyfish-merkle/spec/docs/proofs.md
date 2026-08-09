@@ -473,7 +473,7 @@ If the value is found, we will generate an ICS-23 existence proof, like it was d
 
 ```rust
 let generate_existence_proof = |key: Vec<u8>, value| -> DbResult<_> {
-    let key_hash = key.hash256();
+    let key_hash = key.sha2_256();
     let path = MERKLE_TREE.ics23_prove_existence(&state_commitment, version, key_hash)?;
 
     Ok(ExistenceProof {
@@ -564,7 +564,7 @@ Generation of `NonExistenceProof` emulates the following Rust code:
 
 ```rust
 let cf = cf_preimages(&self.inner.db);
-let key_hash = key.hash256();
+let key_hash = key.sha2_256();
 
 let opts = new_read_options(Some(version), None, None);
 let mode = IteratorMode::From(&key_hash, Direction::Reverse);

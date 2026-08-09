@@ -1,0 +1,7 @@
+---
+- name: Deploy archive instances
+  include_tasks: deploy-instance.yml
+  loop: "{{ archive_instances }}"
+  loop_control:
+    loop_var: instance
+    label: "{{ instance.name }}"

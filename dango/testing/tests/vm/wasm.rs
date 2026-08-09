@@ -1,29 +1,26 @@
 use {
+    super::{WASM_CACHE_CAPACITY, read_wasm_file},
     dango_app::{AppError, NaiveProposalPreparer, NullIndexer},
     dango_backtrace::Backtraceable,
-    dango_crypto::{sha2_256, sha2_512},
+    dango_crypto::sha2_256,
     dango_db_memory::MemDb,
     dango_genesis::{GenesisCodes, GenesisOption},
-    dango_identity::{Identity256, Identity512},
     dango_primitives::{
         Addr, Binary, Coins, GenericResult, InnerMut, Message, QuerierExt, QueryRequest, ResultExt,
         VerificationError,
     },
     dango_tester::{
-        QueryRecoverSecp256k1Request, QueryVerifyEd25519BatchRequest, QueryVerifyEd25519Request,
-        QueryVerifySecp256k1Request, QueryVerifySecp256r1Request,
+        QueryRecoverSecp256k1Request, QueryVerifySecp256k1Request, QueryVerifySecp256r1Request,
     },
     dango_testing::{Preset, TestAccounts, TestSuite, setup_suite_with_db_and_vm},
     dango_vm_hybrid::HybridVm,
     dango_vm_rust::RustVm,
     dango_vm_wasm::VmError,
-    rand::rngs::OsRng,
+    k256::elliptic_curve::Generate,
     serde::{Serialize, de::DeserializeOwned},
-    std::{fmt::Debug, vec},
+    std::fmt::Debug,
     test_case::test_case,
 };
-
-use super::{WASM_CACHE_CAPACITY, read_wasm_file};
 
 async fn setup_test() -> (
     TestSuite<MemDb, HybridVm, NaiveProposalPreparer>,
@@ -94,10 +91,13 @@ async fn immutable_state() {
     // This tests how the VM handles state mutability while serving the `Query`
     // ABCI request.
     suite
-        .query_wasm_smart(tester, dango_tester::QueryForceWriteRequest {
-            key: "larry".to_string(),
-            value: "engineer".to_string(),
-        })
+        .query_wasm_smart(
+            tester,
+            dango_tester::QueryForceWriteRequest {
+                key: "larry".to_string(),
+                value: "engineer".to_string(),
+            },
+        )
         .should_fail_with_error(VmError::immutable_state());
 
     // Execute the tester contract.
@@ -163,47 +163,32 @@ const MSG: &[u8] = b"finger but hole";
 const WRONG_MSG: &[u8] = b"precious item ahead";
 
 fn generate_secp256r1_verify_request() -> QueryVerifySecp256r1Request {
-    use p256::ecdsa::{Signature, SigningKey, VerifyingKey, signature::DigestSigner};
+    use p256::ecdsa::{Signature, SigningKey, VerifyingKey, signature::hazmat::PrehashSigner};
 
-    let sk = SigningKey::random(&mut OsRng);
+    let sk = SigningKey::generate();
     let vk = VerifyingKey::from(&sk);
-    let msg_hash = Identity256::from(sha2_256(MSG));
-    let sig: Signature = sk.sign_digest(msg_hash.clone());
+    let msg_hash = sha2_256(MSG);
+    let sig: Signature = sk.sign_prehash(&msg_hash).unwrap();
 
     QueryVerifySecp256r1Request {
         pk: vk.to_sec1_bytes().to_vec().into(),
         sig: sig.to_bytes().to_vec().into(),
-        msg_hash: msg_hash.into_bytes().into(),
+        msg_hash: msg_hash.into(),
     }
 }
 
 fn generate_secp256k1_verify_request() -> QueryVerifySecp256k1Request {
-    use k256::ecdsa::{Signature, SigningKey, VerifyingKey, signature::DigestSigner};
+    use k256::ecdsa::{Signature, SigningKey, VerifyingKey, signature::hazmat::PrehashSigner};
 
-    let sk = SigningKey::random(&mut OsRng);
+    let sk = SigningKey::generate();
     let vk = VerifyingKey::from(&sk);
-    let msg_hash = Identity256::from(sha2_256(MSG));
-    let sig: Signature = sk.sign_digest(msg_hash.clone());
+    let msg_hash = sha2_256(MSG);
+    let sig: Signature = sk.sign_prehash(&msg_hash).unwrap();
 
     QueryVerifySecp256k1Request {
         pk: vk.to_sec1_bytes().to_vec().into(),
         sig: sig.to_bytes().to_vec().into(),
-        msg_hash: msg_hash.into_bytes().into(),
-    }
-}
-
-fn generate_ed25519_verify_request() -> QueryVerifyEd25519Request {
-    use ed25519_dalek::{DigestSigner, SigningKey, VerifyingKey};
-
-    let sk = SigningKey::generate(&mut OsRng);
-    let vk = VerifyingKey::from(&sk);
-    let msg_hash = Identity512::from(sha2_512(MSG));
-    let sig = sk.sign_digest(msg_hash.clone());
-
-    QueryVerifyEd25519Request {
-        pk: vk.as_bytes().to_vec().into(),
-        sig: sig.to_bytes().into(),
-        msg_hash: msg_hash.into_bytes().into(),
+        msg_hash: msg_hash.into(),
     }
 }
 
@@ -244,7 +229,7 @@ fn generate_ed25519_verify_request() -> QueryVerifyEd25519Request {
 #[test_case(
     generate_secp256r1_verify_request,
     |mut req| {
-        let sk = p256::ecdsa::SigningKey::random(&mut OsRng);
+        let sk = p256::ecdsa::SigningKey::generate();
         let vk = p256::ecdsa::VerifyingKey::from(&sk);
         req.pk = vk.to_sec1_bytes().to_vec().into();
         req
@@ -298,7 +283,7 @@ fn generate_ed25519_verify_request() -> QueryVerifyEd25519Request {
 #[test_case(
     generate_secp256k1_verify_request,
     |mut req| {
-        let sk = k256::ecdsa::SigningKey::random(&mut OsRng);
+        let sk = k256::ecdsa::SigningKey::generate();
         let vk = k256::ecdsa::VerifyingKey::from(&sk);
         req.pk = vk.to_sec1_bytes().to_vec().into();
         req
@@ -314,60 +299,6 @@ fn generate_ed25519_verify_request() -> QueryVerifyEd25519Request {
     },
     GenericResult::Err(VerificationError::unauthentic().into_generic_backtraced_error());
     "invalid secp256k1: different msg"
-)]
-// ----- Ed25519 -----
-#[test_case(
-    generate_ed25519_verify_request,
-    |req| req,
-    GenericResult::Ok(());
-    "valid ed25519 signature"
-)]
-#[test_case(
-    generate_ed25519_verify_request,
-    |mut req| {
-        req.pk.inner_mut().push(123);
-        req
-    },
-    GenericResult::Err(VerificationError::incorrect_length().into_generic_backtraced_error());
-    "invalid ed25519: incorrect pk length"
-)]
-#[test_case(
-    generate_ed25519_verify_request,
-    |mut req| {
-        req.sig.inner_mut().push(123);
-        req
-    },
-    GenericResult::Err(VerificationError::incorrect_length().into_generic_backtraced_error());
-    "invalid ed25519: incorrect signature length"
-)]
-#[test_case(
-    generate_ed25519_verify_request,
-    |mut req| {
-        req.msg_hash.inner_mut().push(123);
-        req
-    },
-    GenericResult::Err(VerificationError::incorrect_length().into_generic_backtraced_error());
-    "invalid ed25519: incorrect msg hash length"
-)]
-#[test_case(
-    generate_ed25519_verify_request,
-    |mut req| {
-        let sk = ed25519_dalek::SigningKey::generate(&mut OsRng);
-        let vk = ed25519_dalek::VerifyingKey::from(&sk);
-        req.pk = vk.as_bytes().to_vec().into();
-        req
-    },
-        GenericResult::Err(VerificationError::unauthentic().into_generic_backtraced_error());
-    "invalid ed25519: different pk"
-)]
-#[test_case(
-    generate_ed25519_verify_request,
-    |mut req| {
-        req.msg_hash = sha2_512(WRONG_MSG).to_vec().into();
-        req
-    },
-    GenericResult::Err(VerificationError::unauthentic().into_generic_backtraced_error());
-    "invalid ed25519: different msg"
 )]
 #[tokio::test]
 async fn verifying_signature<G, M, R>(
@@ -398,17 +329,20 @@ async fn recovering_secp256k1_pubkey() {
     let (vk, req) = {
         use k256::ecdsa::{SigningKey, VerifyingKey};
 
-        let sk = SigningKey::random(&mut OsRng);
+        let sk = SigningKey::generate();
         let vk = VerifyingKey::from(&sk);
-        let msg_hash = Identity256::from(sha2_256(MSG));
-        let (sig, recovery_id) = sk.sign_digest_recoverable(msg_hash.clone()).unwrap();
+        let msg_hash = sha2_256(MSG);
+        let (sig, recovery_id) = sk.sign_prehash_recoverable(&msg_hash);
 
-        (vk, QueryRecoverSecp256k1Request {
-            sig: sig.to_vec().into(),
-            msg_hash: msg_hash.into_bytes().to_vec().into(),
-            recovery_id: recovery_id.to_byte(),
-            compressed: true,
-        })
+        (
+            vk,
+            QueryRecoverSecp256k1Request {
+                sig: sig.to_vec().into(),
+                msg_hash: msg_hash.to_vec().into(),
+                recovery_id: recovery_id.to_byte(),
+                compressed: true,
+            },
+        )
     };
 
     // Ok
@@ -436,50 +370,5 @@ async fn recovering_secp256k1_pubkey() {
         suite
             .query_wasm_smart(tester, false_req)
             .should_fail_with_error(VerificationError::invalid_recovery_id());
-    }
-}
-
-fn ed25519_sign(msg: &str) -> (Binary, Binary, Binary) {
-    use ed25519_dalek::{Signer, SigningKey, VerifyingKey};
-
-    let sk = SigningKey::generate(&mut OsRng);
-    let vk = VerifyingKey::from(&sk);
-    let sig = sk.sign(msg.as_bytes());
-
-    (
-        msg.as_bytes().to_vec().into(),
-        sig.to_bytes().into(),
-        vk.to_bytes().into(),
-    )
-}
-
-#[tokio::test]
-async fn wasm_ed25519_batch_verify() {
-    let (suite, _, tester) = setup_test().await;
-
-    let mut req = {
-        let (prehash_msg1, sig1, vk1) = ed25519_sign("Jake");
-        let (prehash_msg2, sig2, vk2) = ed25519_sign("Larry");
-        let (prehash_msg3, sig3, vk3) = ed25519_sign("Rhaki");
-
-        QueryVerifyEd25519BatchRequest {
-            prehash_msgs: vec![prehash_msg1, prehash_msg2, prehash_msg3],
-            sigs: vec![sig1, sig2, sig3],
-            pks: vec![vk1, vk2, vk3],
-        }
-    };
-
-    // Ok
-    {
-        suite.query_wasm_smart(tester, req.clone()).should_succeed();
-    }
-
-    // Create an invalid batch simply by shuffling the order of signatures.
-    {
-        req.sigs.reverse();
-
-        suite
-            .query_wasm_smart(tester, req)
-            .should_fail_with_error(VerificationError::unauthentic());
     }
 }

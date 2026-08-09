@@ -9,6 +9,26 @@ use {
 /// still returns `200` (its `check_tx.result` is an `Err`). Only a transport
 /// failure to the consensus client returns `500`. Mirrors the GraphQL
 /// `broadcastTxSync` mutation; both go through `crate::broadcast::broadcast_tx`.
+#[utoipa::path(
+    post,
+    path = "/broadcast",
+    tag = "chain",
+    summary = "Broadcast a signed transaction",
+    description = "Submit a signed `Tx` to the mempool. Returns a mempool \
+                   receipt (`BroadcastTxOutcome`), not block inclusion; a \
+                   mempool-rejected tx still returns `200` with its \
+                   `check_tx.result` an `Err`. Mirrors the GraphQL \
+                   `broadcastTxSync` mutation.",
+    request_body(
+        content = serde_json::Value,
+        description = "A signed `Tx`",
+        content_type = "application/json",
+    ),
+    responses(
+        (status = 200, description = "The mempool receipt (`BroadcastTxOutcome`)", body = serde_json::Value),
+        (status = 500, description = "Transport failure to the consensus client"),
+    ),
+)]
 #[cfg_attr(feature = "tracing", tracing::instrument(skip_all))]
 #[post("/broadcast")]
 pub async fn broadcast(

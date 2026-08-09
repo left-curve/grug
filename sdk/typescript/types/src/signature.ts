@@ -1,9 +1,9 @@
 import type { Base64 } from "./encoding.js";
 import type { JsonValue } from "./encoding.js";
 import type { Credential } from "./credential.js";
-import type { ArbitraryTypedData, TxMessageType, TypedData } from "./typedData.js";
+import type { ArbitraryTypedData, TypedData } from "./typedData.js";
 
-export type SignDoc = TypedData<TxMessageType>;
+export type SignDoc = TypedData;
 
 export type ArbitraryDoc<T extends JsonValue = JsonValue> = ArbitraryTypedData<T>;
 

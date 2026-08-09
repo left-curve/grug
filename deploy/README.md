@@ -62,7 +62,6 @@ exposed to the public internet through Cloudflare tunnels.
 | Service     | Description                               | Location                   |
 | ----------- | ----------------------------------------- | -------------------------- |
 | hyperlane   | Cross-chain message validators + relayers | hetzner1-6                 |
-| minio       | S3-compatible object storage              | ovh3                       |
 | uptimekuma  | Service health monitoring                 | ovh3                       |
 | vaultwarden | Password manager                          | ovh3                       |
 | metabase    | BI/analytics dashboards                   | ovh3                       |

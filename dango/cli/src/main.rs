@@ -162,21 +162,24 @@ async fn main() -> anyhow::Result<()> {
 
     let mut _sentry_guard: Option<sentry::ClientInitGuard> = None;
     let sentry_layer = if cfg.sentry.enabled {
-        let guard = sentry::init((cfg.sentry.dsn, sentry::ClientOptions {
-            environment: Some(cfg.sentry.environment.clone().into()),
-            release: sentry::release_name!(),
-            enable_logs: cfg.sentry.enable_logs,
-            sample_rate: cfg.sentry.sample_rate,
-            traces_sample_rate: cfg.sentry.traces_sample_rate,
-            // Drop noisy exporter transport errors that surface as trace logs.
-            before_send: Some(Arc::new(|event| {
-                if event.logger.as_deref() == Some("opentelemetry_sdk") {
-                    return None;
-                }
-                Some(event)
-            })),
-            ..Default::default()
-        }));
+        let guard = sentry::init((
+            cfg.sentry.dsn,
+            sentry::ClientOptions {
+                environment: Some(cfg.sentry.environment.clone().into()),
+                release: sentry::release_name!(),
+                enable_logs: cfg.sentry.enable_logs,
+                sample_rate: cfg.sentry.sample_rate,
+                traces_sample_rate: cfg.sentry.traces_sample_rate,
+                // Drop noisy exporter transport errors that surface as trace logs.
+                before_send: Some(Arc::new(|event| {
+                    if event.logger.as_deref() == Some("opentelemetry_sdk") {
+                        return None;
+                    }
+                    Some(event)
+                })),
+                ..Default::default()
+            },
+        ));
         _sentry_guard = Some(guard);
 
         sentry::configure_scope(|scope| {

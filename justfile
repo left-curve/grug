@@ -71,7 +71,7 @@ lint-without-features:
 
 # Perform formatting
 fmt:
-  cargo +nightly fmt --all
+  cargo fmt --all
 
 # Build schema
 build-graphql-schema:
@@ -84,7 +84,7 @@ book:
 
 # Update wasm artifacts used in tests
 update-testdata:
-  cp -v artifacts/dango_tester.wasm dango/testing/testdata/
+  cp -v artifacts/dango_tester.wasm dango/core/vm/wasm/testdata/
 
 # ---------------------------------- Frontend ----------------------------------
 
@@ -103,13 +103,3 @@ optimize:
     --mount type=volume,source="$(basename "$(pwd)")_cache",target=/target \
     --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
     {{OPTIMIZER_NAME}}:{{OPTIMIZER_VERSION}}
-
-# ----------------------------------- Debug ------------------------------------
-
-check-candles:
-  INDEXER__CLICKHOUSE__URL="http://localhost:8123" \
-    INDEXER__DATABASE__URL=postgres://postgres@localhost:5432/grug_dev \
-    INDEXER__CLICKHOUSE__DATABASE=testnet_dango_production \
-    INDEXER__CLICKHOUSE__PASSWORD=${CLICKHOUSE_PASSWORD} \
-    RUST_LOG=info \
-    cargo run -p dango-cli indexer --home localdango/configs/dango/ check-candles

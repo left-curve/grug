@@ -17,7 +17,7 @@ pub async fn add_user_public_key(
     test_account: &mut TestAccount,
 ) -> (Key, Hash256) {
     let (_, pk) = TestAccount::new_key_pair();
-    let key_hash = pk.to_json_vec().unwrap().hash256();
+    let key_hash = pk.to_json_vec().unwrap().sha2_256();
     suite
         .execute(
             test_account,
@@ -58,7 +58,7 @@ pub async fn create_user_and_account(
     let user = TestAccount::new_random().predict_address(
         contracts.account_factory,
         0,
-        codes.account.to_bytes().hash256(),
+        codes.account.to_bytes().sha2_256(),
         true,
     );
 

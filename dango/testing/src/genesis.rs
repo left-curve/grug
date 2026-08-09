@@ -191,7 +191,7 @@ impl Preset for AccountOption {
                 GenesisUser {
                     salt: NewUserSalt {
                         key: Key::Secp256k1(owner::PUBLIC_KEY.into()),
-                        key_hash: owner::PUBLIC_KEY.hash256(),
+                        key_hash: owner::PUBLIC_KEY.sha2_256(),
                         seed: 0,
                     },
                     dango_balance: Uint128::new(100_000_000_000_000),
@@ -199,7 +199,7 @@ impl Preset for AccountOption {
                 GenesisUser {
                     salt: NewUserSalt {
                         key: Key::Secp256k1(user1::PUBLIC_KEY.into()),
-                        key_hash: user1::PUBLIC_KEY.hash256(),
+                        key_hash: user1::PUBLIC_KEY.sha2_256(),
                         seed: 1,
                     },
                     dango_balance: Uint128::new(1_000_000_000_000_000_000),
@@ -207,7 +207,7 @@ impl Preset for AccountOption {
                 GenesisUser {
                     salt: NewUserSalt {
                         key: Key::Secp256k1(user2::PUBLIC_KEY.into()),
-                        key_hash: user2::PUBLIC_KEY.hash256(),
+                        key_hash: user2::PUBLIC_KEY.sha2_256(),
                         seed: 2,
                     },
                     dango_balance: Uint128::new(100_000_000_000_000),
@@ -215,7 +215,7 @@ impl Preset for AccountOption {
                 GenesisUser {
                     salt: NewUserSalt {
                         key: Key::Secp256k1(user3::PUBLIC_KEY.into()),
-                        key_hash: user3::PUBLIC_KEY.hash256(),
+                        key_hash: user3::PUBLIC_KEY.sha2_256(),
                         seed: 3,
                     },
                     dango_balance: Uint128::new(100_000_000_000_000),
@@ -223,7 +223,7 @@ impl Preset for AccountOption {
                 GenesisUser {
                     salt: NewUserSalt {
                         key: Key::Secp256k1(user4::PUBLIC_KEY.into()),
-                        key_hash: user4::PUBLIC_KEY.hash256(),
+                        key_hash: user4::PUBLIC_KEY.sha2_256(),
                         seed: 4,
                     },
                     dango_balance: Uint128::new(100_000_000_000_000),
@@ -231,7 +231,7 @@ impl Preset for AccountOption {
                 GenesisUser {
                     salt: NewUserSalt {
                         key: Key::Secp256k1(user5::PUBLIC_KEY.into()),
-                        key_hash: user5::PUBLIC_KEY.hash256(),
+                        key_hash: user5::PUBLIC_KEY.sha2_256(),
                         seed: 5,
                     },
                     dango_balance: Uint128::new(100_000_000_000_000),
@@ -239,7 +239,7 @@ impl Preset for AccountOption {
                 GenesisUser {
                     salt: NewUserSalt {
                         key: Key::Secp256k1(user6::PUBLIC_KEY.into()),
-                        key_hash: user6::PUBLIC_KEY.hash256(),
+                        key_hash: user6::PUBLIC_KEY.sha2_256(),
                         seed: 6,
                     },
                     dango_balance: Uint128::new(100_000_000_000_000),
@@ -247,7 +247,7 @@ impl Preset for AccountOption {
                 GenesisUser {
                     salt: NewUserSalt {
                         key: Key::Secp256k1(user7::PUBLIC_KEY.into()),
-                        key_hash: user7::PUBLIC_KEY.hash256(),
+                        key_hash: user7::PUBLIC_KEY.sha2_256(),
                         seed: 7,
                     },
                     dango_balance: Uint128::new(100_000_000_000_000),
@@ -255,7 +255,7 @@ impl Preset for AccountOption {
                 GenesisUser {
                     salt: NewUserSalt {
                         key: Key::Secp256k1(user8::PUBLIC_KEY.into()),
-                        key_hash: user8::PUBLIC_KEY.hash256(),
+                        key_hash: user8::PUBLIC_KEY.sha2_256(),
                         seed: 8,
                     },
                     dango_balance: Uint128::new(100_000_000_000_000),
@@ -263,7 +263,7 @@ impl Preset for AccountOption {
                 GenesisUser {
                     salt: NewUserSalt {
                         key: Key::Secp256k1(user9::PUBLIC_KEY.into()),
-                        key_hash: user9::PUBLIC_KEY.hash256(),
+                        key_hash: user9::PUBLIC_KEY.sha2_256(),
                         seed: 9,
                     },
                     dango_balance: Uint128::new(100_000_000_000_000),
@@ -361,6 +361,10 @@ impl Preset for GatewayOption {
                 eth::DENOM.clone()  => Bounded::new_unchecked(Udec128::new_percent(10)),
             },
             rate_limit_refresh_period: Duration::from_days(1),
+            // No guardian in the test genesis; the owner responds to
+            // withdrawal requests. Tests that exercise the guardian flow set
+            // one at runtime via `SetGuardian`.
+            guardian: None,
         }
     }
 }

@@ -174,7 +174,7 @@ where
 
     fn prove(&self, key: &[u8], version: Option<u64>) -> DbResult<Self::Proof> {
         let version = version.unwrap_or_else(|| self.latest_version().unwrap_or(0));
-        Ok(T::prove(&self.state_commitment(), key.hash256(), version)?)
+        Ok(T::prove(&self.state_commitment(), key.sha2_256(), version)?)
     }
 
     // Note on implementing this function: We must make sure that we don't

@@ -110,8 +110,6 @@ Persists complete block + outcome data to disk for recovery:
 ~/.dango/indexer/last_block.json       -- Latest block height
 ```
 
-Optional S3 sync with bitmap tracking of uploaded blocks.
-
 ## 4. Dango-Specific Writes (`dango/indexer/sql/src/write/`)
 
 The SQL indexer crate also performs Dango-specific data extraction in the same `post_indexing` pass, after the generic block/tx/message/event rows have been written:
@@ -183,7 +181,7 @@ The `dango start` command initializes and runs the full node:
 5.  Create RustVm
 6.  Create base App
 7.  Setup indexer stack (HookedIndexer with three components):
-    ├── Cache (disk persistence + optional S3 sync)
+    ├── Cache (disk persistence)
     ├── SqlIndexer (PostgreSQL — generic + Dango-specific tables)
     └── ClickhouseIndexer (analytics)
 8.  Run DB migrations + catch-up reindexing
@@ -224,7 +222,7 @@ The app is split into four ABCI service components:
                     │ Block + Outcome
 ┌───────────────────┴────────────────────────────────────┐
 │ Non-Consensus (Indexer Stack)                          │
-│  Cache → disk (+ optional S3 sync)                     │
+│  Cache → disk                                          │
 │  SqlIndexer → PostgreSQL (generic + Dango tables)      │
 │  ClickhouseIndexer → analytics DB                      │
 └────────────────── ▼ ───────────────────────────────────┘

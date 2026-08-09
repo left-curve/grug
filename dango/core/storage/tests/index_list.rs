@@ -13,10 +13,13 @@ struct TestIndexes<'a> {
     pub bar: UniqueIndex<'a, (u8, u64), i64, (i8, i64)>,
 }
 
-const TEST: IndexedMap<(u8, u64), (i8, i64), TestIndexes> = IndexedMap::new("test", TestIndexes {
-    foo: MultiIndex::new(|k, _v| k.0, "test", "test__foo"),
-    bar: UniqueIndex::new(|_k, v| v.1, "test", "test__bar"),
-});
+const TEST: IndexedMap<(u8, u64), (i8, i64), TestIndexes> = IndexedMap::new(
+    "test",
+    TestIndexes {
+        foo: MultiIndex::new(|k, _v| k.0, "test", "test__foo"),
+        bar: UniqueIndex::new(|_k, v| v.1, "test", "test__bar"),
+    },
+);
 
 #[test]
 fn index_list_macro_works() {

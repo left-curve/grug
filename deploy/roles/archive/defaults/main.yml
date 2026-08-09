@@ -1,0 +1,46 @@
+---
+archive_dir: "{{ deploy_home }}/archive"
+archive_image: "ghcr.io/left-curve/left-curve/archive"
+archive_tag: "latest"
+
+# Instances to run on this host. Each runs as its own docker compose project
+# (own directory, container, RocksDB data dir, and Postgres database). The
+# read API is published VPN-only on httpd_host_port (wireguard+tailscale) by
+# default. Public exposure is opt-in per instance with:
+#
+#   cloudflare:
+#     enabled: true        # cloudflared -> traefik -> archive
+#     load_balancer: true  # api-archive-<name>.<dango_domain>
+#
+# Multiple instances coexist on one host as long as each has a unique name and
+# unique host ports. Populated from the host's host_vars/<ip>.yml (the
+# [archive-<network>] inventory groups only drive `--limit` targeting).
+#
+# Example (live_host_override makes the container resolve the live_url
+# hostname to that IP — direct VPN path to the node's traefik, no Cloudflare;
+# httpd_host_port publishes the read API on the host's wireguard+tailscale
+# IPs, VPN-only):
+#   archive_instances:
+#     - name: testnet
+#       live_url: "http://api-testnet.dango.zone"
+#       live_host_override: "10.99.0.9"
+#       metrics_host_port: 9191
+#       httpd_host_port: 9081
+#       cloudflare:
+#         enabled: true
+#         load_balancer: true
+archive_instances: []
+
+# Postgres connection — the shared host postgres, reached by the container over
+# the `postgres` external docker network (same pattern as referral-dashboard /
+# metabase). The per-instance database and user are derived from the instance
+# name: db == user == "archive_<name>".
+archive_db_host: "postgres"
+archive_db_port: 5432
+# archive_db_password: ""  # required, from
+# group_vars/archive/vault.sops.json (SOPS)
+
+# Superuser used to provision the per-instance database/user on the shared
+# postgres (login over localhost, not the container network).
+postgres_external_host: "127.0.0.1"
+postgres_port: 5432

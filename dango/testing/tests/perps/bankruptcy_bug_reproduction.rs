@@ -171,9 +171,12 @@ async fn solvent_partial_close_adl_price() {
         .should_succeed();
 
     let alice: UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
     assert_eq!(alice.margin, UsdValue::new_int(2_000));
@@ -290,9 +293,12 @@ async fn solvent_partial_close_adl_price() {
     // ------------------------------------------------------------------------
 
     let alice: UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user1.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user1.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
     assert_eq!(alice.margin, UsdValue::new_int(1_600));
@@ -321,9 +327,12 @@ async fn solvent_partial_close_adl_price() {
     // ------------------------------------------------------------------------
 
     let bob: UserState = suite
-        .query_wasm_smart(contracts.perps, perps::QueryUserStateRequest {
-            user: accounts.user2.address(),
-        })
+        .query_wasm_smart(
+            contracts.perps,
+            perps::QueryUserStateRequest {
+                user: accounts.user2.address(),
+            },
+        )
         .should_succeed()
         .unwrap();
     assert_eq!(bob.margin, UsdValue::new_int(10_400));

@@ -75,7 +75,7 @@ impl Commitment for MerkleTree {
         // Hash256 the keys and values
         let mut batch: Vec<_> = batch
             .iter()
-            .map(|(k, op)| (k.hash256(), op.as_ref().map(|v| v.hash256())))
+            .map(|(k, op)| (k.sha2_256(), op.as_ref().map(|v| v.sha2_256())))
             .collect();
 
         // Sort by key hashes ascendingly
@@ -933,7 +933,7 @@ mod tests {
     fn proving(key: &str, proof: Proof) {
         let (storage, _) = build_test_case().unwrap();
         assert_eq!(
-            MerkleTree::prove(&storage, key.as_bytes().hash256(), 0).unwrap(),
+            MerkleTree::prove(&storage, key.as_bytes().sha2_256(), 0).unwrap(),
             proof
         );
     }
@@ -957,7 +957,7 @@ mod tests {
         // Attempting to generate proof without applying any batch.
         // The tree is empty at this point.
         // We check that the expected error is emitted.
-        MerkleTree::prove(&storage, b"foo".hash256(), 0).should_fail_with_error(
+        MerkleTree::prove(&storage, b"foo".sha2_256(), 0).should_fail_with_error(
             StdError::data_not_found::<Node>(NODES.path((0, &ROOT_BITS)).storage_key()),
         );
     }

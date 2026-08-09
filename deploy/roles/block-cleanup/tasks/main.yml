@@ -1,0 +1,137 @@
+---
+- name: Require an explicit network and height range
+  assert:
+    that:
+      - network is defined
+      - block_cleanup_start_height is defined
+      - block_cleanup_start_height | int > 0
+      - block_cleanup_end_height is defined
+      - block_cleanup_end_height | int >= block_cleanup_start_height | int
+    fail_msg: >-
+      network, block_cleanup_start_height and block_cleanup_end_height are
+      required, with 0 < start_height <= end_height. The bot never picks a
+      deletion range on its own.
+
+- name: Refuse to run on more than one host
+  assert:
+    that: ansible_play_hosts | length == 1
+    fail_msg: >-
+      block-cleanup deletes blocks from disk; target exactly one server
+      with --limit <server> (this play matched:
+      {{ ansible_play_hosts | join(', ') }}).
+  run_once: true
+
+- name: "{{ network }} - Auto-detect active deployment blocks_dir"
+  when: block_cleanup_blocks_dir[network] is not defined
+  block:
+    - name: "{{ network }} - Read active deployment marker"
+      slurp:
+        src: "{{ deploy_home }}/deployments/{{ network }}.json"
+      register: block_cleanup_deploy_marker
+
+    - name: "{{ network }} - Parse active deployment name"
+      set_fact:
+        block_cleanup_active_deployment: >-
+          {{ (block_cleanup_deploy_marker.content
+              | b64decode | from_json).current_deployment }}
+
+    # DANGO_DIRECTORY is the node's persistent data dir (decoupled from the
+    # blue/green deployment dir) mounted at /root/.dango; the block shard tree
+    # lives at <DANGO_DIRECTORY>/indexer/blocks on the host.
+    - name: "{{ network }} - Read DANGO_DIRECTORY from active deployment"
+      ansible.builtin.command:
+        cmd: >-
+          grep -m1 '^DANGO_DIRECTORY=' {{ deploy_home }}/deployments/{{
+          block_cleanup_active_deployment }}/.env
+      register: block_cleanup_dango_line
+      changed_when: false
+      failed_when: false
+
+    - name: "{{ network }} - Derive blocks_dir from DANGO_DIRECTORY"
+      set_fact:
+        block_cleanup_resolved_blocks_dir: >-
+          {{ block_cleanup_dango_line.stdout
+             | regex_replace('^DANGO_DIRECTORY=', '') | trim }}/indexer/blocks
+
+- name: "{{ network }} - Use configured blocks_dir override"
+  when: block_cleanup_blocks_dir[network] is defined
+  set_fact:
+    block_cleanup_resolved_blocks_dir: >-
+      {{ block_cleanup_blocks_dir[network] }}
+
+- name: "{{ network }} - Check blocks_dir exists"
+  stat:
+    path: "{{ block_cleanup_resolved_blocks_dir }}"
+  register: block_cleanup_blocks_stat
+
+- name: "{{ network }} - Fail if blocks_dir is missing"
+  fail:
+    msg: >-
+      blocks_dir '{{ block_cleanup_resolved_blocks_dir }}' was not found
+      on {{ inventory_hostname }}. Ensure the full-app node is deployed for
+      {{ network }}, or set
+      block_cleanup_blocks_dir['{{ network }}'] explicitly.
+  when: not block_cleanup_blocks_stat.stat.exists
+
+- name: "{{ network }} - Create directory"
+  file:
+    path: "{{ block_cleanup_dir }}/{{ network }}"
+    state: directory
+    mode: "0755"
+
+- name: "{{ network }} - Template .env"
+  template:
+    src: env.j2
+    dest: "{{ block_cleanup_dir }}/{{ network }}/.env"
+    mode: "0600"
+
+- name: "{{ network }} - Template docker-compose.yml"
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ block_cleanup_dir }}/{{ network }}/docker-compose.yml"
+    mode: "0644"
+
+- name: "{{ network }} - Login to GHCR"
+  community.docker.docker_login:
+    registry: ghcr.io
+    username: "{{ ghcr_user }}"
+    password: "{{ ghcr_token }}"
+  no_log: true
+
+- name: "{{ network }} - Launch one-shot cleanup"
+  community.docker.docker_compose_v2:
+    project_src: "{{ block_cleanup_dir }}/{{ network }}"
+    pull: always
+    state: present
+    recreate: always
+
+- name: "{{ network }} - Logout from GHCR"
+  community.docker.docker_login:
+    registry: ghcr.io
+    state: absent
+
+- name: "{{ network }} - Wait for the bot to finish"
+  ansible.builtin.command:
+    cmd: docker wait block-cleanup-{{ network }}
+  register: block_cleanup_exit
+  changed_when: false
+
+- name: "{{ network }} - Collect logs"
+  ansible.builtin.command:
+    cmd: docker logs --tail 200 block-cleanup-{{ network }}
+  register: block_cleanup_logs
+  changed_when: false
+
+# Strip ANSI color codes so the output is readable in Ansible's JSON display.
+- name: "{{ network }} - Show logs"
+  debug:
+    msg: >-
+      {{ (block_cleanup_logs.stdout_lines + block_cleanup_logs.stderr_lines)
+         | map('regex_replace', '\x1b\[[0-9;]*m', '') | list }}
+
+- name: "{{ network }} - Fail if the bot exited non-zero"
+  fail:
+    msg: >-
+      block-cleanup exited with code {{ block_cleanup_exit.stdout | trim }};
+      see logs above.
+  when: block_cleanup_exit.stdout | trim != '0'

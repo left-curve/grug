@@ -1,0 +1,23 @@
+{
+  "live_url": "https://api-{{ network }}.dango.zone",
+  "archive_url": "https://api-archive-{{ network }}.dango.zone",
+  "name": "{{ network }}",
+  "discord_role_id": "{{ monitor_bot_discord_role_id }}",
+  "app_settings": {
+    "perps_address": "{{ monitor_bot_addresses[network].perps }}",
+    "gateway_address": "{{ monitor_bot_addresses[network].gateway }}"{{ "," if network in monitor_bot_bridge_chains }}
+{% if network in monitor_bot_bridge_chains %}
+    "bridge_collateral": {
+      "chains": {
+{% for name, chain in monitor_bot_bridge_chains[network] | dictsort %}
+        "{{ name }}": {
+          "domain": {{ chain.domain }},
+          "warp_address": "{{ chain.warp_address }}",
+          "usdc_address": "{{ chain.usdc_address }}"
+        }{{ "," if not loop.last }}
+{% endfor %}
+      }
+    }
+{% endif %}
+  }
+}
