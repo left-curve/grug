@@ -255,7 +255,12 @@ const Body: React.FC<SearchMenuBodyProps> = ({
                         key={applet.title}
                         value={applet.title}
                         className="group"
-                        onSelect={() => [navigate({ to: applet.path }), hideMenu()]}
+                        disabled={applet.isDisabled}
+                        onSelect={
+                          applet.isDisabled
+                            ? undefined
+                            : () => [navigate({ to: applet.path }), hideMenu()]
+                        }
                       >
                         <SearchItem.Applet key={applet.title} {...applet} />
                       </Command.Item>
@@ -269,7 +274,12 @@ const Body: React.FC<SearchMenuBodyProps> = ({
                         key={applet.title}
                         value={applet.title}
                         className="group"
-                        onSelect={() => [navigate({ to: applet.path }), hideMenu()]}
+                        disabled={applet.isDisabled}
+                        onSelect={
+                          applet.isDisabled
+                            ? undefined
+                            : () => [navigate({ to: applet.path }), hideMenu()]
+                        }
                       >
                         <SearchItem.Applet key={applet.title} {...applet} />
                       </Command.Item>

@@ -7,6 +7,10 @@ const appletRouteMocks = vi.hoisted(() => ({
   isConnected: true,
   navigate: vi.fn(),
   params: {} as Record<string, unknown>,
+  redirect: vi.fn((options: unknown) => ({
+    options,
+    type: "redirect",
+  })),
   search: {} as Record<string, unknown>,
 }));
 
@@ -23,6 +27,7 @@ function createInspectableRoute(routePath: string) {
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: createInspectableRoute,
   createLazyFileRoute: createInspectableRoute,
+  redirect: appletRouteMocks.redirect,
   useNavigate: () => appletRouteMocks.navigate,
 }));
 
@@ -349,6 +354,12 @@ type RouteWithComponent = {
   };
 };
 
+type RouteWithBeforeLoad = {
+  options: {
+    beforeLoad: () => Promise<void>;
+  };
+};
+
 function setSearch(search: Record<string, unknown>) {
   appletRouteMocks.search = search;
 }
@@ -371,7 +382,9 @@ async function loadBridgeLazyRoute() {
 
 async function loadEarnRoute() {
   return import("../src/pages/(app)/_app.earn.index").then(
-    ({ Route }) => Route as unknown as RouteWithValidate<{ action: "deposit" | "withdraw" }>,
+    ({ Route }) =>
+      Route as unknown as RouteWithValidate<{ action: "deposit" | "withdraw" }> &
+        RouteWithBeforeLoad,
   );
 }
 
@@ -506,6 +519,21 @@ describe("applet routes", () => {
       action: "deposit",
     });
   }, 10_000);
+
+  it("redirects the earn route to the exchange shutdown notice", async () => {
+    const EarnRoute = await loadEarnRoute();
+
+    await expect(EarnRoute.options.beforeLoad()).rejects.toMatchObject({
+      type: "redirect",
+    });
+    expect(appletRouteMocks.redirect).toHaveBeenLastCalledWith({
+      replace: true,
+      search: {
+        notice: "exchange-shutdown",
+      },
+      to: "/",
+    });
+  });
 
   it("defaults transfer search params to sends", async () => {
     const Route = await loadTransferRoute();

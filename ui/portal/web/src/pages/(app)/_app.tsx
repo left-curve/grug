@@ -15,9 +15,11 @@ import { TestnetBanner } from "~/components/foundation/TestnetBanner";
 
 import { z } from "zod";
 import { Image } from "~/components/foundation/Image";
+import { EXCHANGE_SHUTDOWN_NOTICE } from "~/constants";
 
 export const Route = createFileRoute("/(app)/_app")({
   validateSearch: z.object({
+    notice: z.literal(EXCHANGE_SHUTDOWN_NOTICE).optional(),
     socketId: z.string().optional(),
   }),
   component: LayoutApp,
@@ -63,9 +65,15 @@ function LayoutApp() {
     return router.state.location.pathname.includes("trade");
   }, [router.state.location.pathname]);
 
-  const { socketId } = useSearch({ strict: false });
+  const { notice, socketId } = useSearch({ strict: false });
+  const isExchangeShutdownNotice = notice === EXCHANGE_SHUTDOWN_NOTICE;
 
   useEffect(() => {
+    if (isExchangeShutdownNotice) showModal(Modals.WindingDown);
+  }, [isExchangeShutdownNotice, showModal]);
+
+  useEffect(() => {
+    if (isExchangeShutdownNotice) return;
     if (!isConnected) modalShowed.current = false;
     if (!isConnected || modalShowed.current) return;
 
@@ -78,7 +86,7 @@ function LayoutApp() {
       modalShowed.current = true;
       showModal(Modals.ActivateAccount);
     }
-  }, [isConnected, userStatus, balances, chain.id]);
+  }, [isConnected, userStatus, balances, chain.id, isExchangeShutdownNotice, showModal]);
 
   useEffect(() => {
     if (socketId) showModal(Modals.SignWithDesktopFromNativeCamera, { socketId });

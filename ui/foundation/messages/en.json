@@ -644,9 +644,9 @@
     "description": "We are currently undergoing maintenance. We apologize for any inconvenience this may cause and appreciate your patience."
   },
   "announcement": {
-    "title": "Dango is shutting down",
-    "windingDown": "Dango exchange is going to be wound down. We encourage you to close your positions and withdraw funds at your earliest convenience. For a detailed winding down timeline:",
-    "readMore": "Read more"
+    "title": "Dango exchange has been shut down.",
+    "windingDown": "Funds have been returned to your deposit addresses on Ethereum. See the relevant",
+    "readMore": "announcement"
   },
   "geoblock": {
     "bannerLead": "Your IP address indicates that you are in a country or region outside of Dango's service zone. We do not provide services to your location.",

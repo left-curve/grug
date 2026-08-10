@@ -35,7 +35,7 @@ const layoutRouteMocks = vi.hoisted(() => ({
     modal: null as string | null,
   },
   pathname: "/",
-  search: {} as { socketId?: string },
+  search: {} as { notice?: "exchange-shutdown"; socketId?: string },
   showModal: vi.fn(),
   theme: "light" as "dark" | "light",
   useBalances: vi.fn(),
@@ -113,7 +113,7 @@ type LayoutRoute = {
   options: {
     component: React.ComponentType;
     validateSearch: {
-      parse: (value: unknown) => { socketId?: string };
+      parse: (value: unknown) => { notice?: "exchange-shutdown"; socketId?: string };
     };
   };
 };
@@ -175,14 +175,32 @@ describe("app layout route", () => {
     vi.clearAllMocks();
   });
 
-  it("validates native-camera socket ids from route search state", () => {
+  it("validates supported route search state", () => {
     const route = Route as unknown as LayoutRoute;
 
     expect(route.options.validateSearch.parse({})).toEqual({});
+    expect(route.options.validateSearch.parse({ notice: "exchange-shutdown" })).toEqual({
+      notice: "exchange-shutdown",
+    });
     expect(route.options.validateSearch.parse({ socketId: "native-camera-socket" })).toEqual({
       socketId: "native-camera-socket",
     });
+    expect(() => route.options.validateSearch.parse({ notice: "maintenance" })).toThrow();
     expect(() => route.options.validateSearch.parse({ socketId: 123 })).toThrow();
+  });
+
+  it("opens the winding-down modal from shutdown route state", async () => {
+    layoutRouteMocks.search = {
+      notice: "exchange-shutdown",
+    };
+    const Component = LayoutComponent();
+
+    render(<Component />);
+
+    await waitFor(() => {
+      expect(layoutRouteMocks.showModal).toHaveBeenCalledWith(Modals.WindingDown);
+    });
+    expect(layoutRouteMocks.showModal).toHaveBeenCalledTimes(1);
   });
 
   it("shows account activation on mainnet when the connected user is not active", async () => {

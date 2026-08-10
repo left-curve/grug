@@ -28,6 +28,7 @@ type AppletFixture = {
   description: string;
   id: string;
   img: string;
+  isDisabled?: boolean;
   path: string;
   title: string;
 };
@@ -85,13 +86,20 @@ vi.mock("cmdk", () => ({
     ),
     Item: ({
       children,
+      disabled,
       onSelect,
       value,
     }: React.PropsWithChildren<{
+      disabled?: boolean;
       onSelect?: () => void;
       value?: string;
     }>) => (
-      <div data-command-item="true" data-value={value} onClick={onSelect}>
+      <div
+        aria-disabled={disabled || undefined}
+        data-command-item="true"
+        data-value={value}
+        onClick={disabled ? undefined : onSelect}
+      >
         {children}
       </div>
     ),
@@ -339,7 +347,7 @@ describe("search menu body", () => {
         address: accountAddress,
         index: 0,
         owner: 3,
-        username: undefined,
+        username: "",
       },
     });
 
@@ -371,6 +379,31 @@ describe("search menu body", () => {
 
     fireEvent.click(screen.getByRole("button", { name: m["common.starToggle.add"]() }));
     expect(searchMenuMocks.addFavApplet).toHaveBeenCalledWith(bridgeApplet);
+  });
+
+  it("keeps disabled applets visible without allowing selection or favorite changes", () => {
+    const disabledTradeApplet = {
+      ...tradeApplet,
+      isDisabled: true,
+    };
+
+    renderBody({
+      allApplets: [],
+      searchResult: emptySearchResult({
+        applets: [disabledTradeApplet as never],
+      }),
+    });
+
+    const row = screen.getByText("Trade perpetuals").closest('[data-command-item="true"]');
+    expect(row).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByAltText("Trade")).toHaveClass("grayscale");
+    expect(screen.getByRole("button", { name: m["common.starToggle.remove"]() })).toBeDisabled();
+
+    clickResult("Trade");
+
+    expect(searchMenuMocks.navigate).not.toHaveBeenCalled();
+    expect(searchMenuMocks.hideMenu).not.toHaveBeenCalled();
+    expect(searchMenuMocks.removeFavApplet).not.toHaveBeenCalled();
   });
 
   it("renders loading and empty states with localized copy", () => {

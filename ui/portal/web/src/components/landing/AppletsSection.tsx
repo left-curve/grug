@@ -2,7 +2,7 @@ import { useFavApplets } from "@left-curve/store";
 
 import { APPLETS } from "~/constants";
 
-import { IconAddCross, useApp } from "@left-curve/applets-kit";
+import { IconAddCross, twMerge, useApp } from "@left-curve/applets-kit";
 import { Link } from "@tanstack/react-router";
 import { Image } from "~/components/foundation/Image";
 
@@ -21,14 +21,32 @@ export function AppletsSection() {
             key={`applets.section.${applet.title}}`}
           >
             <div className="flex flex-col items-center gap-2">
-              <Link
-                to={applet.path}
-                className="h-16 w-16 md:h-20 md:w-20 shadow-account-card bg-surface-primary-red hover:bg-surface-secondary-red transition-all rounded-xl p-[10px]"
-              >
-                <Image src={applet.img} alt={applet.title} className="w-full h-full" />
-              </Link>
+              {applet.isDisabled ? (
+                <button
+                  type="button"
+                  aria-label={applet.title}
+                  disabled
+                  className="h-16 w-16 cursor-not-allowed rounded-xl bg-surface-disabled-gray p-[10px] shadow-account-card md:h-20 md:w-20"
+                >
+                  <Image src={applet.img} alt="" className="h-full w-full grayscale opacity-50" />
+                </button>
+              ) : (
+                <Link
+                  to={applet.path}
+                  className="h-16 w-16 md:h-20 md:w-20 shadow-account-card bg-surface-primary-red hover:bg-surface-secondary-red transition-all rounded-xl p-[10px]"
+                >
+                  <Image src={applet.img} alt={applet.title} className="w-full h-full" />
+                </Link>
+              )}
               <div className="md:w-[5rem] h-[36.41px] relative">
-                <p className="text-sm font-bold text-center">{applet.title}</p>
+                <p
+                  className={twMerge(
+                    "text-center text-sm font-bold",
+                    applet.isDisabled && "text-fg-disabled",
+                  )}
+                >
+                  {applet.title}
+                </p>
               </div>
             </div>
           </div>

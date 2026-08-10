@@ -21,11 +21,15 @@ describe("WindingDown", () => {
     vi.clearAllMocks();
   });
 
-  it("renders the winding-down notice and timeline link", () => {
+  it("renders the shutdown notice and announcement link", () => {
     render(<WindingDown />);
 
-    expect(screen.getByRole("heading", { name: m["announcement.title"]() })).toBeInTheDocument();
-    expect(screen.getByText(m["announcement.windingDown"](), { exact: false })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: m["announcement.title"]() })).toHaveTextContent(
+      m["announcement.title"](),
+    );
+    expect(screen.getByText(m["announcement.windingDown"](), { exact: false })).toHaveTextContent(
+      `${m["announcement.windingDown"]()} ${m["announcement.readMore"]()}.`,
+    );
     expect(screen.getByRole("link", { name: m["announcement.readMore"]() })).toHaveAttribute(
       "href",
       announcementUrl,

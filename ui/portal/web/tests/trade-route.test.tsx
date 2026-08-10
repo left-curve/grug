@@ -112,21 +112,7 @@ vi.mock("~/components/dex/components/ProTrade", () => {
 
 type TradeRoute = {
   options: {
-    beforeLoad: (args: {
-      context: {
-        client: {
-          getPerpsPairParam: ReturnType<typeof vi.fn>;
-        };
-        config: {
-          chain: {
-            name: string;
-          };
-        };
-      };
-      params: {
-        ticker: string;
-      };
-    }) => Promise<void>;
+    beforeLoad: () => Promise<void>;
     validateSearch: {
       parse: (search: unknown) => {
         action: "buy" | "sell";
@@ -138,15 +124,7 @@ type TradeRoute = {
 
 type TradeIndexRoute = {
   options: {
-    beforeLoad: (args: {
-      context: {
-        config: {
-          chain: {
-            name: string;
-          };
-        };
-      };
-    }) => Promise<void>;
+    beforeLoad: () => Promise<void>;
   };
 };
 
@@ -187,23 +165,6 @@ async function loadTradeIndexRoute() {
   return tradeIndexRoutePromise;
 }
 
-function createRouteContext({
-  getPerpsPairParam = vi.fn().mockResolvedValue({ pairId: "perp/btcusd" }),
-}: {
-  getPerpsPairParam?: ReturnType<typeof vi.fn>;
-} = {}) {
-  return {
-    client: {
-      getPerpsPairParam,
-    },
-    config: {
-      chain: {
-        name: "Mainnet",
-      },
-    },
-  };
-}
-
 function setLazyRouteState({
   ticker = "ETHUSD",
   search = {},
@@ -240,88 +201,17 @@ describe("trade routes", () => {
     setLazyRouteState();
   });
 
-  it("keeps a backend-confirmed normalized pair on the trade pair route", async () => {
+  it("redirects the trade pair route to the exchange shutdown notice", async () => {
     const Route = await loadTradeRoute();
-    const getPerpsPairParam = vi.fn().mockResolvedValue({ pairId: "perp/ethusd" });
 
-    await expect(
-      Route.options.beforeLoad({
-        context: createRouteContext({ getPerpsPairParam }),
-        params: {
-          ticker: "ETHUSD",
-        },
-      }),
-    ).resolves.toBeUndefined();
-
-    expect(getPerpsPairParam).toHaveBeenCalledWith({
-      pairId: "perp/ethusd",
-    });
-    expect(routeMocks.redirect).not.toHaveBeenCalled();
-  });
-
-  it("normalizes cataloged pair ticker casing before asking the backend for pair params", async () => {
-    const Route = await loadTradeRoute();
-    const getPerpsPairParam = vi.fn();
-
-    const redirect = await expectRedirect(
-      Route.options.beforeLoad({
-        context: createRouteContext({ getPerpsPairParam }),
-        params: {
-          ticker: "ethusd",
-        },
-      }),
-    );
+    const redirect = await expectRedirect(Route.options.beforeLoad());
 
     expect(redirect.options).toEqual({
-      params: {
-        ticker: "ETHUSD",
+      replace: true,
+      search: {
+        notice: "exchange-shutdown",
       },
-      to: "/trade/$ticker",
-    });
-    expect(getPerpsPairParam).not.toHaveBeenCalled();
-  });
-
-  it("falls back to the route default when the pair route is malformed", async () => {
-    const Route = await loadTradeRoute();
-    const getPerpsPairParam = vi.fn();
-
-    const redirect = await expectRedirect(
-      Route.options.beforeLoad({
-        context: createRouteContext({ getPerpsPairParam }),
-        params: {
-          ticker: "ETHUSD-EXTRA",
-        },
-      }),
-    );
-
-    expect(redirect.options).toEqual({
-      params: {
-        ticker: "BTCUSD",
-      },
-      to: "/trade/$ticker",
-    });
-    expect(getPerpsPairParam).not.toHaveBeenCalled();
-  });
-
-  it("falls back to the route default without querying the backend when the ticker is uncataloged", async () => {
-    const Route = await loadTradeRoute();
-    const getPerpsPairParam = vi.fn();
-
-    const redirect = await expectRedirect(
-      Route.options.beforeLoad({
-        context: createRouteContext({ getPerpsPairParam }),
-        params: {
-          ticker: "DOGE-USD",
-        },
-      }),
-    );
-
-    expect(getPerpsPairParam).not.toHaveBeenCalled();
-    expect(redirect.options).toEqual({
-      params: {
-        ticker: "BTCUSD",
-      },
-      to: "/trade/$ticker",
+      to: "/",
     });
   });
 
@@ -344,26 +234,17 @@ describe("trade routes", () => {
     expect(() => Route.options.validateSearch.parse({ action: "close" })).toThrow();
   });
 
-  it("redirects the trade index route to the route default pair", async () => {
+  it("redirects the trade index route to the exchange shutdown notice", async () => {
     const Route = await loadTradeIndexRoute();
 
-    const redirect = await expectRedirect(
-      Route.options.beforeLoad({
-        context: {
-          config: {
-            chain: {
-              name: "Devnet",
-            },
-          },
-        },
-      }),
-    );
+    const redirect = await expectRedirect(Route.options.beforeLoad());
 
     expect(redirect.options).toEqual({
-      params: {
-        ticker: "BTCUSD",
+      replace: true,
+      search: {
+        notice: "exchange-shutdown",
       },
-      to: "/trade/$ticker",
+      to: "/",
     });
   });
 

@@ -5,4 +5,5 @@ export type AppletMetadata = {
   keywords: string[];
   description: string;
   path: string;
+  isDisabled?: boolean;
 };

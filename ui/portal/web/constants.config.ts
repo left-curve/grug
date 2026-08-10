@@ -21,6 +21,16 @@ export const PERPS_DEFAULT_SLIPPAGE = "0.005";
 /** 14-day lookback window (in seconds), matching the backend VOLUME_LOOKBACK. */
 export const FEE_VOLUME_LOOKBACK_SECONDS = 14 * 24 * 60 * 60;
 
+export const EXCHANGE_SHUTDOWN_NOTICE = "exchange-shutdown" as const;
+
+export const EXCHANGE_SHUTDOWN_REDIRECT = {
+  replace: true,
+  search: { notice: EXCHANGE_SHUTDOWN_NOTICE },
+  to: "/",
+} as const;
+
+const DISABLED_APPLET_IDS = new Set(["earn", "trade"]);
+
 const translations = m as unknown as Record<string, () => string>;
 export const APPLETS: Record<string, AppletMetadata> = Object.keys(translations)
   .filter((k) => /^applets\..*\.id$/.test(k))
@@ -33,6 +43,7 @@ export const APPLETS: Record<string, AppletMetadata> = Object.keys(translations)
       img: translations[`applets.${id}.img`](),
       keywords: translations[`applets.${id}.keywords`]().split(","),
       path: translations[`applets.${id}.path`](),
+      isDisabled: DISABLED_APPLET_IDS.has(id),
     };
     return acc;
   }, Object.create({}));

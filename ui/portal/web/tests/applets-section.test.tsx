@@ -9,7 +9,7 @@ import { APPLETS } from "../constants.config";
 import { AppletsSection } from "../src/components/landing/AppletsSection";
 
 const appletsSectionMocks = vi.hoisted(() => ({
-  favApplets: ["trade", "missing-applet", "transfer"] as string[],
+  favApplets: ["trade", "earn", "missing-applet", "transfer"] as string[],
   setSearchBarVisibility: vi.fn(),
 }));
 
@@ -41,7 +41,7 @@ vi.mock("@left-curve/store", () => ({
 describe("applets section", () => {
   beforeEach(() => {
     resetAppletsKitMocks();
-    appletsSectionMocks.favApplets = ["trade", "missing-applet", "transfer"];
+    appletsSectionMocks.favApplets = ["trade", "earn", "missing-applet", "transfer"];
     setAppletsKitUseApp({
       setSearchBarVisibility: appletsSectionMocks.setSearchBarVisibility,
     });
@@ -52,14 +52,23 @@ describe("applets section", () => {
     vi.clearAllMocks();
   });
 
-  it("renders known favorite applets from metadata and ignores stale favorite ids", () => {
+  it("disables shutdown applets while keeping other favorite applets navigable", () => {
     render(<AppletsSection />);
 
     const trade = APPLETS.trade;
+    const earn = APPLETS.earn;
     const transfer = APPLETS.transfer;
 
-    expect(screen.getByRole("link", { name: trade.title })).toHaveAttribute("href", trade.path);
-    expect(screen.getByAltText(trade.title)).toHaveAttribute("src", trade.img);
+    expect(trade.isDisabled).toBe(true);
+    expect(earn.isDisabled).toBe(true);
+    expect(transfer.isDisabled).toBe(false);
+    expect(screen.getByRole("button", { name: trade.title })).toBeDisabled();
+    expect(screen.getByRole("button", { name: earn.title })).toBeDisabled();
+    expect(screen.queryByRole("link", { name: trade.title })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: earn.title })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: trade.title }).querySelector("img")).toHaveClass(
+      "grayscale",
+    );
     expect(screen.getByText(trade.title)).toBeInTheDocument();
 
     expect(screen.getByRole("link", { name: transfer.title })).toHaveAttribute(
@@ -74,7 +83,11 @@ describe("applets section", () => {
   it("opens the search bar from the add applet tile", () => {
     render(<AppletsSection />);
 
-    const addButton = screen.getByRole("button");
+    const addButton = screen
+      .getAllByRole("button")
+      .find((button) => !button.hasAttribute("disabled"));
+    expect(addButton).toBeDefined();
+    if (!addButton) throw new Error("Expected an enabled add applet button");
     fireEvent.click(addButton);
 
     expect(appletsSectionMocks.setSearchBarVisibility).toHaveBeenCalledWith(true);

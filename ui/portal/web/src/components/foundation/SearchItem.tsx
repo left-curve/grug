@@ -1,4 +1,9 @@
-import { AddressVisualizer, StarToggleButton, useMediaQuery } from "@left-curve/applets-kit";
+import {
+  AddressVisualizer,
+  StarToggleButton,
+  twMerge,
+  useMediaQuery,
+} from "@left-curve/applets-kit";
 import { useFavApplets } from "@left-curve/store";
 
 import { TruncateText } from "@left-curve/applets-kit";
@@ -21,27 +26,49 @@ const Root: React.FC<PropsWithChildren> = ({ children }) => {
 type SearchAppletItemProps = AppletMetadata;
 
 const AppletItem: React.FC<SearchAppletItemProps> = (applet) => {
-  const { id, title, description, img } = applet;
+  const { id, title, description, img, isDisabled } = applet;
   const { favApplets, addFavApplet, removeFavApplet } = useFavApplets();
   const isFav = favApplets.includes(id);
 
   return (
     <motion.div
-      className="w-full p-2 flex items-center justify-between hover:bg-surface-tertiary-rice rounded-xs group-data-[selected=true]:bg-surface-tertiary-rice cursor-pointer"
+      aria-disabled={isDisabled || undefined}
+      className={twMerge(
+        "w-full p-2 flex items-center justify-between rounded-xs",
+        isDisabled
+          ? "cursor-not-allowed text-fg-disabled"
+          : "cursor-pointer hover:bg-surface-tertiary-rice group-data-[selected=true]:bg-surface-tertiary-rice",
+      )}
       variants={childVariants}
       key={title}
     >
       <div className="flex items-center gap-4">
-        <div className="p-1 bg-surface-primary-red rounded-xxs border border-surface-secondary-red">
-          <Image src={img} alt={title} className="w-12 h-12" />
+        <div
+          className={twMerge(
+            "rounded-xxs border p-1",
+            isDisabled
+              ? "border-outline-secondary-gray bg-surface-disabled-gray"
+              : "border-surface-secondary-red bg-surface-primary-red",
+          )}
+        >
+          <Image
+            src={img}
+            alt={title}
+            className={twMerge("h-12 w-12", isDisabled && "grayscale opacity-50")}
+          />
         </div>
         <div>
-          <p className="diatype-lg-medium text-ink-secondary-700">{title}</p>
-          <p className="diatype-m-regular text-ink-tertiary-500">{description}</p>
+          <p className={twMerge("diatype-lg-medium", !isDisabled && "text-ink-secondary-700")}>
+            {title}
+          </p>
+          <p className={twMerge("diatype-m-regular", !isDisabled && "text-ink-tertiary-500")}>
+            {description}
+          </p>
         </div>
       </div>
       <StarToggleButton
         isActive={isFav}
+        isDisabled={isDisabled}
         onToggle={() => (isFav ? removeFavApplet(applet) : addFavApplet(applet))}
         className="w-6 h-6 text-primitives-rice-light-500"
       />
