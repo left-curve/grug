@@ -774,9 +774,18 @@ jobs:
     needs: [backend-build, changes]
     env:
       BACKEND_CHANGED: ${{ needs.changes.outputs.backend }}
+      # `docker manifest` is still an experimental CLI command. The
+      # self-hosted runner had it enabled in its own Docker config; a hosted
+      # runner does not, and the whole job turns on that one command.
+      DOCKER_CLI_EXPERIMENTAL: enabled
     outputs:
       published: ${{ steps.publish-status.outputs.published }}
-    runs-on: [self-hosted]
+    # The bare `:<sha>` tag this job creates is what the release recipes pin
+    # as `dango_image_tag`; `backend-build` only pushes `:<sha>-amd64`. Keyless
+    # cosign signing works here through the job's `id-token: write` permission
+    # and GitHub's OIDC issuer, which is the same on a hosted runner.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Skip backend manifest publish (no backend changes)
         if: env.BACKEND_CHANGED != 'true'
