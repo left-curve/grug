@@ -1,5 +1,7 @@
 use {
-    crate::{BALANCES, METADATAS, NAMESPACE_OWNERS, ORPHANED_TRANSFERS, SUPPLIES},
+    crate::{
+        BALANCES, METADATAS, NAMESPACE_OWNERS, ORPHANED_TRANSFERS, SUPPLIES, transfers_enabled,
+    },
     dango_math::{NumberConst, Uint128},
     dango_primitives::{
         Addr, BankQuery, BankQueryResponse, Bound, Coin, Coins, DEFAULT_PAGE_LIMIT, Denom,
@@ -55,7 +57,15 @@ pub fn query(ctx: ImmutableCtx, msg: QueryMsg) -> StdResult<Json> {
             let res = query_orphaned_transfers_by_recipient(ctx, recipient, start_after, limit)?;
             res.to_json_value()
         },
+        QueryMsg::TransfersEnabled {} => {
+            let res = query_transfers_enabled(ctx)?;
+            res.to_json_value()
+        },
     }
+}
+
+fn query_transfers_enabled(ctx: ImmutableCtx) -> StdResult<bool> {
+    transfers_enabled(ctx.storage)
 }
 
 fn query_namespace_owner(ctx: ImmutableCtx, namespace: Part) -> StdResult<Addr> {

@@ -1,9 +1,16 @@
 use {
     dango_math::Uint128,
     dango_primitives::{Addr, Coins, Denom, Part},
-    dango_storage::{IndexedMap, Map, MultiIndex},
+    dango_storage::{IndexedMap, Item, Map, MultiIndex},
     dango_types::bank::Metadata,
 };
+
+/// Whether token transfers are enabled.
+///
+/// An absent value means enabled. Chains that were created before the
+/// wind-down therefore keep working without a genesis change or a migration of
+/// this item; only the wind-down upgrade ever writes it.
+pub const TRANSFERS_ENABLED: Item<bool> = Item::new("transfers_enabled");
 
 pub const NAMESPACE_OWNERS: Map<&Part, Addr> = Map::new("namespace_owner");
 

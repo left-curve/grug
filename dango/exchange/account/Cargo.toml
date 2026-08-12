@@ -12,5 +12,6 @@ version       = { workspace = true }
 [dependencies]
 anyhow           = { workspace = true }
 dango-auth       = { workspace = true }
+dango-math       = { workspace = true }
 dango-primitives = { workspace = true }
 dango-types      = { workspace = true }

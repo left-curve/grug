@@ -38,6 +38,7 @@ The bank contract manages all token balances, transfers, mints, and burns.
 | `SUPPLIES`           | `Denom`                | `Uint128`  | Total supply per denom                          |
 | `BALANCES`           | `(Addr, Denom)`        | `Uint128`  | Account balances                                |
 | `ORPHANED_TRANSFERS` | `(Addr, Addr)`         | `Coins`    | Dead-letter transfers to non-existent contracts |
+| `TRANSFERS_ENABLED`  | --                     | `bool`     | Whether transfers are allowed; absent = allowed |
 
 ### Operations
 
@@ -48,6 +49,30 @@ The bank contract manages all token balances, transfers, mints, and burns.
 - **Burn.** `Burn { from, coins }` -- caller must be the namespace owner.
 - **Force transfer.** `ForceTransfer { from, to, coins }` -- namespace owner can
   move funds arbitrarily. Used by the perps contract to settle PnL.
+- **Set transfers enabled.** `SetTransfersEnabled(bool)` -- chain owner only.
+
+### Disabling transfers
+
+Every balance movement caused by a transfer passes through `bank_execute`: the
+`Transfer` message, the funds attached to an `Execute` or `Instantiate` message,
+and the gas fee withheld by the state machine. That makes it the one place where
+transfers can be switched off, which the wind-down does.
+
+While disabled, a transfer goes through only if it satisfies both conditions:
+
+1. The sender or the recipient is the gateway contract, or the recipient is the
+   chain owner. The first two cover bridge deposits, withdrawals, and refunds;
+   the third covers the gas fee.
+2. The recipient exists. No new orphaned transfer may be created, even on an
+   allowed leg, or a bridge deposit to an account that was never created would
+   strand tokens in the bank again.
+
+`mint` carries the same recipient check, since it has its own orphan branch.
+`burn` and `RecoverTransfer` are not gated: neither can strand funds once the
+map is empty and no new entry can be created.
+
+An absent `TRANSFERS_ENABLED` means enabled, so a chain created before the
+wind-down needs no genesis change and no migration of this item.
 
 ### Access control
 
@@ -124,6 +149,24 @@ When the host receives a transaction, it calls the sender account's `authenticat
 3. Verify the nonce is valid (not seen, not too far ahead).
 4. Verify the signature against the signing key registered in the factory.
 5. Return `Response`.
+
+### Operations
+
+- **Force withdrawal.** `ForceWithdrawal { denom, remote, recipient }` -- chain
+  owner only. Sends the account's entire balance of `denom` to `recipient` on the
+  remote chain, by calling the gateway's `TransferRemote` with the balance
+  attached.
+
+  This exists for the wind-down: balances left behind by users who don't withdraw
+  before the shutdown are returned to the address they deposited from, which the
+  owner supplies as `recipient`. It carries no privilege inside the gateway --
+  routes, reserves, fees, personal quotas, and rate limits all apply as they
+  would to a withdrawal the user makes themselves, and the resulting withdrawal
+  request still needs the guardian's or the owner's approval.
+
+  It works on an `Inactive` account. The account is not the transaction sender,
+  so `authenticate` is never involved, and funds attached to an `Execute`
+  message skip the recipient's `receive` hook.
 
 ## 5. Gas fees
 
