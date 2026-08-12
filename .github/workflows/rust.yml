@@ -508,16 +508,22 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Each arch builds on a runner of its own architecture, so nothing
-        # runs under emulation. `Set build config` below already branches on
-        # `runner.arch`: it picks `native-builder:amd64` on X64, and
-        # `cross-builder-arm64` on ARM64, which `docker/docker-bake.hcl`
-        # publishes for linux/arm64 as well as linux/amd64.
+        # amd64 only. Every host we deploy to is x86, so the arm64 image
+        # served only the local ci-stack on Apple Silicon, and it is not
+        # worth carrying through the shutdown.
+        #
+        # Building it on `ubuntu-24.04-arm` does not work as things stand:
+        # `Set build config` picks `cross-builder-arm64` there, and the image
+        # published under that name holds x86-64 binaries, so the container
+        # dies with `exec /usr/bin/sh: exec format error`. On the old X64
+        # self-hosted runners that went unnoticed, because an amd64 container
+        # cross-compiling to aarch64 is exactly what it is for. Note that
+        # `docker/docker-bake.hcl` declares both platforms for that image --
+        # the copy in the registry does not match the declaration. Republish
+        # it before trusting the arm64 path again.
         include:
           - arch: amd64
             runner: ubuntu-latest
-          - arch: arm64
-            runner: ubuntu-24.04-arm
     name: Build backend for ${{ matrix.arch }} on ${{ matrix.runner }}
     runs-on: ${{ matrix.runner }}
     env:
@@ -804,22 +810,21 @@ jobs:
           for image in \
             ghcr.io/left-curve/left-curve/dango \
             ghcr.io/left-curve/left-curve/archive; do
+            # amd64 only, matching the build matrix. Amending a tag that is
+            # never pushed fails the whole step.
             docker manifest create $image:$GIT_COMMIT \
-              --amend $image:$GIT_COMMIT-amd64 \
-              --amend $image:$GIT_COMMIT-arm64
+              --amend $image:$GIT_COMMIT-amd64
             docker manifest push --purge $image:$GIT_COMMIT
 
             if [ "$GIT_REF" == "refs/heads/main" ]; then
               docker manifest create $image:latest \
-                --amend $image:$GIT_COMMIT-amd64 \
-                --amend $image:$GIT_COMMIT-arm64
+                --amend $image:$GIT_COMMIT-amd64
               docker manifest push --purge $image:latest
             fi
 
             if [ "$EVENT_NAME" == "pull_request" ]; then
               docker manifest create $image:pr-$PR_NUMBER-latest \
-                --amend $image:$GIT_COMMIT-amd64 \
-                --amend $image:$GIT_COMMIT-arm64
+                --amend $image:$GIT_COMMIT-amd64
               docker manifest push --purge $image:pr-$PR_NUMBER-latest
             fi
           done
@@ -911,7 +916,7 @@ jobs:
             echo "| **Latest tag:** | [ghcr.io/left-curve/left-curve/dango:latest](https://github.com/left-curve/left-curve/pkgs/container/left-curve%2Fdango) |" >> $GITHUB_STEP_SUMMARY
             echo "| **Indexer latest tag:** | [ghcr.io/left-curve/left-curve/archive:latest](https://github.com/left-curve/left-curve/pkgs/container/left-curve%2Farchive) |" >> $GITHUB_STEP_SUMMARY
           fi
-          echo "| **Architectures** | amd64, arm64 |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Architectures** | amd64 |" >> $GITHUB_STEP_SUMMARY
           if [ -n "$DIGEST_TABLE" ]; then
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "## 🔏 Signed Image Digests" >> $GITHUB_STEP_SUMMARY
