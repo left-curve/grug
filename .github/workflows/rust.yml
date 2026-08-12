@@ -280,7 +280,8 @@ jobs:
     # The self-hosted runner kept `target/` and `~/.cargo` between runs, so 20
     # minutes covered an incremental build. A hosted runner starts cold, has 4
     # cores instead of 24, and this job compiles the workspace twice over: once
-    # for clippy, once instrumented for coverage.
+    # for clippy, once instrumented for coverage. Measured at 35 and 38 minutes
+    # across two runs.
     timeout-minutes: 180
     environment: ci
     permissions:
@@ -344,21 +345,6 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ github.head_ref || github.ref }}
-
-      - name: Free disk space
-        if: env.BACKEND_CHANGED == 'true'
-        run: |
-          # A cold build of this workspace needs more room than the hosted
-          # image leaves free. None of these preinstalled toolchains are used
-          # by this workflow.
-          df -h /
-          sudo rm -rf \
-            /usr/share/dotnet \
-            /usr/local/lib/android \
-            /opt/ghc \
-            /usr/local/share/boost \
-            /opt/hostedtoolcache/CodeQL
-          df -h /
 
       - name: Start PostgreSQL with increased max_connections
         if: env.BACKEND_CHANGED == 'true'
@@ -630,20 +616,24 @@ jobs:
               exit 1
           fi
 
-      - name: Free disk space
+      - name: Add swap
         if: env.BACKEND_CHANGED == 'true'
         run: |
-          # A cold build of this workspace needs more room than the hosted
-          # image leaves free. None of these preinstalled toolchains are used
-          # by this workflow.
+          # Linking `dango` with `lto = true`, `codegen-units = 1` and
+          # `-C debuginfo=2` needs more than the 16 GB a standard hosted
+          # runner has, and rustc is SIGKILLed part-way through. Swap lets
+          # that one step spill instead of dying. The build is slower for it,
+          # but the binary is identical -- the alternatives all mean shipping
+          # something built differently from what we have been shipping.
+          free -h
           df -h /
-          sudo rm -rf \
-            /usr/share/dotnet \
-            /usr/local/lib/android \
-            /opt/ghc \
-            /usr/local/share/boost \
-            /opt/hostedtoolcache/CodeQL
-          df -h /
+          sudo swapoff -a || true
+          sudo rm -f /swapfile /mnt/swapfile
+          sudo fallocate -l 24G /mnt/swapfile
+          sudo chmod 600 /mnt/swapfile
+          sudo mkswap /mnt/swapfile
+          sudo swapon /mnt/swapfile
+          free -h
 
       - name: Install toolchain
         if: env.BACKEND_CHANGED == 'true'
