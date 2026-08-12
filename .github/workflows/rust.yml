@@ -157,7 +157,7 @@ jobs:
   format:
     name: Format
     needs: [changes, zizmor]
-    runs-on: [self-hosted]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     env:
@@ -276,8 +276,12 @@ jobs:
   backend-test:
     needs: [format, changes]
     name: Lint + Test
-    runs-on: self-hosted
-    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    # The self-hosted runner kept `target/` and `~/.cargo` between runs, so 20
+    # minutes covered an incremental build. A hosted runner starts cold, has 4
+    # cores instead of 24, and this job compiles the workspace twice over: once
+    # for clippy, once instrumented for coverage.
+    timeout-minutes: 180
     environment: ci
     permissions:
       id-token: write
@@ -340,6 +344,21 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ github.head_ref || github.ref }}
+
+      - name: Free disk space
+        if: env.BACKEND_CHANGED == 'true'
+        run: |
+          # A cold build of this workspace needs more room than the hosted
+          # image leaves free. None of these preinstalled toolchains are used
+          # by this workflow.
+          df -h /
+          sudo rm -rf \
+            /usr/share/dotnet \
+            /usr/local/lib/android \
+            /opt/ghc \
+            /usr/local/share/boost \
+            /opt/hostedtoolcache/CodeQL
+          df -h /
 
       - name: Start PostgreSQL with increased max_connections
         if: env.BACKEND_CHANGED == 'true'
@@ -481,17 +500,25 @@ jobs:
   backend-build:
     needs: [backend-test, changes]
     environment: ci
-    timeout-minutes: 20
+    # A cold `cross build --release` with `lto = true` and
+    # `codegen-units = 1`, on 4 cores instead of 24. The LTO stage barely
+    # parallelizes, so this is far more than a 6x slowdown on the old
+    # 20-minute budget.
+    timeout-minutes: 240
     strategy:
       fail-fast: false
       matrix:
-        arch: [amd64, arm64]
-        runner:
-          [self-hosted]
-          # when needing to try on all runner types
-          # - [self-hosted, Linux]
-          # - [self-hosted, macOS]
-    name: Build backend for ${{ matrix.arch }} on ${{ join(matrix.runner, ', ') }}
+        # Each arch builds on a runner of its own architecture, so nothing
+        # runs under emulation. `Set build config` below already branches on
+        # `runner.arch`: it picks `native-builder:amd64` on X64, and
+        # `cross-builder-arm64` on ARM64, which `docker/docker-bake.hcl`
+        # publishes for linux/arm64 as well as linux/amd64.
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    name: Build backend for ${{ matrix.arch }} on ${{ matrix.runner }}
     runs-on: ${{ matrix.runner }}
     env:
       BACKEND_CHANGED: ${{ needs.changes.outputs.backend }}
@@ -596,6 +623,21 @@ jobs:
               echo "Unsupported matrix $MATRIX_ARCH"
               exit 1
           fi
+
+      - name: Free disk space
+        if: env.BACKEND_CHANGED == 'true'
+        run: |
+          # A cold build of this workspace needs more room than the hosted
+          # image leaves free. None of these preinstalled toolchains are used
+          # by this workflow.
+          df -h /
+          sudo rm -rf \
+            /usr/share/dotnet \
+            /usr/local/lib/android \
+            /opt/ghc \
+            /usr/local/share/boost \
+            /opt/hostedtoolcache/CodeQL
+          df -h /
 
       - name: Install toolchain
         if: env.BACKEND_CHANGED == 'true'
