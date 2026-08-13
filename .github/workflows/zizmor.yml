@@ -9,6 +9,9 @@ permissions: {}
 on:
   workflow_call:
 
+env:
+  ZIZMOR_VERSION: "1.20.0"
+
 jobs:
   zizmor:
     name: Audit GitHub Actions
@@ -34,7 +37,14 @@ jobs:
           version: "0.11.29"
       - name: Run zizmor (SARIF)
         if: always()
-        run: uvx zizmor --config .github/zizmor.yml --format=sarif .github/workflows/ > results.sarif
+        # Pin zizmor for the same reason uv is pinned above: left unpinned,
+        # `uvx` takes whatever is newest at run time, so a release that adds
+        # an audit turns this gate red without anything in the repo changing.
+        # 1.24.0 added `ref-version-mismatch`, which flags all 39 of our hash
+        # pins whose trailing version comment is coarser than the tag the
+        # commit belongs to (`# v4` against a commit tagged v4.3.1). To
+        # unpin, correct those comments first, then raise this version.
+        run: uvx zizmor@${{ env.ZIZMOR_VERSION }} --config .github/zizmor.yml --format=sarif .github/workflows/ > results.sarif
       - name: Upload SARIF
         if: always()
         uses: github/codeql-action/upload-sarif@cdefb33c0f6224e58673d9004f47f7cb3e328b89 # v4.31.10
@@ -42,4 +52,4 @@ jobs:
           sarif_file: results.sarif
           category: zizmor
       - name: Run zizmor (audit)
-        run: uvx zizmor --config .github/zizmor.yml .github/workflows/
+        run: uvx zizmor@${{ env.ZIZMOR_VERSION }} --config .github/zizmor.yml .github/workflows/

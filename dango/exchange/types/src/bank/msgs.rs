@@ -42,6 +42,13 @@ pub enum ExecuteMsg {
     /// Retrieve funds sent to a non-existing recipient.
     /// Can only be called by the transfer's sender, recipient, or the chain owner.
     RecoverTransfer { sender: Addr, recipient: Addr },
+    /// Enable or disable token transfers.
+    /// Can only be called by the chain owner.
+    ///
+    /// While disabled, the only transfers that go through are those to or from
+    /// the gateway contract, and those to the chain owner. See the comments on
+    /// `bank_execute` for why.
+    SetTransfersEnabled(bool),
 }
 
 #[dango_primitives::derive(Serde, QueryRequest)]
@@ -87,6 +94,9 @@ pub enum QueryMsg {
         start_after: Option<Addr>,
         limit: Option<u32>,
     },
+    /// Query whether token transfers are enabled.
+    #[returns(bool)]
+    TransfersEnabled {},
 }
 
 #[dango_primitives::derive(Serde)]

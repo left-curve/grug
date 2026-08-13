@@ -157,7 +157,7 @@ jobs:
   format:
     name: Format
     needs: [changes, zizmor]
-    runs-on: [self-hosted]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     env:
@@ -276,8 +276,13 @@ jobs:
   backend-test:
     needs: [format, changes]
     name: Lint + Test
-    runs-on: self-hosted
-    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    # The self-hosted runner kept `target/` and `~/.cargo` between runs, so 20
+    # minutes covered an incremental build. A hosted runner starts cold, has 4
+    # cores instead of 24, and this job compiles the workspace twice over: once
+    # for clippy, once instrumented for coverage. Measured at 35 and 38 minutes
+    # across two runs.
+    timeout-minutes: 180
     environment: ci
     permissions:
       id-token: write
@@ -481,17 +486,31 @@ jobs:
   backend-build:
     needs: [backend-test, changes]
     environment: ci
-    timeout-minutes: 20
+    # A cold `cross build --release` with `lto = true` and
+    # `codegen-units = 1`, on 4 cores instead of 24. The LTO stage barely
+    # parallelizes, so this is far more than a 6x slowdown on the old
+    # 20-minute budget.
+    timeout-minutes: 240
     strategy:
       fail-fast: false
       matrix:
-        arch: [amd64, arm64]
-        runner:
-          [self-hosted]
-          # when needing to try on all runner types
-          # - [self-hosted, Linux]
-          # - [self-hosted, macOS]
-    name: Build backend for ${{ matrix.arch }} on ${{ join(matrix.runner, ', ') }}
+        # amd64 only. Every host we deploy to is x86, so the arm64 image
+        # served only the local ci-stack on Apple Silicon, and it is not
+        # worth carrying through the shutdown.
+        #
+        # Building it on `ubuntu-24.04-arm` does not work as things stand:
+        # `Set build config` picks `cross-builder-arm64` there, and the image
+        # published under that name holds x86-64 binaries, so the container
+        # dies with `exec /usr/bin/sh: exec format error`. On the old X64
+        # self-hosted runners that went unnoticed, because an amd64 container
+        # cross-compiling to aarch64 is exactly what it is for. Note that
+        # `docker/docker-bake.hcl` declares both platforms for that image --
+        # the copy in the registry does not match the declaration. Republish
+        # it before trusting the arm64 path again.
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+    name: Build backend for ${{ matrix.arch }} on ${{ matrix.runner }}
     runs-on: ${{ matrix.runner }}
     env:
       BACKEND_CHANGED: ${{ needs.changes.outputs.backend }}
@@ -596,6 +615,25 @@ jobs:
               echo "Unsupported matrix $MATRIX_ARCH"
               exit 1
           fi
+
+      - name: Add swap
+        if: env.BACKEND_CHANGED == 'true'
+        run: |
+          # Linking `dango` with `lto = true`, `codegen-units = 1` and
+          # `-C debuginfo=2` needs more than the 16 GB a standard hosted
+          # runner has, and rustc is SIGKILLed part-way through. Swap lets
+          # that one step spill instead of dying. The build is slower for it,
+          # but the binary is identical -- the alternatives all mean shipping
+          # something built differently from what we have been shipping.
+          free -h
+          df -h /
+          sudo swapoff -a || true
+          sudo rm -f /swapfile /mnt/swapfile
+          sudo fallocate -l 24G /mnt/swapfile
+          sudo chmod 600 /mnt/swapfile
+          sudo mkswap /mnt/swapfile
+          sudo swapon /mnt/swapfile
+          free -h
 
       - name: Install toolchain
         if: env.BACKEND_CHANGED == 'true'
@@ -736,9 +774,18 @@ jobs:
     needs: [backend-build, changes]
     env:
       BACKEND_CHANGED: ${{ needs.changes.outputs.backend }}
+      # `docker manifest` is still an experimental CLI command. The
+      # self-hosted runner had it enabled in its own Docker config; a hosted
+      # runner does not, and the whole job turns on that one command.
+      DOCKER_CLI_EXPERIMENTAL: enabled
     outputs:
       published: ${{ steps.publish-status.outputs.published }}
-    runs-on: [self-hosted]
+    # The bare `:<sha>` tag this job creates is what the release recipes pin
+    # as `dango_image_tag`; `backend-build` only pushes `:<sha>-amd64`. Keyless
+    # cosign signing works here through the job's `id-token: write` permission
+    # and GitHub's OIDC issuer, which is the same on a hosted runner.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Skip backend manifest publish (no backend changes)
         if: env.BACKEND_CHANGED != 'true'
@@ -762,22 +809,21 @@ jobs:
           for image in \
             ghcr.io/left-curve/left-curve/dango \
             ghcr.io/left-curve/left-curve/archive; do
+            # amd64 only, matching the build matrix. Amending a tag that is
+            # never pushed fails the whole step.
             docker manifest create $image:$GIT_COMMIT \
-              --amend $image:$GIT_COMMIT-amd64 \
-              --amend $image:$GIT_COMMIT-arm64
+              --amend $image:$GIT_COMMIT-amd64
             docker manifest push --purge $image:$GIT_COMMIT
 
             if [ "$GIT_REF" == "refs/heads/main" ]; then
               docker manifest create $image:latest \
-                --amend $image:$GIT_COMMIT-amd64 \
-                --amend $image:$GIT_COMMIT-arm64
+                --amend $image:$GIT_COMMIT-amd64
               docker manifest push --purge $image:latest
             fi
 
             if [ "$EVENT_NAME" == "pull_request" ]; then
               docker manifest create $image:pr-$PR_NUMBER-latest \
-                --amend $image:$GIT_COMMIT-amd64 \
-                --amend $image:$GIT_COMMIT-arm64
+                --amend $image:$GIT_COMMIT-amd64
               docker manifest push --purge $image:pr-$PR_NUMBER-latest
             fi
           done
@@ -869,7 +915,7 @@ jobs:
             echo "| **Latest tag:** | [ghcr.io/left-curve/left-curve/dango:latest](https://github.com/left-curve/left-curve/pkgs/container/left-curve%2Fdango) |" >> $GITHUB_STEP_SUMMARY
             echo "| **Indexer latest tag:** | [ghcr.io/left-curve/left-curve/archive:latest](https://github.com/left-curve/left-curve/pkgs/container/left-curve%2Farchive) |" >> $GITHUB_STEP_SUMMARY
           fi
-          echo "| **Architectures** | amd64, arm64 |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Architectures** | amd64 |" >> $GITHUB_STEP_SUMMARY
           if [ -n "$DIGEST_TABLE" ]; then
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "## 🔏 Signed Image Digests" >> $GITHUB_STEP_SUMMARY

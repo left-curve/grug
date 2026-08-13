@@ -29,7 +29,13 @@ impl GenesisCodes for RustVm {
         }))
         .build();
 
+        // Note: the order of `build()` calls in this function determines each
+        // contract's index in the Rust VM's registry, which is what the chain
+        // stores as its code. Adding an entry point to a builder is therefore
+        // safe for contracts that are already deployed; reordering the calls
+        // is not.
         let account = ContractBuilder::new(Box::new(dango_account::instantiate))
+            .with_execute(Box::new(dango_account::execute))
             .with_authenticate(Box::new(dango_account::authenticate))
             .with_receive(Box::new(dango_account::receive))
             .with_query(Box::new(dango_account::query))
